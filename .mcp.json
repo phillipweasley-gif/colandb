@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "central-ohio-leather-beyond-elementor": {
+      "type": "http",
+      "url": "https://colandb.com/wp-json/elementor/mcp/",
+      "headers": {
+        "Authorization": "Basic ${COLANDB_WP_AUTH}"
+      }
+    }
+  }
+}
