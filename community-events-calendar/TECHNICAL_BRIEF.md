@@ -1,7 +1,7 @@
 # Community Events Calendar — Technical Handoff Brief
 
 **Prepared for:** incoming developer/maintainer
-**Plugin version documented:** 1.25.0 (plus the 1.25.1 timezone-export fix — see the `_cec_timezone` row in Appendix A1 and CHANGELOG 1.25.1)
+**Plugin version documented:** 1.25.0, plus 1.25.1 (timezone-export fix, see the `_cec_timezone` row in Appendix A1) and 1.26.0 (integration API and `CEC_Month_Grid`, see §2a)
 **Codebase reviewed:** full source, read directly from the files in this repository
 **This revision prepared:** October 2026 (supersedes the version of this document dated August 2026 / written against 1.6.2)
 
@@ -93,6 +93,13 @@ As of 1.22.0, the *logic* for saving and displaying the newer Phase 1a fields (a
 - Occurrences are excluded from the wp-admin Events list table (`exclude_occurrences_from_admin_list`) — they're only reachable via the root's "Manage Dates" view.
 - Hard safety cap of 104 generated dates (`MAX_OCCURRENCES`) regardless of rule — roughly 2 years of weekly events.
 - **As of 1.22.0:** when a new occurrence post is generated, `update_series()` copies *every* post meta field from the parent except an explicit skip-list (`$skip_meta` inside `CEC_Recurrence::update_series()`). This means every Phase 1a field (admission status, location mode, timezone, etc.) is copied to new occurrences automatically — you do not need to add anything to this method when you add a new event field, **unless** that new field is something that must never be copied (like the recurrence rule itself, which is already in the skip-list). If in doubt, read the skip-list in that method directly before assuming your new field will or won't be copied.
+
+## 2a. Integration API for other plugins (1.26.0)
+
+The separate member-planning plugin (Phase 2/3) reads events only through these, and this plugin never reads member data:
+
+- `cec_get_public_event( $id )` / `cec_get_public_events( $ids )` (`CEC_Public_API`): allow-listed public fields for a **published** event, `null` otherwise. Do not add editorial or RSVP fields to `CEC_Public_API::FIELDS`. Bump `CEC_PUBLIC_API_VERSION` if a key is removed or changes meaning.
+- `CEC_Month_Grid::render( $month, $year, $items, $options )`: the month-view layout with no query of its own. The public calendar feeds it from `CEC_Shortcodes::render_month_html()`. Any change to the month view's markup now goes in `CEC_Month_Grid`, and affects the member plugin's calendars too.
 
 ## 3. Full feature / shortcode reference
 
