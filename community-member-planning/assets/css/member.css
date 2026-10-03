@@ -1,0 +1,158 @@
+/* Community Member Planning — member area.
+   Reuses the Community Events Calendar's site-wide colour variables
+   (--cec-primary etc., set on :root from Events → Settings) with fallbacks,
+   so the member area matches the calendar. Interactive elements are scoped
+   under .cmp-member-area with !important on their visual properties — the
+   same rule CEC's TECHNICAL_BRIEF §7 makes mandatory, because the site
+   theme styles buttons and links globally with !important. */
+
+.cmp-member-area {
+	--cmp-primary: var(--cec-primary, #c6ff00);
+	--cmp-secondary: var(--cec-secondary, #ff2d95);
+	--cmp-text: var(--cec-text, #f4f2fa);
+	--cmp-card: #1b1826;
+	--cmp-card-alt: #211d2e;
+	--cmp-muted: #a9a6bb;
+	--cmp-border: rgba(255, 255, 255, 0.12);
+	--cmp-error: #ff6b6b;
+	--cmp-radius: 12px;
+	color: var(--cmp-text);
+	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	max-width: 760px;
+	margin: 0 auto;
+	box-sizing: border-box;
+}
+.cmp-member-area *, .cmp-member-area *::before, .cmp-member-area *::after { box-sizing: border-box; }
+
+.cmp-member-area .cmp-step,
+.cmp-member-area .cmp-panel {
+	background: var(--cmp-card);
+	border: 1px solid var(--cmp-border);
+	border-radius: var(--cmp-radius);
+	padding: 24px;
+	margin: 0 0 16px;
+}
+/* A titled sub-section inside a card (e.g. the inbox on the member home). */
+.cmp-member-area .cmp-section { border-top: 1px solid var(--cmp-border); margin-top: 16px; padding-top: 16px; }
+.cmp-member-area .cmp-title { margin: 0 0 12px; color: var(--cmp-text); font-size: 1.5rem; line-height: 1.25; }
+.cmp-member-area .cmp-panel-title { margin: 0; color: var(--cmp-text); font-size: 1.125rem; display: flex; align-items: center; gap: 8px; }
+.cmp-member-area .cmp-panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.cmp-member-area p { margin: 0 0 12px; line-height: 1.55; }
+.cmp-member-area .cmp-muted { color: var(--cmp-muted); font-size: 0.9rem; }
+.cmp-member-area .cmp-empty { color: var(--cmp-muted); margin: 0; }
+.cmp-member-area .cmp-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+
+/* Links inside the member area */
+.cmp-member-area a:not(.cmp-btn) {
+	color: var(--cmp-primary) !important;
+	text-decoration: underline !important;
+	background: transparent !important;
+}
+
+/* Buttons — hardened against global theme button/link rules. */
+.cmp-member-area .cmp-btn,
+.cmp-member-area a.cmp-btn,
+.cmp-member-area button.cmp-btn {
+	display: inline-flex !important;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px; /* WCAG 2.2 target size, comfortably above 24px */
+	padding: 10px 20px !important;
+	border-radius: 100px !important;
+	border: 2px solid var(--cmp-primary) !important;
+	background: var(--cmp-primary) !important;
+	color: #111 !important;
+	font: 700 0.95rem/1.2 inherit !important;
+	text-decoration: none !important;
+	text-transform: none !important;
+	box-shadow: none !important;
+	cursor: pointer;
+}
+.cmp-member-area .cmp-btn.cmp-btn-outline,
+.cmp-member-area a.cmp-btn.cmp-btn-outline,
+.cmp-member-area button.cmp-btn.cmp-btn-outline {
+	background: transparent !important;
+	color: var(--cmp-primary) !important;
+}
+.cmp-member-area .cmp-btn.cmp-btn-small,
+.cmp-member-area button.cmp-btn.cmp-btn-small {
+	min-height: 36px;
+	padding: 6px 14px !important;
+	font-size: 0.85rem !important;
+}
+.cmp-member-area .cmp-btn:hover,
+.cmp-member-area a.cmp-btn:hover,
+.cmp-member-area button.cmp-btn:hover { filter: brightness(1.1); }
+.cmp-member-area .cmp-btn:focus-visible,
+.cmp-member-area a:focus-visible,
+.cmp-member-area input:focus-visible {
+	outline: 3px solid var(--cmp-secondary) !important;
+	outline-offset: 2px !important;
+}
+.cmp-member-area .cmp-btn[disabled] { opacity: 0.6; cursor: progress; }
+.cmp-member-area [hidden] { display: none !important; }
+
+/* Notices — icon + text, never colour alone. */
+.cmp-member-area .cmp-notice {
+	border: 1px solid var(--cmp-border);
+	border-left-width: 4px;
+	border-radius: 8px;
+	padding: 12px 16px;
+	margin: 0 0 16px;
+	background: var(--cmp-card-alt);
+}
+.cmp-member-area .cmp-notice-success { border-left-color: var(--cmp-primary); }
+.cmp-member-area .cmp-notice-success::before { content: "\2713\00a0"; font-weight: 700; color: var(--cmp-primary); }
+.cmp-member-area .cmp-notice-error { border-left-color: var(--cmp-error); }
+.cmp-member-area .cmp-notice-error::before { content: "!\00a0"; font-weight: 700; color: var(--cmp-error); }
+.cmp-member-area .cmp-inline-status:empty { display: none; }
+.cmp-member-area .cmp-inline-status { margin: 0 0 12px; color: var(--cmp-error); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* Step indicator */
+.cmp-member-area .cmp-steps { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.cmp-member-area .cmp-steps li { display: flex; align-items: center; gap: 8px; color: var(--cmp-muted); }
+.cmp-member-area .cmp-steps-num {
+	display: inline-flex; align-items: center; justify-content: center;
+	width: 26px; height: 26px; border-radius: 50%;
+	border: 2px solid currentColor; font-weight: 700; font-size: 0.85rem;
+}
+.cmp-member-area .cmp-steps-current { color: var(--cmp-text); font-weight: 700; }
+.cmp-member-area .cmp-steps-current .cmp-steps-num { border-color: var(--cmp-primary); color: var(--cmp-primary); }
+.cmp-member-area .cmp-steps-done .cmp-steps-num { background: var(--cmp-primary); border-color: var(--cmp-primary); color: #111; }
+
+/* Attestation checkbox */
+.cmp-member-area .cmp-check { display: flex; gap: 12px; align-items: flex-start; }
+.cmp-member-area .cmp-check input { width: 24px; height: 24px; margin: 2px 0 0; flex: 0 0 auto; accent-color: var(--cmp-primary); }
+.cmp-member-area .cmp-check label { font-weight: 600; }
+
+/* Notification inbox */
+.cmp-member-area .cmp-count {
+	display: inline-flex; align-items: center; justify-content: center;
+	min-width: 24px; height: 24px; padding: 0 8px; border-radius: 100px;
+	background: var(--cmp-secondary); color: #fff; font-size: 0.8rem; font-weight: 700;
+}
+.cmp-member-area .cmp-notifications { list-style: none; margin: 0; padding: 0; }
+.cmp-member-area .cmp-notification {
+	display: flex; gap: 12px; align-items: flex-start;
+	padding: 12px 0; border-top: 1px solid var(--cmp-border);
+}
+.cmp-member-area .cmp-notification:first-child { border-top: 0; }
+.cmp-member-area .cmp-notification .cmp-btn { flex: 0 0 auto; white-space: nowrap !important; }
+.cmp-member-area .cmp-notification-state { color: var(--cmp-secondary); line-height: 1.5; }
+.cmp-member-area .cmp-notification.is-read .cmp-notification-state { color: var(--cmp-muted); }
+.cmp-member-area .cmp-notification-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.cmp-member-area .cmp-notification:not(.is-read) .cmp-notification-body > :first-child { font-weight: 700; }
+
+.cmp-member-area .screen-reader-text {
+	border: 0; clip: rect(1px, 1px, 1px, 1px); clip-path: inset(50%);
+	height: 1px; margin: -1px; overflow: hidden; padding: 0;
+	position: absolute !important; width: 1px; word-wrap: normal !important;
+}
+
+@media (max-width: 600px) {
+	.cmp-member-area .cmp-step,
+	.cmp-member-area .cmp-panel { padding: 16px; }
+	/* Dot | message, with the button under the message. */
+	.cmp-member-area .cmp-notification { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; row-gap: 8px; }
+	.cmp-member-area .cmp-notification .cmp-btn { grid-column: 2; justify-self: start; }
+}
