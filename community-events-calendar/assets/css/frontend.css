@@ -1,0 +1,754 @@
+/* Community Events Calendar — front-end styles
+   Dark / neon aesthetic: near-black surfaces, hot-pink borders & labels,
+   lime CTAs, bold uppercase display type. Brand colors are CSS custom
+   properties set inline from Settings > Community Calendar, so the palette
+   can be changed without touching this file. */
+
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700&display=swap');
+
+.cec-calendar-wrap, .cec-events-wrap, .cec-upcoming-wrap, .cec-submit-form, .cec-single-event, .cec-taxonomy-archive, .cec-auth-form, .cec-editor-preview {
+	--cec-radius: 12px;
+	--cec-pill: 100px;
+	--cec-card: #1b1826;
+	--cec-card-alt: #211d2e;
+	--cec-muted: #a9a6bb;
+	--cec-border-soft: rgba(255, 255, 255, 0.08);
+	color: var(--cec-text);
+	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	box-sizing: border-box;
+	max-width: 100%;
+	/* No-op for anything still at 100% width (calendar/events/upcoming —
+	   these fill whatever column they're dropped into either way), but
+	   self-centers .cec-submit-form/.cec-auth-form's own narrower
+	   max-width wherever they land — including a plain page with no
+	   Elementor column to do that centering for them, e.g. this plugin's
+	   own auto-created pages. */
+	margin: 0 auto;
+}
+.cec-calendar-wrap *, .cec-events-wrap *, .cec-upcoming-wrap *, .cec-submit-form *, .cec-single-event *, .cec-taxonomy-archive *, .cec-auth-form *, .cec-editor-preview * {
+	box-sizing: border-box;
+}
+/* Not .cec-single-event here — it has a position:sticky sidebar, and
+   overflow-x:hidden on an ancestor silently breaks sticky positioning. */
+.cec-calendar-wrap, .cec-events-wrap, .cec-upcoming-wrap, .cec-submit-form, .cec-taxonomy-archive, .cec-auth-form {
+	overflow-x: hidden;
+}
+
+/* These two are rendered by the plugin's own page templates (not built in
+   Elementor), so unlike shortcode output dropped into an Elementor page,
+   nothing else paints a dark background behind them — the active theme's
+   default (often white) would otherwise show through. */
+.cec-single-event, .cec-taxonomy-archive {
+	background: var(--cec-bg);
+	padding: 32px 24px 60px;
+	max-width: 1100px;
+	margin: 0 auto;
+}
+body.cec-plugin-page {
+	background: var(--cec-bg) !important;
+}
+
+.cec-calendar-wrap h1, .cec-calendar-wrap h2, .cec-calendar-wrap h3,
+.cec-events-wrap h1, .cec-events-wrap h2, .cec-events-wrap h3,
+.cec-single-event h1, .cec-single-event h3,
+.cec-taxonomy-archive h1 {
+	font-family: 'Archivo Black', 'Arial Black', sans-serif;
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+	color: var(--cec-primary);
+}
+
+.cec-btn {
+	display: inline-block;
+	padding: 12px 26px;
+	border-radius: var(--cec-pill);
+	text-decoration: none !important;
+	cursor: pointer;
+	font-weight: 700;
+	font-size: 13px;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	font-family: 'Inter', sans-serif;
+	transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+/* Every button variant keeps a solid, filled background and dark text in
+   its resting state, full stop — hover/focus only adds a glow/lift, never
+   a color swap or a transparent background. This is deliberate: a
+   transparent/outline resting state is exactly what caused buttons to
+   become unreadable against certain backgrounds.
+   !important on background/border/color here guards against the active
+   theme's own default styling for native <button>/<input type=submit>
+   elements — many themes apply that with high specificity, and it was
+   overriding all three properties (not just text color) on every actual
+   <button> in the plugin (form submit buttons). <a class="cec-btn">
+   links need their own guard too, just for a different property: a
+   real theme was later found styling all `a` elements with
+   `text-decoration: underline !important`, which this rule didn't
+   originally account for — text-decoration is !important below for
+   the same reason the properties above are. */
+.cec-btn, .cec-btn-outline, .cec-btn-danger {
+	color: #0b0a12 !important;
+	border-style: solid !important;
+	border-width: 2px !important;
+}
+.cec-btn { background: var(--cec-primary) !important; border-color: var(--cec-primary) !important; }
+.cec-btn-outline { background: var(--cec-secondary) !important; border-color: var(--cec-secondary) !important; }
+.cec-btn-danger { background: #ff4d5e !important; border-color: #ff4d5e !important; }
+.cec-btn:hover, .cec-btn-outline:hover, .cec-btn-danger:hover,
+.cec-btn:focus-visible, .cec-btn-outline:focus-visible, .cec-btn-danger:focus-visible {
+	color: #0b0a12 !important;
+	transform: translateY(-1px);
+}
+.cec-btn:hover, .cec-btn:focus-visible { box-shadow: 0 0 24px var(--cec-primary); }
+.cec-btn-outline { padding: 10px 24px; }
+.cec-btn-outline:hover, .cec-btn-outline:focus-visible { box-shadow: 0 0 24px var(--cec-secondary); }
+.cec-btn-danger:hover, .cec-btn-danger:focus-visible { box-shadow: 0 0 24px #ff4d5e; }
+.cec-btn-small { padding: 8px 18px; font-size: 11px; }
+.cec-btn-block { display: block; width: 100%; text-align: center; margin-top: 10px; }
+
+.cec-badge {
+	display: inline-block;
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	padding: 5px 12px;
+	border-radius: var(--cec-pill);
+	background: var(--cec-accent);
+	color: #0b0a12;
+	margin: 0 4px 4px 0;
+}
+.cec-badge-free { background: var(--cec-free-badge); }
+.cec-badge-paid { background: var(--cec-secondary); color: #fff; }
+.cec-badge-varies { background: var(--cec-accent); color: #0b0a12; }
+.cec-badge-not-posted { background: transparent; color: var(--cec-text); box-shadow: inset 0 0 0 1px var(--cec-border-soft); }
+.cec-badge-postponed { background: #ffb020; color: #0b0a12; }
+.cec-badge-cancelled { background: #ff4d5e; color: #0b0a12; }
+.cec-badge-past { background: transparent; color: var(--cec-muted); box-shadow: inset 0 0 0 1px var(--cec-border-soft); }
+
+.cec-event-card-cancelled { opacity: 0.7; }
+.cec-event-card-cancelled .cec-card-title a, .cec-event-card-cancelled .cec-card-media img { text-decoration: line-through; filter: grayscale(60%); }
+.cec-event-card-postponed .cec-card-media img { filter: grayscale(35%); }
+.cec-status-note { font-size: 12px; font-weight: 700; color: #ffb020; margin: -4px 0 8px; }
+.cec-event-card-cancelled .cec-status-note { color: #ff4d5e; }
+
+.cec-cal-chip-postponed { background: #ffb020 !important; }
+.cec-cal-chip-cancelled { background: #ff4d5e !important; opacity: 0.75; }
+.cec-cal-chip-cancelled .cec-cal-event-title { text-decoration: line-through; }
+
+.cec-status-banner { padding: 14px 18px; border-radius: var(--cec-radius); margin-bottom: 20px; font-size: 14px; }
+.cec-status-banner-postponed { background: rgba(255, 176, 32, 0.12); border: 1px solid #ffb020; color: #ffb020; }
+.cec-status-banner-cancelled { background: rgba(255, 77, 94, 0.12); border: 1px solid #ff4d5e; color: #ff4d5e; }
+.cec-rsvp-disabled-note { color: var(--cec-muted); font-size: 13px; font-style: italic; }
+.cec-field-hint { color: var(--cec-muted); font-size: 12px; margin: 4px 0 0; }
+
+.cec-notice { padding: 16px 20px; border-radius: var(--cec-radius); background: var(--cec-card); border: 1px solid var(--cec-border-soft); margin-bottom: 18px; color: var(--cec-text); }
+.cec-notice-success { border-color: var(--cec-primary); }
+.cec-notice-error { border-color: var(--cec-secondary); }
+.cec-import-notes { margin: 10px 0 0; padding-left: 20px; color: var(--cec-muted); font-size: 13px; line-height: 1.6; }
+
+/* ---------- Calendar (month view) ---------- */
+.cec-cal-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 14px; font-size: 11px; color: var(--cec-muted); }
+.cec-cal-legend-item { display: flex; align-items: center; gap: 6px; }
+.cec-cal-legend-swatch { display: inline-block; width: 16px; height: 10px; border-radius: 3px; }
+.cec-cal-legend-bar { background: var(--cec-secondary); }
+.cec-cal-legend-pill { width: 10px; height: 10px; border-radius: 50%; background: var(--cec-primary); }
+
+.cec-cal-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.cec-cal-header h3 { margin: 0; font-size: 22px; flex: 1; text-align: center; }
+/* Every interactive element the calendar renders is deliberately
+   hardened against a real theme's own global button/link styling —
+   WordPress themes very commonly style `button`/`a` sitewide (solid
+   brand-color fills, borders, uppercase text), and a plain single-class
+   rule with no !important can lose to that. Scoped under
+   .cec-calendar-wrap for extra specificity, with !important on every
+   property that defines this calendar's own visual identity, and
+   explicit :hover/:focus/:active coverage so a theme's own hover rule
+   (often *more* specific than a resting-state rule) can't win either —
+   the same real collision already found and fixed once on a sibling
+   plugin this session. */
+.cec-calendar-wrap .cec-cal-nav {
+	background: var(--cec-primary) !important;
+	color: #0b0a12 !important;
+	border: none !important;
+	border-radius: 50% !important;
+	box-shadow: none !important;
+	text-transform: none !important;
+	width: 34px;
+	height: 34px;
+	cursor: pointer;
+	font-size: 16px;
+	font-weight: 700;
+	flex-shrink: 0;
+}
+.cec-calendar-wrap .cec-cal-nav:hover,
+.cec-calendar-wrap .cec-cal-nav:focus-visible,
+.cec-calendar-wrap .cec-cal-nav:active {
+	background: var(--cec-primary) !important;
+	color: #0b0a12 !important;
+	box-shadow: 0 0 16px var(--cec-primary) !important;
+}
+.cec-calendar-wrap .cec-cal-today-btn {
+	background: var(--cec-secondary) !important;
+	color: #fff !important;
+	border: none !important;
+	border-radius: var(--cec-pill) !important;
+	box-shadow: none !important;
+	text-transform: uppercase !important;
+	padding: 8px 18px;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	cursor: pointer;
+	flex-shrink: 0;
+}
+.cec-calendar-wrap .cec-cal-today-btn:hover,
+.cec-calendar-wrap .cec-cal-today-btn:focus-visible,
+.cec-calendar-wrap .cec-cal-today-btn:active {
+	background: var(--cec-secondary) !important;
+	color: #fff !important;
+	box-shadow: 0 0 16px var(--cec-secondary) !important;
+}
+
+.cec-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; max-width: 100%; }
+.cec-cal-dow-cell { text-align: center; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 6px 0 10px; color: var(--cec-secondary); min-width: 0; border-top: 1px solid var(--cec-border-soft); }
+/* One real calendar week per row, its own grid so a multi-day event's
+   bar can span grid-column X/Y across the days it covers. Zero gap and
+   no visible left/right inset on a bar (see .cec-cal-bar below) is
+   deliberate: the bar's own background paints straight over the
+   column boundary it crosses, so a multi-day event reads as one
+   unbroken shape rather than several bars with a gap cut out of them
+   wherever they cross a day boundary — the same technique a real
+   calendar app uses. */
+.cec-cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-auto-rows: min-content; gap: 0; position: relative; }
+/* Multi-day bars use the secondary (pink) color, single-day pills use
+   the primary (lime) color — a deliberate, consistent color code so
+   the two kinds of event are visibly distinguishable at a glance,
+   matching the legend above. Full-bleed within its own grid-column
+   span (no side margin) so it reaches each day-cell's own border line
+   and visually bridges across it; a small corner radius only at a
+   TRUE start/end, never at an edge that's merely clipped by the week
+   boundary — that edge gets a pointed "keeps going" notch instead (see
+   .cec-cal-bar-continues-to/-from), and the real event title is shown
+   on every week this bar appears in, not just its first one. */
+.cec-calendar-wrap .cec-cal-bar {
+	all: unset;
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	background: var(--cec-secondary) !important;
+	color: #fff !important;
+	border: none !important;
+	box-shadow: none !important;
+	text-shadow: none !important;
+	text-transform: none !important;
+	padding: 3px 10px;
+	margin: 0 0 2px;
+	font-size: 11px;
+	font-weight: 600;
+	text-decoration: none !important;
+	overflow: hidden;
+	white-space: nowrap;
+	cursor: pointer;
+	position: relative;
+	z-index: 1;
+}
+.cec-calendar-wrap .cec-cal-bar:hover,
+.cec-calendar-wrap .cec-cal-bar:focus-visible,
+.cec-calendar-wrap .cec-cal-bar:active {
+	background: var(--cec-secondary) !important;
+	color: #fff !important;
+	filter: brightness(1.1);
+}
+.cec-cal-bar .cec-cal-event-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Chained as a compound selector with .cec-cal-bar (not just the
+   modifier class on its own) so these match the base rule's own
+   specificity — `all: unset` above expands to an explicit `unset` for
+   every property, including ones the base rule never mentions by name
+   (like clip-path), carrying the base rule's full 2-class specificity.
+   A single-class modifier selector would lose to that regardless of
+   source order; matching it here lets normal source order (these
+   rules come later) decide instead, which is what's actually wanted. */
+.cec-calendar-wrap .cec-cal-bar.cec-cal-bar-start { border-top-left-radius: 4px !important; border-bottom-left-radius: 4px !important; margin-left: 2px; padding-left: 10px; }
+.cec-calendar-wrap .cec-cal-bar.cec-cal-bar-end { border-top-right-radius: 4px !important; border-bottom-right-radius: 4px !important; margin-right: 2px; padding-right: 10px; }
+/* A clipped (non-true) edge gets a pointed notch instead of a plain
+   square cut, the standard "this keeps going" cue — built with
+   clip-path so it works at any bar color/width without an extra
+   element. */
+.cec-calendar-wrap .cec-cal-bar.cec-cal-bar-continues-to { clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%); padding-right: 14px; }
+.cec-calendar-wrap .cec-cal-bar.cec-cal-bar-continues-from { clip-path: polygon(7px 0, 100% 0, 100% 100%, 7px 100%, 0 50%); padding-left: 14px; }
+.cec-calendar-wrap .cec-cal-bar.cec-cal-bar-continues-to.cec-cal-bar-continues-from { clip-path: polygon(7px 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 7px 100%, 0 50%); }
+/* .cec-cal-chip-postponed / .cec-cal-chip-cancelled are already defined
+   above (shared with the single-day chip) and apply here unchanged. */
+/* Marks the one not-yet-published event an editor is previewing (Phase
+   1d) — a dashed outline rather than a different fill color, so it
+   reads as "this one isn't real yet" without being mistaken for a
+   fourth event-status color alongside postponed/cancelled. Compound
+   selector for the same all:unset-specificity reason as the rules
+   above. */
+.cec-calendar-wrap .cec-cal-bar.cec-cal-preview-highlight,
+.cec-calendar-wrap .cec-cal-pill.cec-cal-preview-highlight {
+	outline: 2px dashed var(--cec-primary) !important;
+	outline-offset: 1px;
+}
+/* Pure background/border, spanning every row of its week (bar lanes +
+   the day-number row) — the day content and bars (below) are separate
+   elements sharing these same grid cells, painted on top in that
+   order, so the week reads as one continuous bordered grid with the
+   day number pinned to the top of each box and events stacking
+   directly beneath it, rather than a row of separately-rounded cards. */
+.cec-cal-cell {
+	background: var(--cec-card);
+	border-right: 1px solid var(--cec-border-soft);
+	border-bottom: 1px solid var(--cec-border-soft);
+	min-height: 90px;
+	min-width: 0;
+}
+.cec-cal-cell:nth-child(1) { border-left: 1px solid var(--cec-border-soft); }
+.cec-cal-empty { background: transparent; }
+.cec-cal-today { box-shadow: inset 0 0 0 2px var(--cec-primary); }
+/* A separate state from "today" — either can apply alone, or both at
+   once (today also happens to be the selected date). */
+.cec-cal-selected { background: color-mix(in srgb, var(--cec-secondary) 22%, var(--cec-card)); }
+.cec-cal-daycontent { position: relative; z-index: 1; padding: 6px 8px; min-width: 0; }
+.cec-calendar-wrap .cec-cal-daynum {
+	all: unset;
+	box-sizing: border-box;
+	display: inline-block;
+	background: none !important;
+	border: none !important;
+	box-shadow: none !important;
+	text-transform: none !important;
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--cec-muted) !important;
+	cursor: pointer;
+	padding: 2px 6px;
+	border-radius: 50% !important;
+}
+.cec-calendar-wrap .cec-cal-daynum:hover,
+.cec-calendar-wrap .cec-cal-daynum:focus-visible,
+.cec-calendar-wrap .cec-cal-daynum:active {
+	background: var(--cec-card-alt) !important;
+	color: var(--cec-text) !important;
+}
+.cec-calendar-wrap .cec-cal-selected-daynum,
+.cec-calendar-wrap .cec-cal-selected-daynum:hover,
+.cec-calendar-wrap .cec-cal-selected-daynum:focus-visible {
+	color: #fff !important;
+	background: var(--cec-secondary) !important;
+}
+.cec-cal-events { margin-top: 5px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cec-calendar-wrap .cec-cal-pill {
+	all: unset;
+	box-sizing: border-box;
+	display: block;
+	background: var(--cec-primary) !important;
+	color: #0b0a12 !important;
+	border: none !important;
+	box-shadow: none !important;
+	text-transform: none !important;
+	border-radius: var(--cec-pill) !important;
+	padding: 2px 8px;
+	font-size: 11px;
+	font-weight: 600;
+	text-decoration: none !important;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	cursor: pointer;
+}
+.cec-calendar-wrap .cec-cal-pill:hover,
+.cec-calendar-wrap .cec-cal-pill:focus-visible,
+.cec-calendar-wrap .cec-cal-pill:active {
+	background: var(--cec-primary) !important;
+	color: #0b0a12 !important;
+}
+.cec-cal-pill.cec-cal-chip-postponed, .cec-cal-pill.cec-cal-chip-cancelled { color: #0b0a12 !important; }
+.cec-cal-event-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.cec-calendar-wrap .cec-cal-more,
+.cec-calendar-wrap .cec-cal-daymore {
+	all: unset;
+	box-sizing: border-box;
+	display: block;
+	width: 100%;
+	background: none !important;
+	border: none !important;
+	box-shadow: none !important;
+	text-transform: none !important;
+	font-size: 10px;
+	color: var(--cec-muted) !important;
+	cursor: pointer;
+	text-align: left;
+}
+.cec-calendar-wrap .cec-cal-daymore:hover,
+.cec-calendar-wrap .cec-cal-daymore:focus-visible,
+.cec-calendar-wrap .cec-cal-daymore:active {
+	background: none !important;
+	color: var(--cec-secondary) !important;
+}
+
+/* ---------- Day detail panel (click any date) ---------- */
+.cec-cal-day-detail {
+	margin-top: 20px;
+	padding: 18px 20px;
+	background: var(--cec-card);
+	border: 1px solid var(--cec-border-soft);
+	border-radius: var(--cec-radius);
+}
+.cec-cal-day-detail-heading { margin: 0 0 12px; font-size: 18px; }
+.cec-cal-day-detail-list { list-style: none; margin: 0; padding: 0; }
+.cec-cal-day-detail-item {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 0;
+	border-top: 1px solid var(--cec-border-soft);
+}
+.cec-cal-day-detail-item:first-child { border-top: none; padding-top: 0; }
+.cec-cal-day-detail-bar { width: 4px; align-self: stretch; background: var(--cec-secondary); border-radius: 2px; flex-shrink: 0; }
+.cec-cal-day-detail-body { flex: 1; min-width: 0; }
+.cec-cal-day-detail-title { display: block; font-size: 15px; }
+.cec-cal-day-detail-meta { display: block; font-size: 12px; color: var(--cec-muted); margin-top: 2px; }
+.cec-cal-day-detail-empty { color: var(--cec-muted); font-style: italic; padding: 4px 0; }
+a.cec-cal-day-detail-title { color: var(--cec-text) !important; text-decoration: none !important; font-weight: 700; }
+a.cec-cal-day-detail-title:hover, a.cec-cal-day-detail-title:focus-visible { color: var(--cec-primary) !important; }
+
+/* ---------- Small-screen agenda (replaces the month grid below 700px) ---------- */
+.cec-cal-agenda { display: none; }
+.cec-cal-agenda-day { margin-bottom: 22px; }
+.cec-cal-agenda-day:last-child { margin-bottom: 0; }
+.cec-cal-agenda-date { font-family: 'Archivo Black', sans-serif; font-size: 16px; text-transform: none; margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--cec-border-soft); }
+.cec-cal-agenda .cec-cal-day-detail-list { margin-bottom: 0; }
+
+.cec-subscribe-links { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+
+@media (max-width: 700px) {
+	.cec-cal-header h3 { font-size: 17px; }
+	.cec-cal-today-btn { padding: 6px 12px; font-size: 10px; }
+	.cec-cal-day-detail-item { flex-wrap: wrap; }
+	/* The brief calls for a chronological agenda on small screens rather
+	   than a compressed grid — not just smaller text/cells, a different
+	   layout entirely — so the grid (and its own day-detail click panel,
+	   redundant once every event for the month is already listed in the
+	   agenda) is replaced outright below this breakpoint, not shrunk. */
+	.cec-cal-grid-wrap, .cec-cal-day-detail { display: none; }
+	.cec-cal-agenda { display: block; }
+}
+
+/* ---------- Filters ----------
+   Every interactive element below is scoped under .cec-events-wrap (not
+   left as a bare class) and hardened with !important on every property
+   that defines its visual identity — confirmed necessary, not
+   precautionary: a real live theme's own button styling was beating the
+   bare .cec-view-btn/.cec-sort-toggle rules despite !important, because
+   the theme's own selector carried a type-selector (e.g. `button.foo`)
+   that out-specifies a plain single-class rule even when both sides use
+   !important. Scoping under the wrapper adds a class to OUR side of that
+   comparison, the same fix already proven on this calendar's bars/pills
+   in 1.21.0. See also .cec-btn/.cec-btn-outline elsewhere in this file,
+   hardened the same way for the same reason. */
+.cec-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; align-items: center; }
+.cec-events-wrap .cec-filters select {
+	padding: 10px 16px !important;
+	border-radius: var(--cec-pill) !important;
+	border: 2px solid var(--cec-secondary) !important;
+	background: var(--cec-card) !important;
+	color: var(--cec-text) !important;
+	font-size: 12px !important;
+	font-weight: 600 !important;
+	text-transform: uppercase !important;
+	letter-spacing: 0.03em !important;
+}
+.cec-events-wrap .cec-filter-submit {
+	border: none !important;
+	background: var(--cec-secondary) !important;
+	color: #0b0a12 !important;
+	padding: 10px 24px !important;
+	border-radius: var(--cec-pill) !important;
+	font-size: 12px !important;
+	font-weight: 700 !important;
+	text-transform: uppercase !important;
+	letter-spacing: 0.03em !important;
+	text-decoration: none !important;
+	cursor: pointer;
+}
+.cec-events-wrap .cec-filter-submit:hover, .cec-events-wrap .cec-filter-submit:focus-visible { box-shadow: 0 0 16px var(--cec-secondary); }
+.cec-events-wrap .cec-sort-toggle {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	background: transparent !important;
+	border: 1px solid var(--cec-border-soft) !important;
+	color: var(--cec-muted) !important;
+	border-radius: var(--cec-pill) !important;
+	padding: 9px 16px !important;
+	font-size: 12px !important;
+	font-weight: 600 !important;
+	text-decoration: none !important;
+	cursor: pointer;
+	font-family: inherit;
+}
+.cec-events-wrap .cec-sort-toggle:hover, .cec-events-wrap .cec-sort-toggle:focus-visible { color: var(--cec-text) !important; border-color: var(--cec-secondary) !important; }
+.cec-view-toggle { display: flex; gap: 6px; }
+.cec-events-wrap .cec-view-btn {
+	border: 2px solid var(--cec-secondary) !important;
+	background: var(--cec-secondary) !important;
+	color: #0b0a12 !important;
+	padding: 8px 18px !important;
+	border-radius: var(--cec-pill) !important;
+	text-decoration: none !important;
+	cursor: pointer;
+	font-size: 12px !important;
+	font-weight: 700 !important;
+	text-transform: uppercase !important;
+	letter-spacing: 0.03em !important;
+}
+.cec-events-wrap .cec-view-btn:hover, .cec-events-wrap .cec-view-btn:focus-visible { box-shadow: 0 0 16px var(--cec-secondary); }
+.cec-events-wrap .cec-view-btn.active { border-color: var(--cec-primary) !important; background: var(--cec-primary) !important; color: #0b0a12 !important; box-shadow: 0 0 16px var(--cec-primary); }
+
+/* ---------- Grid / List ---------- */
+.cec-events-list.cec-view-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 22px; }
+.cec-events-list.cec-view-list { display: flex; flex-direction: column; gap: 16px; }
+
+.cec-event-card { background: var(--cec-card); border: 1px solid var(--cec-border-soft); border-radius: var(--cec-radius); overflow: hidden; display: flex; flex-direction: column; transition: box-shadow 0.2s ease, transform 0.2s ease; }
+.cec-event-card:hover { border-color: var(--cec-secondary); box-shadow: 0 0 24px rgba(255, 80, 215, 0.2); transform: translateY(-2px); }
+.cec-card-media { position: relative; display: block; aspect-ratio: 16/10; overflow: hidden; background: var(--cec-card-alt); }
+.cec-card-media img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.cec-card-media-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, var(--cec-secondary), #4a1442); }
+.cec-card-media .cec-badge { position: absolute; top: 10px; right: 10px; }
+
+/* display:flex column so the "View Details" button (margin-top:auto below)
+   always sits flush at the same bottom edge across cards in a row,
+   regardless of how much badge/partner/excerpt content sits above it. */
+.cec-card-body { padding: 16px 18px; flex: 1; display: flex; flex-direction: column; }
+.cec-card-body > .cec-btn, .cec-card-body > .cec-card-actions { margin-top: auto; align-self: flex-start; }
+.cec-card-actions { display: flex; gap: 8px; align-items: center; }
+.cec-card-title { margin: 4px 0 8px; font-size: 17px; font-family: 'Inter', sans-serif; font-weight: 700; text-transform: none; letter-spacing: 0; }
+.cec-card-title a { color: var(--cec-text); text-decoration: none; }
+.cec-card-title a:hover { color: var(--cec-primary); }
+.cec-card-meta { font-size: 12px; color: var(--cec-muted); display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
+.cec-card-where a { color: var(--cec-secondary); }
+.cec-card-partners { font-size: 12px; margin-bottom: 8px; }
+.cec-card-partners a { color: var(--cec-secondary); font-weight: 600; }
+.cec-card-excerpt { font-size: 13px; color: var(--cec-muted); margin: 0 0 8px; line-height: 1.5; }
+.cec-expand-toggle { background: none; border: none; color: var(--cec-primary); font-weight: 700; cursor: pointer; padding: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.cec-card-full { margin-top: 10px; font-size: 13px; border-top: 1px dashed var(--cec-border-soft); padding-top: 10px; color: var(--cec-muted); }
+.cec-no-events { padding: 40px; text-align: center; color: var(--cec-muted); }
+
+/* ---------- Upcoming list (List view) — date-range-first row cards ---------- */
+.cec-month-heading { font-family: 'Archivo Black', sans-serif; font-size: 20px; text-transform: none; margin: 28px 0 12px; }
+.cec-month-heading:first-child { margin-top: 0; }
+.cec-event-row {
+	display: flex;
+	gap: 20px;
+	align-items: flex-start;
+	background: var(--cec-card);
+	border-radius: var(--cec-radius);
+	padding: 18px 20px;
+	border-left: 4px solid var(--cec-secondary);
+}
+.cec-event-row-cancelled { opacity: 0.6; }
+.cec-event-row-cancelled .cec-row-title a { text-decoration: line-through; }
+.cec-row-date { min-width: 100px; flex-shrink: 0; }
+.cec-row-month { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--cec-secondary); text-transform: uppercase; }
+.cec-row-days { font-family: 'Archivo Black', sans-serif; font-size: 26px; line-height: 1.15; margin: 2px 0; }
+.cec-row-year { font-size: 12px; color: var(--cec-muted); }
+.cec-row-body { flex: 1; min-width: 0; }
+.cec-row-title { font-size: 18px; font-weight: 700; margin: 0 0 4px; font-family: 'Inter', sans-serif; text-transform: none; letter-spacing: 0; }
+.cec-row-title a { color: var(--cec-text); text-decoration: none; }
+.cec-row-title a:hover { color: var(--cec-primary); }
+.cec-row-meta { font-size: 13px; color: var(--cec-muted); margin-bottom: 8px; }
+.cec-row-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.cec-row-cta { align-self: center; flex-shrink: 0; }
+/* Deliberately a quiet ghost button, not the loud solid-fill .cec-btn/
+   .cec-btn-outline used for primary actions elsewhere — every row on this
+   list has one of these, and the brief's own reference mockup treats it
+   as a secondary, low-emphasis action rather than a CTA competing with
+   the page's actual calls to action. */
+.cec-row-cta-btn {
+	display: inline-block;
+	border: 1px solid var(--cec-border-soft);
+	color: var(--cec-text) !important;
+	text-decoration: none !important;
+	padding: 10px 18px;
+	border-radius: var(--cec-pill);
+	font-size: 13px;
+	font-weight: 700;
+	white-space: nowrap;
+}
+.cec-row-cta-btn:hover, .cec-row-cta-btn:focus-visible { border-color: var(--cec-secondary); color: var(--cec-primary) !important; }
+
+@media (max-width: 600px) {
+	.cec-event-row { flex-wrap: wrap; }
+	.cec-row-cta { width: 100%; }
+	.cec-row-cta-btn { display: block; text-align: center; }
+}
+
+/* ---------- Upcoming scroller ---------- */
+.cec-upcoming-wrap { display: flex; align-items: center; gap: 10px; }
+.cec-upcoming-scroll { display: flex; gap: 18px; overflow-x: auto; scroll-behavior: smooth; padding: 4px 2px 14px; flex: 1; }
+.cec-upcoming-card { flex: 0 0 220px; background: var(--cec-card); border: 1px solid var(--cec-border-soft); border-radius: var(--cec-radius); overflow: hidden; text-decoration: none; color: var(--cec-text); transition: box-shadow 0.2s ease; }
+.cec-upcoming-card:hover { border-color: var(--cec-primary); box-shadow: 0 0 20px rgba(225, 245, 119, 0.18); }
+.cec-upcoming-card img { width: 100%; height: 130px; object-fit: contain; display: block; background: var(--cec-card-alt); }
+.cec-upcoming-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.cec-upcoming-date { font-size: 11px; color: var(--cec-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.cec-upcoming-title { font-size: 14px; font-weight: 700; }
+.cec-scroll-btn { background: var(--cec-primary); color: #0b0a12; border: none; border-radius: 50%; width: 34px; height: 34px; flex-shrink: 0; cursor: pointer; font-weight: 700; }
+.cec-scroll-btn:hover { box-shadow: 0 0 16px var(--cec-primary); }
+
+/* ---------- Submission / edit form ---------- */
+.cec-submit-form { max-width: 700px; }
+.cec-hp-field { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.cec-auth-form { max-width: 420px; }
+.cec-series-note { color: var(--cec-muted); font-size: 13px; margin-bottom: 16px; max-width: 640px; }
+.cec-field, .cec-field-row > .cec-field { margin-bottom: 18px; }
+.cec-field-row { display: flex; gap: 16px; }
+.cec-field-row .cec-field { flex: 1; }
+.cec-submit-form label {
+	display: block;
+	font-weight: 700;
+	margin-bottom: 6px;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--cec-secondary);
+}
+.cec-submit-form input[type=text], .cec-submit-form input[type=url], .cec-submit-form input[type=email],
+.cec-submit-form input[type=datetime-local], .cec-submit-form input[type=number], .cec-submit-form select,
+.cec-submit-form textarea, .cec-submit-form input[type=file] {
+	width: 100%;
+	padding: 12px 14px;
+	background: var(--cec-card);
+	border: 2px solid var(--cec-secondary);
+	border-radius: 8px;
+	font-size: 14px;
+	color: var(--cec-text);
+	font-family: 'Inter', sans-serif;
+}
+.cec-submit-form input::placeholder, .cec-submit-form textarea::placeholder { color: var(--cec-muted); }
+.cec-submit-form input:focus, .cec-submit-form select:focus, .cec-submit-form textarea:focus {
+	outline: none;
+	border-color: var(--cec-primary);
+	box-shadow: 0 0 0 3px rgba(225, 245, 119, 0.15);
+}
+.cec-checkbox { font-weight: 400 !important; text-transform: none !important; color: var(--cec-text) !important; display: inline-flex !important; align-items: center; gap: 6px; margin-right: 14px; letter-spacing: 0 !important; }
+
+/* ---------- Single event ---------- */
+.cec-single-hero { position: relative; background: var(--cec-card-alt); border-radius: var(--cec-radius); }
+.cec-single-hero img { width: 100%; max-height: 440px; object-fit: contain; display: block; border-radius: var(--cec-radius); margin: 0 auto; }
+.cec-single-hero::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: var(--cec-radius);
+	background: linear-gradient(180deg, rgba(11, 10, 18, 0) 40%, rgba(11, 10, 18, 0.7) 100%);
+	pointer-events: none;
+}
+.cec-single-wrap { display: flex; gap: 36px; margin-top: 28px; flex-wrap: wrap; }
+.cec-single-main { flex: 2; min-width: 300px; }
+.cec-single-sidebar { flex: 1; min-width: 260px; }
+.cec-single-main h1 { font-size: 32px; margin: 12px 0 20px; }
+.cec-info-box { background: var(--cec-card); border: 1px solid var(--cec-border-soft); border-radius: var(--cec-radius); padding: 24px; position: sticky; top: 20px; }
+.cec-info-box h3 { font-size: 12px; letter-spacing: 0.06em; color: var(--cec-secondary); margin: 18px 0 6px; }
+.cec-info-box h3:first-child { margin-top: 0; }
+.cec-info-box p { color: var(--cec-muted); }
+.cec-info-box a { color: var(--cec-primary); }
+.cec-coc-box { background: var(--cec-card); border: 1px solid var(--cec-border-soft); border-left: 4px solid var(--cec-secondary); padding: 18px 22px; border-radius: 6px; margin-top: 28px; color: var(--cec-muted); }
+.cec-rsvp-form input {
+	width: 100%;
+	margin-bottom: 10px;
+	padding: 10px 12px;
+	border-radius: 8px;
+	border: 2px solid var(--cec-secondary);
+	background: #0f0d17;
+	color: var(--cec-text);
+}
+.cec-rsvp-message { font-size: 13px; margin-top: 8px; color: var(--cec-primary); }
+.cec-add-to-calendar { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.cec-share { position: relative; display: inline-block; margin-top: 4px; }
+.cec-share-btn-icon { width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px; }
+.cec-share-menu {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	margin-top: 8px;
+	background: var(--cec-card);
+	border: 1px solid var(--cec-border-soft);
+	border-radius: var(--cec-radius);
+	padding: 14px 12px;
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 14px 8px;
+	width: 240px;
+	z-index: 30;
+	box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+.cec-share-icon {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	text-decoration: none;
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	font-family: inherit;
+	min-width: 0;
+}
+.cec-share-icon-circle {
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background: var(--cec-primary);
+	color: #0b0a12;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.cec-share-icon-circle svg { width: 20px; height: 20px; }
+.cec-share-icon:hover .cec-share-icon-circle, .cec-share-icon:focus-visible .cec-share-icon-circle {
+	box-shadow: 0 0 16px var(--cec-primary);
+	transform: translateY(-1px);
+}
+.cec-share-label {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--cec-muted);
+	text-align: center;
+}
+.cec-share-icon.cec-share-copied .cec-share-icon-circle { background: var(--cec-secondary); }
+
+@media (max-width: 480px) {
+	.cec-share-menu { width: 210px; gap: 12px 6px; }
+}
+
+@media (max-width: 782px) {
+	.cec-field-row { flex-direction: column; gap: 0; }
+	.cec-single-wrap { flex-direction: column; }
+}
+
+/* ---------- Editor preview (Phase 1d) ----------
+   Shared by the wp-admin "Event Preview" meta box and the front-end
+   Calendar Manager dashboard's edit form. Given its own explicit dark
+   background rather than relying on inherited text color against
+   whatever page background surrounds it — confirmed necessary, not
+   precautionary: checked against a reconstructed wp-admin postbox (white
+   background) and the heading/description text was genuinely illegible
+   (near-white text, no dark surface under it) before this was added. */
+.cec-editor-preview {
+	background: var(--cec-bg);
+	border-radius: var(--cec-radius);
+	padding: 20px;
+}
+.cec-editor-preview h4 { margin: 24px 0 10px; font-size: 15px; color: var(--cec-text); }
+.cec-editor-preview h4:first-child { margin-top: 0; }
+.cec-editor-preview p.description { color: var(--cec-muted); }
+.cec-editor-preview-card { max-width: 340px; }
+.cec-editor-preview-card .cec-event-card:hover { transform: none; }
+.cec-editor-preview-calendar { max-width: 100%; }

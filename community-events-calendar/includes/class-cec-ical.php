@@ -1,0 +1,217 @@
+<?php
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * "Add to Calendar" links and .ics export. Reachable as a plain query var
+ * (?cec_ical=1 on a single event, ?cec_ical=all site-wide) rather than a
+ * registered WP feed, so it works without a rewrite-rules flush.
+ */
+class CEC_Ical {
+
+	public static function add_query_vars( $vars ) {
+		$vars[] = 'cec_ical';
+		return $vars;
+	}
+
+	public static function maybe_output() {
+		$target = get_query_var( 'cec_ical' );
+		if ( '' === $target || false === $target ) {
+			return;
+		}
+
+		if ( 'all' === $target ) {
+			self::output_feed();
+			return;
+		}
+
+		if ( is_singular( 'cec_event' ) ) {
+			self::output_single( get_queried_object_id() );
+		}
+	}
+
+	private static function output_single( $post_id ) {
+		if ( ! $post_id || 'cec_event' !== get_post_type( $post_id ) || 'publish' !== get_post_status( $post_id ) ) {
+			return;
+		}
+
+		$data = CEC_Event_Helper::data( $post_id );
+
+		nocache_headers();
+		header( 'Content-Type: text/calendar; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="' . sanitize_file_name( $data['title'] ) . '.ics"' );
+		echo self::build_ics( array( $data ), get_bloginfo( 'name' ) . ' - ' . $data['title'] ); // phpcs:ignore
+		exit;
+	}
+
+	private static function output_feed() {
+		$query = new WP_Query(
+			array(
+				'post_type'      => 'cec_event',
+				'post_status'    => 'publish',
+				'posts_per_page' => 200,
+				'meta_key'       => '_cec_start',
+				'orderby'        => 'meta_value',
+				'order'          => 'ASC',
+				'meta_query'     => array(
+					array(
+						'key'     => '_cec_start',
+						'value'   => date( 'Y-m-d\TH:i', current_time( 'timestamp' ) - DAY_IN_SECONDS ), // phpcs:ignore WordPress.DateTime.RestrictedFunctions
+						'compare' => '>=',
+					),
+				),
+			)
+		);
+
+		$events = array();
+		foreach ( $query->posts as $p ) {
+			$events[] = CEC_Event_Helper::data( $p->ID );
+		}
+
+		nocache_headers();
+		header( 'Content-Type: text/calendar; charset=utf-8' );
+		header( 'Content-Disposition: inline; filename="events.ics"' );
+		echo self::build_ics( $events, get_bloginfo( 'name' ) . ' Events' ); // phpcs:ignore
+		exit;
+	}
+
+	private static function build_ics( $events, $calname ) {
+		$lines   = array();
+		$lines[] = 'BEGIN:VCALENDAR';
+		$lines[] = 'VERSION:2.0';
+		$lines[] = 'PRODID:-//' . self::escape( get_bloginfo( 'name' ) ) . '//Community Events Calendar//EN';
+		$lines[] = 'CALSCALE:GREGORIAN';
+		$lines[] = 'X-WR-CALNAME:' . self::escape( $calname );
+
+		foreach ( $events as $data ) {
+			if ( ! $data['start_ts'] || ! $data['start_raw'] ) {
+				continue;
+			}
+
+			$lines[] = 'BEGIN:VEVENT';
+			$lines[] = 'UID:cec-event-' . $data['id'] . '@' . self::host();
+			$lines[] = 'DTSTAMP:' . gmdate( 'Ymd\THis\Z' );
+
+			$end_raw = get_post_meta( $data['id'], '_cec_end', true );
+			if ( 'all_day' === $data['time_mode'] ) {
+				// RFC 5545: an all-day DTEND is EXCLUSIVE (the day after the
+				// last day actually included) — so a single-day all-day event
+				// needs start+1 day as its end, never the same date twice.
+				$lines[] = 'DTSTART;VALUE=DATE:' . date( 'Ymd', $data['start_ts'] );
+				$end_ts  = $end_raw ? strtotime( $end_raw ) : $data['start_ts'];
+				$lines[] = 'DTEND;VALUE=DATE:' . date( 'Ymd', strtotime( '+1 day', $end_ts ) );
+			} else {
+				$lines[] = 'DTSTART:' . self::utc_ics( $data['start_raw'] );
+				if ( $end_raw ) {
+					$lines[] = 'DTEND:' . self::utc_ics( $end_raw );
+				}
+			}
+
+			$lines[] = 'SUMMARY:' . self::escape( $data['title'] );
+
+			$desc = $data['excerpt'] ? $data['excerpt'] : wp_strip_all_tags( $data['content'] );
+			if ( $desc ) {
+				$lines[] = 'DESCRIPTION:' . self::escape( $desc );
+			}
+
+			$lines[] = 'URL:' . $data['permalink'];
+
+			$where     = CEC_Event_Helper::location_display( $data );
+			$location  = 'online' === $data['location_mode'] ? ( $where['online_url'] ? $where['online_url'] : $where['label'] ) : trim( $data['venue_name'] . ( $data['address'] && $data['address'] !== $data['venue_name'] ? ', ' . $data['address'] : '' ) );
+			if ( $location ) {
+				$lines[] = 'LOCATION:' . self::escape( $location );
+			}
+
+			if ( 'cancelled' === $data['event_status'] ) {
+				$lines[] = 'STATUS:CANCELLED';
+			} elseif ( 'postponed' === $data['event_status'] ) {
+				$lines[] = 'STATUS:TENTATIVE';
+			} else {
+				$lines[] = 'STATUS:CONFIRMED';
+			}
+
+			$lines[] = 'END:VEVENT';
+		}
+
+		$lines[] = 'END:VCALENDAR';
+
+		return implode( "\r\n", self::fold_lines( $lines ) ) . "\r\n";
+	}
+
+	/**
+	 * Converts a stored "local" datetime string (site-timezone, no offset
+	 * info of its own) into a UTC ICS timestamp, using WP's configured
+	 * timezone rather than assuming the server's PHP default timezone.
+	 */
+	private static function utc_ics( $raw ) {
+		if ( ! $raw ) {
+			return '';
+		}
+		$gmt = get_gmt_from_date( str_replace( 'T', ' ', $raw ) );
+		return str_replace( array( '-', ':', ' ' ), array( '', '', 'T' ), $gmt ) . 'Z';
+	}
+
+	private static function host() {
+		$host = wp_parse_url( home_url(), PHP_URL_HOST );
+		return $host ? $host : 'localhost';
+	}
+
+	private static function escape( $text ) {
+		$text = str_replace( array( '\\', ';', ',' ), array( '\\\\', '\\;', '\\,' ), $text );
+		$text = str_replace( array( "\r\n", "\n", "\r" ), '\\n', $text );
+		return $text;
+	}
+
+	private static function fold_lines( $lines ) {
+		$out = array();
+		foreach ( $lines as $line ) {
+			while ( mb_strlen( $line, 'UTF-8' ) > 75 ) {
+				$out[] = mb_substr( $line, 0, 75, 'UTF-8' );
+				$line  = ' ' . mb_substr( $line, 75, null, 'UTF-8' );
+			}
+			$out[] = $line;
+		}
+		return $out;
+	}
+
+	public static function single_ics_url( $data ) {
+		return add_query_arg( 'cec_ical', '1', $data['permalink'] );
+	}
+
+	public static function feed_url() {
+		return add_query_arg( 'cec_ical', 'all', home_url( '/' ) );
+	}
+
+	public static function google_calendar_url( $data ) {
+		$end_raw = get_post_meta( $data['id'], '_cec_end', true );
+
+		if ( 'all_day' === $data['time_mode'] ) {
+			$end_ts = $end_raw ? strtotime( $end_raw ) : $data['start_ts'];
+			$dates  = date( 'Ymd', $data['start_ts'] ) . '/' . date( 'Ymd', strtotime( '+1 day', $end_ts ) );
+		} else {
+			$start_raw = $data['start_raw'];
+			if ( ! $end_raw ) {
+				$end_raw = $start_raw;
+			}
+			$dates = self::utc_ics( $start_raw ) . '/' . self::utc_ics( $end_raw );
+		}
+
+		$where    = CEC_Event_Helper::location_display( $data );
+		$location = 'online' === $data['location_mode'] ? ( $where['online_url'] ? $where['online_url'] : $where['label'] ) : trim( $data['venue_name'] . ( $data['address'] && $data['address'] !== $data['venue_name'] ? ', ' . $data['address'] : '' ) );
+		$desc     = $data['excerpt'] ? $data['excerpt'] : wp_strip_all_tags( $data['content'] );
+
+		return add_query_arg(
+			array(
+				'action'   => 'TEMPLATE',
+				'text'     => rawurlencode( $data['title'] ),
+				'dates'    => $dates,
+				'details'  => rawurlencode( $desc . "\n\n" . $data['permalink'] ),
+				'location' => rawurlencode( $location ),
+				'sf'       => 'true',
+				'output'   => 'xml',
+			),
+			'https://www.google.com/calendar/render'
+		);
+	}
+}
