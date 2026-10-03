@@ -306,6 +306,32 @@ class CEC_Event_Helper {
 		}
 	}
 
+	/**
+	 * A stored "local" datetime string (_cec_start/_cec_end: the event's own
+	 * wall-clock time, no offset of its own) as a real point in time in the
+	 * event's resolved timezone (data()['timezone']: event, then venue, then
+	 * site). Anything that leaves the site with an absolute time — ICS, the
+	 * Google Calendar link, schema.org — must go through this, never through
+	 * get_gmt_from_date(), which assumes the *site's* timezone and is wrong
+	 * for any event set to a different one. An invalid stored zone falls
+	 * back to the site timezone rather than fataling. Returns null if empty.
+	 */
+	public static function local_datetime( $raw, $timezone ) {
+		if ( ! $raw ) {
+			return null;
+		}
+		try {
+			$tz = new DateTimeZone( $timezone ? $timezone : wp_timezone_string() );
+		} catch ( Exception $e ) {
+			$tz = wp_timezone();
+		}
+		try {
+			return new DateTimeImmutable( str_replace( 'T', ' ', $raw ), $tz );
+		} catch ( Exception $e ) {
+			return null;
+		}
+	}
+
 	public static function event_status( $post_id ) {
 		$status = get_post_meta( $post_id, '_cec_event_status', true );
 		return in_array( $status, array( 'postponed', 'cancelled' ), true ) ? $status : 'scheduled';
@@ -432,11 +458,15 @@ class CEC_Event_Helper {
 		if ( $description ) {
 			$schema['description'] = $description;
 		}
-		if ( $data['start_ts'] ) {
-			$schema['startDate'] = date_i18n( 'c', $data['start_ts'] );
+		// date_i18n( 'c' ) would stamp the site's UTC offset onto the event's
+		// wall-clock time — wrong for any event in a different timezone.
+		$start_dt = self::local_datetime( $data['start_raw'], $data['timezone'] );
+		$end_dt   = self::local_datetime( get_post_meta( $data['id'], '_cec_end', true ), $data['timezone'] );
+		if ( $start_dt ) {
+			$schema['startDate'] = $start_dt->format( 'c' );
 		}
-		if ( $data['end_ts'] ) {
-			$schema['endDate'] = date_i18n( 'c', $data['end_ts'] );
+		if ( $end_dt ) {
+			$schema['endDate'] = $end_dt->format( 'c' );
 		}
 		if ( $data['thumb_card'] ) {
 			$schema['image'] = array( $data['thumb_card'] );

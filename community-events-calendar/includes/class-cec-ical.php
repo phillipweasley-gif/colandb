@@ -102,9 +102,9 @@ class CEC_Ical {
 				$end_ts  = $end_raw ? strtotime( $end_raw ) : $data['start_ts'];
 				$lines[] = 'DTEND;VALUE=DATE:' . date( 'Ymd', strtotime( '+1 day', $end_ts ) );
 			} else {
-				$lines[] = 'DTSTART:' . self::utc_ics( $data['start_raw'] );
+				$lines[] = 'DTSTART:' . self::utc_ics( $data['start_raw'], $data['timezone'] );
 				if ( $end_raw ) {
-					$lines[] = 'DTEND:' . self::utc_ics( $end_raw );
+					$lines[] = 'DTEND:' . self::utc_ics( $end_raw, $data['timezone'] );
 				}
 			}
 
@@ -140,16 +140,18 @@ class CEC_Ical {
 	}
 
 	/**
-	 * Converts a stored "local" datetime string (site-timezone, no offset
-	 * info of its own) into a UTC ICS timestamp, using WP's configured
-	 * timezone rather than assuming the server's PHP default timezone.
+	 * Converts a stored "local" datetime string (the event's own wall-clock
+	 * time, no offset info of its own) into a UTC ICS timestamp, using the
+	 * event's resolved timezone (data()['timezone']) — not the site's, which
+	 * is what get_gmt_from_date() assumed before 1.25.1 and which put every
+	 * event set to a different timezone at the wrong time.
 	 */
-	private static function utc_ics( $raw ) {
-		if ( ! $raw ) {
+	private static function utc_ics( $raw, $timezone ) {
+		$dt = CEC_Event_Helper::local_datetime( $raw, $timezone );
+		if ( ! $dt ) {
 			return '';
 		}
-		$gmt = get_gmt_from_date( str_replace( 'T', ' ', $raw ) );
-		return str_replace( array( '-', ':', ' ' ), array( '', '', 'T' ), $gmt ) . 'Z';
+		return $dt->setTimezone( new DateTimeZone( 'UTC' ) )->format( 'Ymd\THis\Z' );
 	}
 
 	private static function host() {
@@ -194,7 +196,7 @@ class CEC_Ical {
 			if ( ! $end_raw ) {
 				$end_raw = $start_raw;
 			}
-			$dates = self::utc_ics( $start_raw ) . '/' . self::utc_ics( $end_raw );
+			$dates = self::utc_ics( $start_raw, $data['timezone'] ) . '/' . self::utc_ics( $end_raw, $data['timezone'] );
 		}
 
 		$where    = CEC_Event_Helper::location_display( $data );

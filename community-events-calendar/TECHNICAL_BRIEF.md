@@ -1,7 +1,7 @@
 # Community Events Calendar — Technical Handoff Brief
 
 **Prepared for:** incoming developer/maintainer
-**Plugin version documented:** 1.25.0
+**Plugin version documented:** 1.25.0 (plus the 1.25.1 timezone-export fix — see the `_cec_timezone` row in Appendix A1 and CHANGELOG 1.25.1)
 **Codebase reviewed:** full source, read directly from the files in this repository
 **This revision prepared:** October 2026 (supersedes the version of this document dated August 2026 / written against 1.6.2)
 
@@ -199,7 +199,7 @@ This appendix exists because the main body of this document describes architectu
 | Meta key | Type | Allowed values | Notes |
 |---|---|---|---|
 | `_cec_time_mode` | string enum | `exact`, `start_only`, `all_day`, `varies` | Default for a new event: `exact`. Controls whether a time is shown at all on public pages. |
-| `_cec_timezone` | string | A valid IANA timezone name (e.g. `America/Chicago`), or empty string | Empty means "use the venue's timezone, or the site's own timezone if the venue has none." Validated against PHP's `timezone_identifiers_list()` before being saved — see `CEC_Event_Helper::is_valid_timezone()`. |
+| `_cec_timezone` | string | A valid IANA timezone name (e.g. `America/Chicago`), or empty string | Empty means "use the venue's timezone, or the site's own timezone if the venue has none." Validated against PHP's `timezone_identifiers_list()` before being saved — see `CEC_Event_Helper::is_valid_timezone()`. **As of 1.25.1:** anything that emits an absolute time (ICS, the Google Calendar link, schema.org) must convert the stored wall-clock `_cec_start`/`_cec_end` through `CEC_Event_Helper::local_datetime( $raw, $data['timezone'] )` — never `get_gmt_from_date()` or `date_i18n( 'c' )`, which assume the site's timezone. |
 
 **Admission (Group B, 1.22.0) — `_cec_admission_status` is the single source of truth; `_cec_is_free` still exists but is now a *derived*, read-only value computed from it, kept only so old code reading `_cec_is_free` directly does not break:**
 
