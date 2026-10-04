@@ -459,6 +459,13 @@ a.cec-cal-day-detail-title:hover, a.cec-cal-day-detail-title:focus-visible { col
 	font-weight: 600 !important;
 	text-transform: uppercase !important;
 	letter-spacing: 0.03em !important;
+	/* Themes such as Hello Elementor (reset.css) set every select to
+	   width: 100%, which stacked these one per line. Size to content and
+	   sit in a row; the phone layout below makes them full width again. */
+	width: auto !important;
+	max-width: 100% !important;
+	flex: 0 1 auto !important;
+	min-height: 44px;
 }
 .cec-events-wrap .cec-filter-submit {
 	border: none !important;
@@ -466,6 +473,7 @@ a.cec-cal-day-detail-title:hover, a.cec-cal-day-detail-title:focus-visible { col
 	color: #0b0a12 !important;
 	padding: 10px 24px !important;
 	border-radius: var(--cec-pill) !important;
+	min-height: 44px;
 	font-size: 12px !important;
 	font-weight: 700 !important;
 	text-transform: uppercase !important;
@@ -581,6 +589,7 @@ a.cec-cal-day-detail-title:hover, a.cec-cal-day-detail-title:focus-visible { col
 .cec-row-cta-btn:hover, .cec-row-cta-btn:focus-visible { border-color: var(--cec-secondary); color: var(--cec-primary) !important; }
 
 @media (max-width: 600px) {
+	.cec-events-wrap .cec-filters select { flex: 1 1 100% !important; width: 100% !important; }
 	.cec-event-row { flex-wrap: wrap; }
 	.cec-row-cta { width: 100%; }
 	.cec-row-cta-btn { display: block; text-align: center; }

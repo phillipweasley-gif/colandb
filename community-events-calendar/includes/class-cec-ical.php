@@ -108,9 +108,9 @@ class CEC_Ical {
 				}
 			}
 
-			$lines[] = 'SUMMARY:' . self::escape( $data['title'] );
+			$lines[] = 'SUMMARY:' . self::escape( $data['title_plain'] );
 
-			$desc = $data['excerpt'] ? $data['excerpt'] : wp_strip_all_tags( $data['content'] );
+			$desc = CEC_Event_Helper::plain_text( $data['excerpt'] ? $data['excerpt'] : $data['content'] );
 			if ( $desc ) {
 				$lines[] = 'DESCRIPTION:' . self::escape( $desc );
 			}
@@ -201,12 +201,12 @@ class CEC_Ical {
 
 		$where    = CEC_Event_Helper::location_display( $data );
 		$location = 'online' === $data['location_mode'] ? ( $where['online_url'] ? $where['online_url'] : $where['label'] ) : trim( $data['venue_name'] . ( $data['address'] && $data['address'] !== $data['venue_name'] ? ', ' . $data['address'] : '' ) );
-		$desc     = $data['excerpt'] ? $data['excerpt'] : wp_strip_all_tags( $data['content'] );
+		$desc     = CEC_Event_Helper::plain_text( $data['excerpt'] ? $data['excerpt'] : $data['content'] );
 
 		return add_query_arg(
 			array(
 				'action'   => 'TEMPLATE',
-				'text'     => rawurlencode( $data['title'] ),
+				'text'     => rawurlencode( $data['title_plain'] ),
 				'dates'    => $dates,
 				'details'  => rawurlencode( $desc . "\n\n" . $data['permalink'] ),
 				'location' => rawurlencode( $location ),

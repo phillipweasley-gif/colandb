@@ -6,6 +6,17 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.25.2
+
+Four bugs found by testing 1.25.1 on the staging copy of the live site (WordPress 7.1.2, Hello Elementor theme, 92 real events) — the first full pass on a real install.
+
+- **Multi-day events lost their end date on the event page.** The "When" line was start date/time plus end *time* only, so Mr. Ohio Leather Weekend (Oct 9–11) read "Fri, Oct 9, 2026 12:00 am – 11:59 pm". New `when_display` (from `CEC_Event_Helper::format_when()`) keeps the end date: "Fri, Oct 9 – Sun, Oct 11, 2026", or "Fri, Oct 9, 2026 6:00 pm – Sun, Oct 11, 2026 2:00 pm" for an event with real times.
+- **Midnight-to-11:59 pm events showed "12:00 am".** About 75 imported national events are stored as exact times 00:00 → 23:59 (or 00:00 the next day). New `display_time_mode()` shows those as dates only, everywhere a time is displayed (event page, cards, list date block, preview), with no timezone label. Display only: the stored times, the saved Time Details setting and all exports are unchanged. Exposed as `data()['display_time_mode']`; forms keep using `time_mode`.
+- **Titles reached calendar apps with HTML codes.** WordPress turns a typed " - " into the display code `&#8211;`, and the `.ics` `SUMMARY` used that display version, so "MAsT:Columbus - October Meeting" arrived as "MAsT:Columbus &#8211; October Meeting". New `data()['title_plain']` (the title exactly as entered) and `CEC_Event_Helper::plain_text()` are now used for the `.ics` title and description, the Google Calendar link, schema.org `name`/`description`, and the share links (WhatsApp, Telegram, SMS, X, email). On-page titles are unchanged.
+- **Price showed twice ("$20 — $20").** The Phase 1a migration copied the amount out of the old price note and kept the note. The badge now leaves out a note that only repeats the amount ("$20", "20", "$20.00", "20 USD"); a note with other words ("$20 at the door") still shows. No data changed.
+- **Filter dropdowns stacked one per line** on themes that set every `select` to `width: 100%` (Hello Elementor's `reset.css`). Scoped `width: auto !important` / `flex: 0 1 auto` so they sit in a row; full width below 600px. Dropdowns and the Filter button are at least 44px tall for touch.
+- Verified on staging before release: the date and price-note rules were checked in a Python port against real events from the site; the filter-bar CSS was checked live against the real theme by injecting it into the staging page.
+
 ## 1.25.1
 
 **Fix: the per-event timezone (added in 1.22.0) was ignored by everything that sends an event's time off the site** — the downloadable/subscribed `.ics` files, the "Add to Google Calendar" link, and the schema.org `startDate`/`endDate` search-engine data. All three converted the stored wall-clock time using the *site's* timezone (`get_gmt_from_date()` in `CEC_Ical::utc_ics()`, `date_i18n( 'c' )` in `CEC_Event_Helper::event_schema()`), so any event set to a timezone other than the site's landed at the wrong time in subscribers' calendars. Example, found on a real WordPress install with the site set to America/New_York: an event at 6:00–8:00 pm America/Chicago displayed correctly on its own page ("6:00 pm – 8:00 pm CST") but exported as 23:00–01:00 UTC (an hour early) and as `18:00-05:00` in schema.org. The error grows with distance between the two zones.
