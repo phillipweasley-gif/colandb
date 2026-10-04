@@ -1,0 +1,39 @@
+name: Promote release to live
+
+# Run this after a release has been checked on staging. It marks the
+# release stable, so the live site shows "Update available" for it.
+on:
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: Plugin
+        required: true
+        type: choice
+        options:
+          - community-events-calendar
+          - community-member-planning
+          - colandb-updater
+          - cmp-hosting-check
+      version:
+        description: Version (e.g. 1.26.1)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark release stable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.plugin }}-v${{ inputs.version }}
+        run: |
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "::error::No release $TAG exists."
+            exit 1
+          fi
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest=false
+          echo "$TAG is now stable. The live site will offer it under Plugins (Settings → Plugin Updates → Check for updates now to see it immediately)."

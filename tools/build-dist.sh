@@ -12,6 +12,7 @@ mkdir -p "$DIST"
 PLUGINS="
 community-events-calendar:community-events-calendar.php
 community-member-planning:community-member-planning.php
+colandb-updater:colandb-updater.php
 tools/cmp-hosting-check:cmp-hosting-check.php
 "
 
@@ -31,6 +32,14 @@ for entry in $PLUGINS; do
 		rm -f "$old"
 		echo "removed  $(basename "$old")"
 	done
+
+	# A version's zip is built once: code can't change without a new version
+	# (CI enforces it), and rebuilding would only change zip timestamps.
+	# Use --force to rebuild anyway.
+	if [ -f "$DIST/$slug-$version.zip" ] && [ "${1:-}" != "--force" ]; then
+		echo "exists   $slug-$version.zip"
+		continue
+	fi
 
 	# Zip from the parent folder so the zip's top folder is the plugin slug,
 	# which is what WordPress's "Upload Plugin" expects.

@@ -16,13 +16,17 @@
 #
 # Optional settings (environment variables):
 #   COLANDB_REPO    where the repository copy lives   (default ~/colandb-repo)
-#   COLANDB_BRANCH  which branch holds the releases   (default below)
+#   COLANDB_BRANCH  which branch to take zips from     (default: main, or the pre-main branch)
 set -euo pipefail
 
 DEST=${1:-"$HOME/Claude Code"}
 REPO=${COLANDB_REPO:-"$HOME/colandb-repo"}
-BRANCH=${COLANDB_BRANCH:-claude/nice-edison-cbh5sw}
 URL=${COLANDB_URL:-https://github.com/phillipweasley-gif/colandb.git}
+# Releases live on main; before main existed they were on this branch.
+BRANCH=${COLANDB_BRANCH:-}
+if [ -z "$BRANCH" ]; then
+	if git ls-remote --exit-code --heads "$URL" main >/dev/null 2>&1; then BRANCH=main; else BRANCH=claude/nice-edison-cbh5sw; fi
+fi
 MANIFEST="$DEST/.colandb-sync-manifest"
 ARCHIVE="$DEST/Previous versions"
 
@@ -31,8 +35,8 @@ if [ ! -d "$REPO/.git" ]; then
 	git clone --quiet --branch "$BRANCH" "$URL" "$REPO"
 else
 	git -C "$REPO" fetch --quiet origin "$BRANCH"
-	git -C "$REPO" checkout --quiet "$BRANCH"
-	git -C "$REPO" reset --quiet --hard "origin/$BRANCH" # the copy is download-only; never edit it
+	# The copy is download-only; never edit it. -B also handles switching branches.
+	git -C "$REPO" checkout --quiet --force -B "$BRANCH" "origin/$BRANCH"
 fi
 
 mkdir -p "$DEST"

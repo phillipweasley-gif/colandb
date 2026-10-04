@@ -1,0 +1,39 @@
+name: Release plugins
+
+# Pull requests: check PHP syntax and that every changed plugin has a new version.
+# Push to main: publish each new plugin version as a GitHub pre-release with its zip.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: PHP syntax check
+        run: |
+          find . -name '*.php' -not -path './tests/*' -not -path './.git/*' -print0 \
+            | xargs -0 -n1 php -l > /dev/null
+
+      - name: Check versions (pull request)
+        if: github.event_name == 'pull_request'
+        run: bash tools/release.sh --check
+
+      - name: Publish new versions (main)
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash tools/release.sh --publish
