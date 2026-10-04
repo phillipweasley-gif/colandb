@@ -119,6 +119,26 @@ ok "rewritten address replaced with the GitHub release" $(echo "$out" | grep -q 
 ok "replacement recorded for the settings page" $(ev '$a=get_option("colandb_updater")["last_attempt"]; echo !empty($a["replaced"]) && false!==strpos($a["received"],"example.invalid")?1:0;')
 rm -f $WPT/wordpress/wp-content/mu-plugins/hostswap.php
 
+echo "== The host swaps the package for its own local copy after upgrader_package_options (Elementor Cloud Shared Stack)"
+cat > $WPT/wordpress/wp-content/mu-plugins/sharedstack.php <<'PHPEOF'
+<?php
+// Test-only: imitates Elementor Cloud's Shared Stack engine, which (registered after every plugin, at PHP_INT_MAX) fetches the package itself without the token and hands WordPress a local file.
+add_action( 'plugins_loaded', function () {
+	add_filter( 'upgrader_package_options', function ( $o ) {
+		if ( ! empty( $o['hook_extra']['plugin'] ) && is_string( $o['package'] ) && preg_match( '#^https?://#', $o['package'] ) ) {
+			$f = wp_tempnam( 'sharedstack.zip' ); $r = wp_remote_get( $o['package'], array( 'stream' => true, 'filename' => $f ) ); $o['package'] = $f;
+		}
+		return $o;
+	}, PHP_INT_MAX );
+}, 99 );
+PHPEOF
+rm -rf wp-content/plugins/community-member-planning && cp -r $REPO/community-member-planning wp-content/plugins/ && $W plugin activate community-member-planning >/dev/null 2>&1
+ev 'delete_site_transient("colandb_updater_releases"); delete_site_transient("update_plugins");' >/dev/null
+out=$($W plugin update community-member-planning 2>&1)
+ok "host's local copy replaced by the GitHub release, installs" $(echo "$out" | grep -q 'instead of this plugin' && [ "$($W plugin get community-member-planning --field=version 2>/dev/null)" = 0.2.0 ] && echo 1 || echo 0)
+ok "swap recorded with what the host's file contained" $(ev '$a=get_option("colandb_updater")["last_attempt"]; echo "a local file"===($a["swapped_after"]??"") && false!==strpos($a["swapped_file"]??"","Not Found")?1:0;')
+rm -f $WPT/wordpress/wp-content/mu-plugins/sharedstack.php
+
 echo "== Test download button"
 ok "fetch_asset reports each step" $(ev 'delete_site_transient("colandb_updater_releases"); $t=wp_tempnam("x.zip"); $r=COLANDB_Updater::fetch_asset(COLANDB_Updater::api_base()."/repos/phillipweasley-gif/colandb/releases/assets/2",$t); @unlink($t); echo is_array($r) && false!==strpos(implode("|",$r),"Redirected to 127.0.0.1") && false!==strpos(implode("|",$r),"Received a zip")?1:0;')
 

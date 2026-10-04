@@ -2,7 +2,7 @@
 /**
  * Plugin Name: COL&B Plugin Updater
  * Description: Keeps this site's custom plugins (Community Events Calendar, Community Member Planning, and any future plugin from the same GitHub repository) up to date from the repository's releases. On a staging site it installs pre-releases automatically; on the live site it offers stable releases as a normal one-click "Update now". Setup: Settings → Plugin Updates.
- * Version: 1.0.7
+ * Version: 1.0.8
  * Requires at least: 6.5
  * Requires PHP: 7.4
  * Author: RA Marketing
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'COLANDB_UPDATER_VERSION', '1.0.7' );
+define( 'COLANDB_UPDATER_VERSION', '1.0.8' );
 
 /**
  * How it works
@@ -294,7 +294,31 @@ final class COLANDB_Updater {
 	 */
 	public static function download( $reply, $package, $upgrader, $hook_extra = array() ) {
 		$prefix = self::api_base() . '/repos/' . self::REPO . '/releases/assets/';
-		if ( ! is_string( $package ) || 0 !== strpos( $package, $prefix ) ) {
+		$ours   = is_string( $package ) && 0 === strpos( $package, $prefix );
+
+		// An update of one of our plugins whose package was swapped after
+		// upgrader_package_options (Elementor Cloud's "Shared Stack" engine
+		// hands WordPress its own copy, fetched without the token, as a local
+		// file). WordPress would unpack that file as is, so fetch the GitHub
+		// release instead. Uploads ("Replace current with uploaded") carry no
+		// 'plugin' in $hook_extra and are never touched.
+		$plugin = ! empty( $hook_extra['plugin'] ) ? (string) $hook_extra['plugin'] : '';
+		if ( ! $ours && $plugin && in_array( dirname( $plugin ), self::managed_slugs(), true ) ) {
+			$latest = self::latest( dirname( $plugin ) );
+			if ( $latest ) {
+				$attempt                  = self::settings()['last_attempt'];
+				$attempt                  = is_array( $attempt ) ? $attempt : array();
+				$attempt['swapped_after'] = self::short_url( (string) $package );
+				if ( is_string( $package ) && '' !== $package && file_exists( $package ) ) {
+					$attempt['swapped_file'] = (int) filesize( $package ) . ' bytes.' . self::describe_file( $package );
+				}
+				self::update_settings( array( 'last_attempt' => $attempt ) );
+				self::say( 'COL&B Plugin Updater: WordPress was handed ' . self::short_url( (string) $package ) . ' instead of this plugin\'s GitHub release; downloading release ' . $latest['version'] . ' instead.' );
+				$package = $latest['asset_url'];
+				$ours    = true;
+			}
+		}
+		if ( ! $ours ) {
 			return $reply;
 		}
 		// Our own package: handled here whatever an earlier filter returned.
@@ -1121,6 +1145,9 @@ final class COLANDB_Updater {
 				<ul style="list-style:disc;margin-left:20px">
 					<li><?php echo esc_html( human_time_diff( $a['time'] ) . ' ago: ' . $a['plugin'] . ( $a['version'] ? ' → ' . $a['version'] : '' ) ); ?></li>
 					<li>Download address WordPress had: <?php echo esc_html( self::short_url( $a['received'] ) ); ?><?php echo $a['replaced'] ? esc_html( ' — replaced with the GitHub release' ) : esc_html( ' — the GitHub release (unchanged)' ); ?></li>
+					<?php if ( ! empty( $a['swapped_after'] ) ) : ?>
+						<li>Then swapped by the host for <?php echo esc_html( $a['swapped_after'] . ( ! empty( $a['swapped_file'] ) ? ' (' . $a['swapped_file'] . ')' : '' ) ); ?> — downloaded the GitHub release instead</li>
+					<?php endif; ?>
 				</ul>
 			<?php endif; ?>
 			<?php if ( ! empty( $s['last_download']['time'] ) && '' === $s['last_download']['error'] ) : ?>
