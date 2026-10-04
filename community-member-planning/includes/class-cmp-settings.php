@@ -29,6 +29,7 @@ class CMP_Settings {
 			'attestation_text'      => self::DEFAULT_ATTESTATION,
 			'attestation_version'   => 1,
 			'delete_data_on_delete' => 0,
+			'lock_dashboard'        => 1,
 		);
 	}
 
@@ -83,6 +84,7 @@ class CMP_Settings {
 		$out['attestation_text'] = $text;
 
 		$out['delete_data_on_delete'] = empty( $input['delete_data_on_delete'] ) ? 0 : 1;
+		$out['lock_dashboard']        = empty( $input['lock_dashboard'] ) ? 0 : 1;
 		return $out;
 	}
 
@@ -145,6 +147,14 @@ class CMP_Settings {
 						<td>
 							<input type="url" class="regular-text" name="<?php echo esc_attr( $name ); ?>[privacy_notice_url]" id="cmp_privacy_notice_url" value="<?php echo esc_attr( $opts['privacy_notice_url'] ); ?>" />
 							<p class="description"><?php esc_html_e( 'Linked next to the attestation. Leave empty until the notice is approved.', 'cmp' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Member accounts', 'cmp' ); ?></th>
+						<td>
+							<input type="hidden" name="<?php echo esc_attr( $name ); ?>[lock_dashboard]" value="0" />
+							<label><input type="checkbox" name="<?php echo esc_attr( $name ); ?>[lock_dashboard]" value="1" <?php checked( 1, (int) $opts['lock_dashboard'] ); ?> /> <?php esc_html_e( 'Keep members out of the WordPress dashboard', 'cmp' ); ?></label>
+							<p class="description"><?php esc_html_e( 'Accounts that can\'t write posts, manage calendar events or administer the site are sent to the member area\'s Account tab instead of wp-admin and its profile screen, and don\'t see the admin bar. Needs the member area page above.', 'cmp' ); ?></p>
 						</td>
 					</tr>
 					<tr>

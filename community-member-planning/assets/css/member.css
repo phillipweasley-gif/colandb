@@ -170,6 +170,52 @@
 .cmp-member-area .cmp-notification-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .cmp-member-area .cmp-notification:not(.is-read) .cmp-notification-body > :first-child { font-weight: 700; }
 
+/* Tabs: Home | Account, plus Sign out. */
+.cmp-member-area .cmp-tabs { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 16px; border-bottom: 1px solid var(--cmp-border); }
+.cmp-member-area .cmp-tabs ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; flex-wrap: wrap; }
+.cmp-member-area .cmp-tabs li { margin: 0; }
+.cmp-member-area .cmp-tabs ul a,
+.cmp-member-area .cmp-tabs a.cmp-tabs-signout {
+	display: inline-flex !important; align-items: center; min-height: 44px; padding: 10px 16px !important;
+	font-weight: 700 !important; font-size: 13px !important; letter-spacing: 0.05em; text-transform: uppercase;
+	text-decoration: none !important; color: var(--cmp-muted) !important;
+	border-bottom: 3px solid transparent; margin-bottom: -1px;
+}
+.cmp-member-area .cmp-tabs ul a:hover { color: var(--cmp-text) !important; }
+.cmp-member-area .cmp-tabs ul a.is-current { color: var(--cmp-primary) !important; border-bottom-color: var(--cmp-primary); }
+.cmp-member-area .cmp-tabs a.cmp-tabs-signout { text-decoration: underline !important; padding-right: 0 !important; }
+
+/* Forms on the Account tab. */
+.cmp-member-area .cmp-panel { scroll-margin-top: 100px; }
+.cmp-member-area .cmp-panel > .cmp-panel-title { margin-bottom: 14px; }
+.cmp-member-area .cmp-form { margin: 0; }
+.cmp-member-area .cmp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.cmp-member-area .cmp-field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 16px; }
+.cmp-member-area .cmp-field label { font-weight: 600; }
+.cmp-member-area .cmp-field input {
+	width: 100% !important; min-height: 44px; padding: 10px 14px !important;
+	background: #0f0d16 !important; color: var(--cmp-text) !important;
+	border: 1px solid rgba(255, 255, 255, 0.35) !important; border-radius: 8px !important;
+	font-family: inherit !important; font-size: 16px !important; /* 16px stops iOS zooming in */
+	box-shadow: none !important;
+}
+.cmp-member-area .cmp-field input:focus-visible { border-color: var(--cmp-primary) !important; }
+.cmp-member-area .cmp-check-small { align-items: center; margin: 0 0 16px; }
+.cmp-member-area .cmp-check-small input { width: 20px; height: 20px; margin: 0; }
+.cmp-member-area .cmp-check-small label { font-weight: 400; }
+.cmp-member-area .cmp-badge {
+	display: inline-block; margin-left: 6px; padding: 2px 10px; border-radius: 100px;
+	font-size: 0.8rem; font-weight: 700; background: var(--cmp-primary); color: #111;
+}
+.cmp-member-area .cmp-badge-warn { background: var(--cmp-error); color: #111; }
+.cmp-member-area .cmp-notice-info { border-left-color: var(--cmp-secondary); }
+.cmp-member-area .cmp-notice-info::before { content: "i\00a0"; font-weight: 700; color: var(--cmp-secondary); }
+.cmp-member-area .cmp-notice-info .cmp-form { margin-top: 10px; }
+.cmp-member-area .cmp-actions .cmp-form { display: inline-flex; }
+.cmp-member-area .cmp-btn.cmp-btn-danger,
+.cmp-member-area button.cmp-btn.cmp-btn-danger { border-color: var(--cmp-error) !important; color: var(--cmp-error) !important; }
+.cmp-member-area .cmp-btn.is-busy { opacity: 0.6; cursor: progress; }
+
 .cmp-member-area .screen-reader-text {
 	border: 0; clip: rect(1px, 1px, 1px, 1px); clip-path: inset(50%);
 	height: 1px; margin: -1px; overflow: hidden; padding: 0;
@@ -182,4 +228,6 @@
 	/* Dot | message, with the button under the message. */
 	.cmp-member-area .cmp-notification { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; row-gap: 8px; }
 	.cmp-member-area .cmp-notification .cmp-btn { grid-column: 2; justify-self: start; }
+	.cmp-member-area .cmp-grid { grid-template-columns: 1fr; }
+	.cmp-member-area .cmp-tabs ul a { padding: 10px 12px !important; }
 }

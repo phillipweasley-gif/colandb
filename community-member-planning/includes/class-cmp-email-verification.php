@@ -43,7 +43,7 @@ class CMP_Email_Verification {
 	public static function send( $user_id ) {
 		$user = get_userdata( $user_id );
 		if ( ! $user || ! is_email( $user->user_email ) ) {
-			return new WP_Error( 'no_email', __( 'Your account has no valid email address. Please update it in your profile.', 'cmp' ) );
+			return new WP_Error( 'no_email', __( 'Your account has no valid email address. Please change it on the Account tab.', 'cmp' ) );
 		}
 		if ( self::is_verified( $user_id ) ) {
 			return true;

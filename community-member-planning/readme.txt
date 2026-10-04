@@ -1,16 +1,17 @@
 === Community Member Planning ===
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.1.2
+Stable tag: 0.2.0
 
 Private member area for the Community Events Calendar site.
 
 == Description ==
 
-Adds a signed-in member area. In this release (0.1.0):
+Adds a signed-in member area. In this release (0.2.0):
 
 * Members must verify their email address and confirm they are 18 or older before entering.
 * An in-app notification inbox.
+* An Account tab where members change their name, email address and password, sign out other devices, and request a copy or deletion of their data, so they never need the WordPress dashboard.
 * An append-only audit log of account and access changes.
 
 Profiles, personal calendars (My Calendars), connections and calendar sharing, and the member directory come in later releases.
@@ -38,6 +39,8 @@ Member information never appears on public pages, public feeds, the public REST 
 2. Signed in: "Confirm your email". The member sends themselves a link (valid once, for 7 days).
 3. Verified: "Confirm you are 18 or older" (a checkbox with your wording).
 4. Member home: their notifications.
+
+The Account tab is available from the first step onward, so someone can correct a mistyped email address before confirming it. Members are kept out of the WordPress dashboard and its profile screen (Settings → Member Planning → "Keep members out of the WordPress dashboard", on by default).
 
 If a member changes their email address, they confirm the new one before re-entering. They aren't asked the 18+ question again.
 
