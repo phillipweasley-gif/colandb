@@ -2,7 +2,7 @@
 /**
  * Plugin Name: COL&B Plugin Updater
  * Description: Keeps this site's custom plugins (Community Events Calendar, Community Member Planning, and any future plugin from the same GitHub repository) up to date from the repository's releases. On a staging site it installs pre-releases automatically; on the live site it offers stable releases as a normal one-click "Update now". Setup: Settings → Plugin Updates.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Requires at least: 6.5
  * Requires PHP: 7.4
  * Author: RA Marketing
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'COLANDB_UPDATER_VERSION', '1.0.0' );
+define( 'COLANDB_UPDATER_VERSION', '1.0.1' );
 
 /**
  * How it works
@@ -48,6 +48,7 @@ final class COLANDB_Updater {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_post_colandb_updater_save', array( __CLASS__, 'handle_save' ) );
 		add_action( 'admin_post_colandb_updater_check', array( __CLASS__, 'handle_check' ) );
+		add_action( 'admin_post_colandb_updater_update', array( __CLASS__, 'handle_update' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( __CLASS__, 'action_links' ) );
 	}
 
@@ -435,6 +436,42 @@ final class COLANDB_Updater {
 		self::back( 'checked' );
 	}
 
+	/**
+	 * "Update now" on the settings screen: refreshes WordPress's update data
+	 * (so it definitely knows about the newest release), then hands over to
+	 * WordPress's own plugin updater screen, which does the install.
+	 */
+	public static function handle_update() {
+		if ( ! current_user_can( 'update_plugins' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		$file = isset( $_GET['plugin'] ) ? sanitize_text_field( wp_unslash( $_GET['plugin'] ) ) : '';
+		check_admin_referer( 'colandb_updater_update_' . $file );
+		if ( ! isset( self::installed()[ $file ] ) ) {
+			wp_die( 'That plugin is not managed by COL&B Plugin Updater.' );
+		}
+		delete_site_transient( self::CACHE );
+		delete_site_transient( 'update_plugins' );
+		wp_update_plugins();
+		// Built with add_query_arg(), not wp_nonce_url(): the latter HTML-encodes
+		// "&" for use in links, which breaks the nonce in a redirect.
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'action'   => 'upgrade-plugin',
+					'plugin'   => rawurlencode( $file ),
+					'_wpnonce' => wp_create_nonce( 'upgrade-plugin_' . $file ),
+				),
+				self_admin_url( 'update.php' )
+			)
+		);
+		exit;
+	}
+
+	private static function can_update_here() {
+		return current_user_can( 'update_plugins' ) && wp_is_file_mod_allowed( 'colandb_updater' );
+	}
+
 	public static function render() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
@@ -500,12 +537,12 @@ final class COLANDB_Updater {
 
 			<h2>Plugins</h2>
 			<table class="widefat striped" style="max-width:900px">
-				<thead><tr><th>Plugin</th><th>Installed</th><th>Newest for this site (<?php echo esc_html( 'staging' === $channel ? 'staging' : 'live' ); ?>)</th><th>Status</th></tr></thead>
+				<thead><tr><th>Plugin</th><th>Installed</th><th>Newest for this site (<?php echo esc_html( 'staging' === $channel ? 'staging' : 'live' ); ?>)</th><th>Status</th><th><span class="screen-reader-text">Action</span></th></tr></thead>
 				<tbody>
 				<?php
 				$installed = self::installed();
 				if ( ! $installed ) {
-					echo '<tr><td colspan="4">None of the managed plugins is installed.</td></tr>';
+					echo '<tr><td colspan="5">None of the managed plugins is installed.</td></tr>';
 				}
 				foreach ( $installed as $file => $data ) {
 					$latest = is_array( $releases ) ? self::latest( dirname( $file ) ) : null;
@@ -514,16 +551,22 @@ final class COLANDB_Updater {
 					} elseif ( ! $latest ) {
 						$status = 'No release published yet';
 					} elseif ( version_compare( $latest['version'], $data['Version'], '>' ) ) {
-						$status = 'staging' === $channel ? 'Update available – installs automatically' : 'Update available – go to Plugins and click Update';
+						$status = 'staging' === $channel ? 'Update available – installs automatically, or update now' : 'Update available';
 					} else {
 						$status = 'Up to date';
 					}
+					$action = '';
+					if ( $latest && version_compare( $latest['version'], $data['Version'], '>' ) && self::can_update_here() ) {
+						$url    = wp_nonce_url( admin_url( 'admin-post.php?action=colandb_updater_update&plugin=' . rawurlencode( $file ) ), 'colandb_updater_update_' . $file );
+						$action = '<a class="button button-primary" href="' . esc_url( $url ) . '" aria-label="' . esc_attr( 'Update ' . $data['Name'] . ' to ' . $latest['version'] ) . '">Update now</a>';
+					}
 					printf(
-						'<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
+						'<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
 						esc_html( $data['Name'] ),
 						esc_html( $data['Version'] ),
 						esc_html( $latest ? $latest['version'] . ( $latest['prerelease'] ? ' (pre-release)' : '' ) : '–' ),
-						esc_html( $status )
+						esc_html( $status ),
+						$action // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from escaped parts above.
 					);
 				}
 				?>

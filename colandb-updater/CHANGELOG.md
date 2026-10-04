@@ -1,5 +1,9 @@
 # Changelog — COL&B Plugin Updater
 
+## 1.0.1
+
+- **"Update now" buttons on Settings → Plugin Updates** for any plugin with a newer release. Each one refreshes WordPress's update information and then opens WordPress's own plugin updater screen, so the install itself is WordPress's standard process. Shown only to users who can update plugins, and not when file changes are disabled on the site.
+
 ## 1.0.0
 
 First release. Updates the site's custom plugins from the GitHub repository's releases.
