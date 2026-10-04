@@ -1,5 +1,11 @@
 # Changelog — COL&B Plugin Updater
 
+## 1.0.4
+
+- **Install diagnostics.** On staging, 1.0.3's Test download succeeded (valid zip, nothing else hooked into downloads) but installing still failed in WordPress's unpack step with PclZip's error. Our release zips open cleanly with both ZipArchive (strict) and PclZip, so the file WordPress unpacks there must differ from the one downloaded. The updater now records the downloaded file (path, size, fingerprint) and, at the start of WordPress's `unzip_file()` (via `unzip_file_use_ziparchive`, which runs before either zip reader can fail), the file WordPress actually unpacks, whether ZipArchive is switched off by another plugin, and how both zip readers judge it. Shown under "Last install attempt" on Settings → Plugin Updates. Purely diagnostic.
+- **Downloads are checked the way WordPress will open them:** the size received must match the size the server announced (a download that stops early still starts with the zip signature, so 1.0.2's signature check alone could pass it), and the zip is opened in ZipArchive's strict `CHECKCONS` mode, the same mode `unzip_file()` uses. Either failure stops the update with a message saying so.
+- **Test download now tests every installed plugin's newest release**, not only the updater's own small zip.
+
 ## 1.0.3
 
 - **Fix: updates failing with "PCLZIP_ERR_BAD_FORMAT … Unable to find End of Central Dir Record" on the staging site.** The failure came back with WordPress's own unzip message rather than 1.0.2's new zip check, so this plugin's download code was not the one fetching the file: another plugin hooked into WordPress's download step got there first and fetched the private GitHub address without the token, receiving GitHub's "Not Found" reply instead of the zip. The updater now handles its own GitHub packages before anything else (priority -1000) and regardless of what an earlier filter returned; every other download is left alone.

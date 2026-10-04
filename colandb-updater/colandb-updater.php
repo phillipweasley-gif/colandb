@@ -2,7 +2,7 @@
 /**
  * Plugin Name: COL&B Plugin Updater
  * Description: Keeps this site's custom plugins (Community Events Calendar, Community Member Planning, and any future plugin from the same GitHub repository) up to date from the repository's releases. On a staging site it installs pre-releases automatically; on the live site it offers stable releases as a normal one-click "Update now". Setup: Settings → Plugin Updates.
- * Version: 1.0.3
+ * Version: 1.0.4
  * Requires at least: 6.5
  * Requires PHP: 7.4
  * Author: RA Marketing
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'COLANDB_UPDATER_VERSION', '1.0.3' );
+define( 'COLANDB_UPDATER_VERSION', '1.0.4' );
 
 /**
  * How it works
@@ -48,6 +48,9 @@ final class COLANDB_Updater {
 		// itself gets GitHub's "Not Found" reply instead of a zip.
 		add_filter( 'upgrader_pre_download', array( __CLASS__, 'download' ), -1000, 4 );
 		add_filter( 'plugins_api', array( __CLASS__, 'plugin_info' ), 20, 3 );
+		// Diagnostics: runs at the start of every unzip_file(), before either
+		// zip reader can fail, and last (so it sees other plugins' choice).
+		add_filter( 'unzip_file_use_ziparchive', array( __CLASS__, 'record_unzip' ), PHP_INT_MAX );
 		add_filter( 'auto_update_plugin', array( __CLASS__, 'auto_update' ), 10, 2 );
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_post_colandb_updater_save', array( __CLASS__, 'handle_save' ) );
@@ -73,7 +76,7 @@ final class COLANDB_Updater {
 	}
 
 	private static function settings() {
-		return wp_parse_args( (array) get_option( self::OPTION, array() ), array( 'token' => '', 'channel' => '', 'last_check' => 0, 'last_error' => '', 'last_download' => array(), 'last_test' => array() ) );
+		return wp_parse_args( (array) get_option( self::OPTION, array() ), array( 'token' => '', 'channel' => '', 'last_check' => 0, 'last_error' => '', 'last_download' => array(), 'last_test' => array(), 'last_unzip' => array() ) );
 	}
 
 	private static function update_settings( $changes ) {
@@ -312,7 +315,19 @@ final class COLANDB_Updater {
 			self::update_settings( array( 'last_download' => array( 'time' => time(), 'slug' => $slug, 'error' => $check->get_error_message() ) ) );
 			return $check;
 		}
-		self::update_settings( array( 'last_download' => array( 'time' => time(), 'slug' => $slug, 'error' => '' ) ) );
+		self::update_settings(
+			array(
+				'last_download' => array(
+					'time'  => time(),
+					'slug'  => $slug,
+					'error' => '',
+					'file'  => $tmp,
+					'size'  => (int) filesize( $tmp ),
+					'md5'   => (string) md5_file( $tmp ),
+				),
+				'last_unzip'    => array(),
+			)
+		);
 		return $tmp;
 	}
 
@@ -356,8 +371,67 @@ final class COLANDB_Updater {
 			$type = wp_remote_retrieve_header( $res, 'content-type' );
 			return new WP_Error( 'colandb_not_zip', 'GitHub\'s download did not return a zip (' . implode( '; ', $steps ) . ( $type ? '; content type ' . ( is_array( $type ) ? implode( ', ', $type ) : $type ) : '' ) . ').' . self::describe_file( $tmp ) );
 		}
-		$steps[] = 'Received a zip of ' . size_format( (int) filesize( $tmp ) );
+		// A download that stopped early still starts with "PK", so also compare
+		// against the size the server announced.
+		clearstatcache( true, $tmp );
+		$got      = (int) filesize( $tmp );
+		$expected = (int) wp_remote_retrieve_header( $res, 'content-length' );
+		if ( $expected > 0 && $got !== $expected ) {
+			return new WP_Error( 'colandb_incomplete', 'The download stopped early: received ' . $got . ' of ' . $expected . ' bytes (' . implode( '; ', $steps ) . ').' );
+		}
+		$steps[] = 'Received a zip of ' . $got . ' bytes' . ( $expected > 0 ? ' (matches the announced size)' : ' (server did not announce a size)' );
 		return $steps;
+	}
+
+	/**
+	 * Diagnostics: records what WordPress is about to unpack right after one
+	 * of our downloads, and how its two zip readers judge that file. Hooked
+	 * to unzip_file_use_ziparchive and returns its value unchanged; the file
+	 * being unpacked is read from unzip_file()'s arguments.
+	 */
+	public static function record_unzip( $use_ziparchive ) {
+		$last = self::settings()['last_download'];
+		if ( empty( $last['time'] ) || time() - (int) $last['time'] > 600 ) {
+			return $use_ziparchive;
+		}
+		$file = null;
+		foreach ( debug_backtrace( 0, 10 ) as $frame ) { // phpcs:ignore WordPress.PHP.DevelopmentFunctions
+			if ( isset( $frame['function'], $frame['args'][0] ) && 'unzip_file' === $frame['function'] && ! isset( $frame['class'] ) ) {
+				$file = (string) $frame['args'][0];
+				break;
+			}
+		}
+		if ( null === $file ) {
+			return $use_ziparchive; // Not an unzip_file() call (e.g. wp_zip_file_is_valid()).
+		}
+		$result = $use_ziparchive;
+		$info = array(
+			'time'          => time(),
+			'file'          => (string) $file,
+			'same_file'     => isset( $last['file'] ) && $last['file'] === $file,
+			'exists'        => file_exists( $file ),
+			'size'          => file_exists( $file ) ? (int) filesize( $file ) : 0,
+			'md5'           => file_exists( $file ) ? (string) md5_file( $file ) : '',
+			'head'          => file_exists( $file ) ? bin2hex( (string) @file_get_contents( $file, false, null, 0, 8 ) ) : '', // phpcs:ignore WordPress.PHP.NoSilencedErrors,WordPress.WP.AlternativeFunctions
+			'use_ziparchive' => class_exists( 'ZipArchive', false ) && $use_ziparchive,
+			'checkcons'     => '',
+			'pclzip'        => '',
+		);
+		if ( class_exists( 'ZipArchive', false ) && $info['exists'] ) {
+			$z    = new ZipArchive();
+			$open = $z->open( $file, ZipArchive::CHECKCONS );
+			if ( true === $open ) {
+				$z->close();
+			}
+			$info['checkcons'] = true === $open ? 'ok' : 'error ' . $open;
+		}
+		if ( $info['exists'] ) {
+			require_once ABSPATH . 'wp-admin/includes/class-pclzip.php';
+			$pcl            = new PclZip( $file );
+			$info['pclzip'] = is_array( $pcl->properties() ) ? 'ok' : $pcl->errorInfo( true );
+		}
+		self::update_settings( array( 'last_unzip' => $info ) );
+		return $result;
 	}
 
 	private static function describe_file( $file ) {
@@ -383,8 +457,10 @@ final class COLANDB_Updater {
 			return in_array( $slug . '/' . $slug . '.php', $names, true ) ? true : new WP_Error( 'colandb_zip', 'The downloaded zip does not contain the ' . $slug . ' plugin folder as expected, so it was not installed.' );
 		}
 		$zip = new ZipArchive();
-		if ( true !== $zip->open( $file ) ) {
-			return new WP_Error( 'colandb_zip', 'The downloaded file is not a valid zip.' );
+		// Same strict mode WordPress's unzip_file() uses.
+		$opened = $zip->open( $file, ZipArchive::CHECKCONS );
+		if ( true !== $opened ) {
+			return new WP_Error( 'colandb_zip', 'The downloaded file is not a valid zip (ZipArchive error ' . $opened . ', ' . (int) filesize( $file ) . ' bytes).' );
 		}
 		$ok = $zip->numFiles > 0;
 		for ( $i = 0; $ok && $i < $zip->numFiles; $i++ ) {
@@ -531,21 +607,25 @@ final class COLANDB_Updater {
 			wp_die( 'Not allowed.' );
 		}
 		check_admin_referer( 'colandb_updater_test' );
-		$lines  = array();
-		$latest = self::latest( 'colandb-updater', 'staging' );
-		if ( ! $latest ) {
-			$releases = self::releases( true );
-			$lines[]  = is_wp_error( $releases ) ? $releases->get_error_message() : 'No COL&B Plugin Updater release found to test with.';
-		} else {
-			$lines[] = 'Testing with COL&B Plugin Updater ' . $latest['version'] . ' (' . $latest['asset_name'] . ').';
-			$tmp     = wp_tempnam( 'colandb-test.zip' );
-			$result  = self::fetch_asset( $latest['asset_url'], $tmp );
+		$lines    = array();
+		$releases = self::releases( true );
+		if ( is_wp_error( $releases ) ) {
+			$lines[] = 'FAILED: ' . $releases->get_error_message();
+		}
+		foreach ( is_wp_error( $releases ) ? array() : self::installed() as $file => $data ) {
+			$slug   = dirname( $file );
+			$latest = self::latest( $slug, 'staging' );
+			if ( ! $latest ) {
+				$lines[] = $data['Name'] . ': no release to test.';
+				continue;
+			}
+			$tmp    = wp_tempnam( 'colandb-test.zip' );
+			$result = self::fetch_asset( $latest['asset_url'], $tmp );
 			if ( is_wp_error( $result ) ) {
-				$lines[] = 'FAILED: ' . $result->get_error_message();
+				$lines[] = $data['Name'] . ' ' . $latest['version'] . ': FAILED: ' . $result->get_error_message();
 			} else {
-				$lines   = array_merge( $lines, $result );
-				$check   = self::verify_zip( $tmp, 'colandb-updater' );
-				$lines[] = is_wp_error( $check ) ? 'FAILED: ' . $check->get_error_message() : 'Zip contents OK. Updates should install.';
+				$check   = self::verify_zip( $tmp, $slug );
+				$lines[] = $data['Name'] . ' ' . $latest['version'] . ': ' . implode( '; ', $result ) . '. ' . ( is_wp_error( $check ) ? 'FAILED: ' . $check->get_error_message() : 'Zip OK.' );
 			}
 			@unlink( $tmp ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
 		}
@@ -687,8 +767,21 @@ final class COLANDB_Updater {
 				<input type="hidden" name="action" value="colandb_updater_test" />
 				<?php wp_nonce_field( 'colandb_updater_test' ); ?>
 				<?php submit_button( 'Test download', 'secondary', 'submit', false ); ?>
-				<span class="description">Downloads the newest updater release from GitHub without installing it, and shows each step.</span>
+				<span class="description">Downloads the newest release of each plugin listed above from GitHub without installing anything, and shows each step.</span>
 			</form>
+			<?php if ( ! empty( $s['last_download']['time'] ) && '' === $s['last_download']['error'] ) : ?>
+				<h2>Last install attempt</h2>
+				<ul style="list-style:disc;margin-left:20px">
+					<li>Downloaded (<?php echo esc_html( human_time_diff( $s['last_download']['time'] ) ); ?> ago): <?php echo esc_html( $s['last_download']['slug'] . ' — ' . $s['last_download']['size'] . ' bytes, fingerprint ' . substr( (string) $s['last_download']['md5'], 0, 12 ) . ', ' . $s['last_download']['file'] ); ?></li>
+					<?php if ( ! empty( $s['last_unzip'] ) ) : $u = $s['last_unzip']; ?>
+						<li>WordPress unpacked: <?php echo esc_html( $u['file'] . ' — ' . ( $u['same_file'] ? 'same file' : 'a DIFFERENT file' ) . ', ' . ( $u['exists'] ? $u['size'] . ' bytes, fingerprint ' . substr( $u['md5'], 0, 12 ) . ', starts ' . $u['head'] : 'file missing' ) ); ?></li>
+						<li>Zip readers: <?php echo esc_html( 'ZipArchive in use: ' . ( $u['use_ziparchive'] ? 'yes' : 'NO (switched off)' ) . '; strict check: ' . ( $u['checkcons'] ? $u['checkcons'] : 'n/a' ) . '; PclZip: ' . ( $u['pclzip'] ? $u['pclzip'] : 'n/a' ) ); ?></li>
+					<?php else : ?>
+						<li>WordPress did not reach the unpack step after this download.</li>
+					<?php endif; ?>
+				</ul>
+				<p class="description">If an update fails, copy this section to your developer.</p>
+			<?php endif; ?>
 			<?php if ( ! empty( $s['last_download']['time'] ) && '' !== $s['last_download']['error'] ) : ?>
 				<p><strong>Last failed download</strong> (<?php echo esc_html( human_time_diff( $s['last_download']['time'] ) ); ?> ago, <?php echo esc_html( $s['last_download']['slug'] ); ?>): <?php echo esc_html( $s['last_download']['error'] ); ?></p>
 			<?php endif; ?>

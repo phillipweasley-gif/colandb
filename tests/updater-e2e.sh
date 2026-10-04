@@ -79,6 +79,13 @@ ok "non-zip refused, says what came back" $(echo "$out" | grep -q 'did not retur
 ok "failure remembered for the settings page" $(ev '$o=get_option("colandb_updater"); echo false!==strpos($o["last_download"]["error"],"did not return a zip")?1:0;')
 echo '{}' > $M/state.json
 
+echo "== A download that arrives cut short"
+echo '{"truncated_release":true}' > $M/state.json
+ev 'delete_site_transient("colandb_updater_releases"); delete_site_transient("update_plugins");' >/dev/null
+out=$($W plugin update community-member-planning 2>&1)
+ok "truncated zip refused before WordPress unpacks it" $(echo "$out" | grep -q 'not a valid zip' && ! echo "$out" | grep -q PCLZIP && echo 1 || echo 0)
+echo '{}' > $M/state.json
+
 echo "== Test download button"
 ok "fetch_asset reports each step" $(ev 'delete_site_transient("colandb_updater_releases"); $t=wp_tempnam("x.zip"); $r=COLANDB_Updater::fetch_asset(COLANDB_Updater::api_base()."/repos/phillipweasley-gif/colandb/releases/assets/2",$t); @unlink($t); echo is_array($r) && false!==strpos(implode("|",$r),"Redirected to 127.0.0.1") && false!==strpos(implode("|",$r),"Received a zip")?1:0;')
 
