@@ -29,7 +29,7 @@ class CMP_Account {
 
 	const MIN_PASSWORD = 10;
 
-	const FORMS = array( 'details', 'email', 'email_cancel', 'password', 'sessions', 'privacy' );
+	const FORMS = array( 'details', 'email', 'email_cancel', 'password', 'sessions', 'preferences', 'privacy' );
 
 	public static function init() {
 		foreach ( self::FORMS as $form ) {
@@ -351,6 +351,46 @@ class CMP_Account {
 	}
 
 	/**
+	 * Notification categories a member can switch off. Account and
+	 * security notices always stay on.
+	 */
+	public static function categories() {
+		return array(
+			'invitation'      => __( 'Invitations and connection requests', 'cmp' ),
+			'access_change'   => __( 'Changes to what is shared with me', 'cmp' ),
+			'assignment'      => __( 'New task assignments', 'cmp' ),
+			'due_reminder'    => __( 'Task due reminders', 'cmp' ),
+			'submission'      => __( 'Submissions waiting for my review', 'cmp' ),
+			'review_decision' => __( 'Review decisions on my submissions', 'cmp' ),
+		);
+	}
+
+	public static function handle_preferences() {
+		$user = self::check( 'preferences' );
+		$tz   = sanitize_text_field( self::post( 'timezone' ) );
+		if ( '' !== $tz && ! in_array( $tz, timezone_identifiers_list(), true ) ) {
+			self::back( 'timezone_invalid', 'preferences' );
+		}
+		$on       = array_map( 'sanitize_key', (array) self::post( 'notify' ) );
+		$disabled = array_values( array_diff( array_keys( self::categories() ), $on ) );
+		$old      = array(
+			'timezone' => (string) get_user_meta( $user->ID, CMP_Notifications::META_TIMEZONE, true ),
+			'disabled' => array_values( (array) get_user_meta( $user->ID, CMP_Notifications::META_DISABLED, true ) ),
+		);
+		if ( '' === $tz ) {
+			delete_user_meta( $user->ID, CMP_Notifications::META_TIMEZONE );
+		} else {
+			update_user_meta( $user->ID, CMP_Notifications::META_TIMEZONE, $tz );
+		}
+		update_user_meta( $user->ID, CMP_Notifications::META_DISABLED, $disabled );
+		$new = array( 'timezone' => $tz, 'disabled' => $disabled );
+		if ( $old['timezone'] !== $new['timezone'] || array_diff( $old['disabled'], $disabled ) || array_diff( $disabled, $old['disabled'] ) ) {
+			CMP_Audit::log( 'preferences_changed', 'user', $user->ID, $old, $new );
+		}
+		self::back( 'preferences_saved', 'preferences' );
+	}
+
+	/**
 	 * WordPress's own privacy requests: the account holder confirms by
 	 * email, then an administrator completes it under Tools → Export /
 	 * Erase Personal Data, which also runs this plugin's exporter/eraser.
@@ -409,6 +449,10 @@ class CMP_Account {
 			if ( $rows ) {
 				$data[] = array( 'group_id' => 'cmp-access', 'group_label' => __( 'Member area access', 'cmp' ), 'item_id' => 'cmp-access-' . $user->ID, 'data' => $rows );
 			}
+			$profile = CMP_Profiles::export_items( $user->ID );
+			if ( $profile ) {
+				$data[] = array( 'group_id' => 'cmp-profile', 'group_label' => __( 'Member profile', 'cmp' ), 'item_id' => 'cmp-profile-' . $user->ID, 'data' => $profile );
+			}
 			foreach ( CMP_Notifications::for_user( $user->ID, 1000 ) as $n ) {
 				$n      = CMP_Notifications::to_public( $n );
 				$data[] = array(
@@ -432,6 +476,8 @@ class CMP_Account {
 		$removed = false;
 		if ( $user ) {
 			$removed = (bool) $wpdb->delete( CMP_Install::table( 'notifications' ), array( 'user_id' => $user->ID ), array( '%d' ) );
+			$removed = CMP_Profiles::delete_all( $user->ID ) > 0 || $removed;
+			$removed = CMP_Profile_Images::delete_all( $user->ID ) > 0 || $removed;
 			foreach ( array( CMP_Email_Verification::META_VERIFIED_EMAIL, CMP_Email_Verification::META_VERIFIED_AT, CMP_Email_Verification::META_TOKEN_HASH, CMP_Email_Verification::META_TOKEN_EXPIRES, CMP_Email_Verification::META_TOKEN_EMAIL, CMP_Access::META_ATTESTED_AT, CMP_Access::META_ATTESTED_VERSION, CMP_Notifications::META_DISABLED, CMP_Notifications::META_TIMEZONE, self::META_CHANGE_HASH, self::META_CHANGE_EXPIRES, self::META_CHANGE_EMAIL ) as $key ) {
 				$removed = delete_user_meta( $user->ID, $key ) || $removed;
 			}
@@ -470,6 +516,8 @@ class CMP_Account {
 			'export_requested'       => array( 'success', __( 'Request sent. Confirm it from the email we just sent you; we will then email you a copy of your data.', 'cmp' ) ),
 			'erase_requested'        => array( 'success', __( 'Request sent. Confirm it from the email we just sent you; the site administrator then deletes your data and lets you know.', 'cmp' ) ),
 			'privacy_pending'        => array( 'error', __( 'You already have a request like this in progress. Check your email for the confirmation link.', 'cmp' ) ),
+			'preferences_saved'      => array( 'success', __( 'Your preferences are saved.', 'cmp' ) ),
+			'timezone_invalid'       => array( 'error', __( 'Please choose a time zone from the list.', 'cmp' ) ),
 			'server_error'           => array( 'error', __( 'Something went wrong on our side. Please try again in a moment.', 'cmp' ) ),
 		);
 	}
@@ -488,6 +536,60 @@ class CMP_Account {
 			. '<input type="' . esc_attr( $type ) . '" id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( $value ) . '" ' . $attrs . ( $help ? ' aria-describedby="' . esc_attr( $id ) . '_help"' : '' ) . ' />'
 			. ( $help ? '<span class="cmp-muted" id="' . esc_attr( $id ) . '_help">' . esc_html( $help ) . '</span>' : '' )
 			. '</p>';
+	}
+
+	/**
+	 * Time zone (used for quiet hours and dates) and notification
+	 * categories. Members only: the categories are about member features.
+	 */
+	private static function render_preferences( $user ) {
+		if ( ! CMP_Access::is_member( $user->ID ) ) {
+			return '';
+		}
+		$tz       = (string) get_user_meta( $user->ID, CMP_Notifications::META_TIMEZONE, true );
+		$disabled = (array) get_user_meta( $user->ID, CMP_Notifications::META_DISABLED, true );
+		// Real place names only (they follow daylight saving time), grouped
+		// by region; no "UTC+5"-style fixed offsets.
+		$groups = array();
+		foreach ( timezone_identifiers_list() as $zone ) {
+			$parts = explode( '/', $zone, 2 );
+			if ( 2 === count( $parts ) ) {
+				$groups[ $parts[0] ][ $zone ] = str_replace( array( '_', '/' ), array( ' ', ' – ' ), $parts[1] );
+			}
+		}
+		$choices = '';
+		foreach ( $groups as $region => $zones ) {
+			$choices .= '<optgroup label="' . esc_attr( $region ) . '">';
+			foreach ( $zones as $zone => $label ) {
+				$choices .= '<option value="' . esc_attr( $zone ) . '"' . selected( $tz, $zone, false ) . '>' . esc_html( $label ) . '</option>';
+			}
+			$choices .= '</optgroup>';
+		}
+		ob_start();
+		?>
+		<section class="cmp-panel" id="cmp-preferences">
+			<h3 class="cmp-panel-title" id="cmp-preferences-title"><?php esc_html_e( 'Notifications and time zone', 'cmp' ); ?></h3>
+			<?php echo self::form_open( 'preferences', 'cmp-preferences-title' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+			<p class="cmp-field">
+				<label for="cmp_timezone"><?php esc_html_e( 'Your time zone', 'cmp' ); ?></label>
+				<select id="cmp_timezone" name="timezone" aria-describedby="cmp_timezone_help">
+					<option value=""<?php selected( '', $tz ); ?>><?php echo esc_html( sprintf( /* translators: %s: the site's time zone */ __( 'Same as this site (%s)', 'cmp' ), wp_timezone_string() ) ); ?></option>
+					<?php echo $choices; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above. ?>
+				</select>
+				<span class="cmp-muted" id="cmp_timezone_help"><?php esc_html_e( 'Dates are shown in this time zone, and notifications that arrive between 10 p.m. and 8 a.m. wait until 8 a.m.', 'cmp' ); ?></span>
+			</p>
+			<fieldset class="cmp-fieldset">
+				<legend><?php esc_html_e( 'Notify me in the member area about', 'cmp' ); ?></legend>
+				<?php foreach ( self::categories() as $key => $label ) : ?>
+					<p class="cmp-check cmp-check-small"><input type="checkbox" id="cmp_notify_<?php echo esc_attr( $key ); ?>" name="notify[]" value="<?php echo esc_attr( $key ); ?>" <?php checked( ! in_array( $key, $disabled, true ) ); ?> /><label for="cmp_notify_<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></label></p>
+				<?php endforeach; ?>
+				<p class="cmp-muted"><?php esc_html_e( 'Account and security notices are always on. Email notifications are not sent yet.', 'cmp' ); ?></p>
+			</fieldset>
+			<button type="submit" class="cmp-btn"><?php esc_html_e( 'Save preferences', 'cmp' ); ?></button>
+			</form>
+		</section>
+		<?php
+		return ob_get_clean();
 	}
 
 	public static function render() {
@@ -581,6 +683,8 @@ class CMP_Account {
 				<a class="cmp-btn cmp-btn-outline" href="<?php echo esc_url( wp_logout_url( CMP_Settings::member_page_url() ) ); ?>"><?php esc_html_e( 'Sign out', 'cmp' ); ?></a>
 			</div>
 		</section>
+
+		<?php echo self::render_preferences( $user ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 
 		<section class="cmp-panel" id="cmp-privacy">
 			<h3 class="cmp-panel-title" id="cmp-privacy-title"><?php esc_html_e( 'Your data', 'cmp' ); ?></h3>
