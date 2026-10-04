@@ -6,6 +6,13 @@
       "headers": {
         "Authorization": "Basic ${COLANDB_WP_AUTH}"
       }
+    },
+    "central-ohio-leather-beyond-elementor-staging": {
+      "type": "http",
+      "url": "https://stg-mtbrmv.elementor.cloud/wp-json/elementor/mcp/",
+      "headers": {
+        "Authorization": "Basic ${COLANDB_STG_WP_AUTH}"
+      }
     }
   }
 }

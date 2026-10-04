@@ -1,3 +1,6 @@
 {
-  "enabledMcpjsonServers": ["central-ohio-leather-beyond-elementor"]
+  "enabledMcpjsonServers": [
+    "central-ohio-leather-beyond-elementor",
+    "central-ohio-leather-beyond-elementor-staging"
+  ]
 }
