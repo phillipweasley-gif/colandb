@@ -1,5 +1,11 @@
 # Changelog — COL&B Plugin Updater
 
+## 1.0.6
+
+- **Fix: updates on the staging site downloading something other than our release.** After 1.0.5, Settings → Plugin Updates on staging showed neither "Last install attempt" nor "Last failed download" after a failed update, so this plugin's download code was never called: the download address WordPress used for the update was not our GitHub release address (something on the host replaces it in WordPress's update list), WordPress fetched that address itself, and the result was not our zip ("PCLZIP_ERR_BAD_FORMAT"). The updater now hooks `upgrader_package_options`, the last point before WordPress downloads, and for its own plugins sets the address back to the GitHub release; its own download (with the token) then runs as designed.
+- New **"Last update"** section on Settings → Plugin Updates, and a line on the update screen, showing the address WordPress had and whether it was replaced, so we can see what the host substitutes.
+- Verified locally with a stand-in for the host that rewrites the address in WordPress's update list: 1.0.5 fails, 1.0.6 installs and reports the replacement.
+
 ## 1.0.5
 
 - **Fix: updates failing on the staging site at "Unpacking the update…" with PclZip's "Unable to find End of Central Dir Record".** 1.0.4's checks showed the download itself is complete and valid every time (all four plugins, sizes matching, strict ZipArchive check passing), and the update screen skipped WordPress's own "Downloading update from…" line, so this plugin's download was being used; the file was being removed or altered on the host between download and unpack. The updater now keeps a second verified copy of each download in its own folder (`wp-content/colandb-updater-cache/`, random names, removed after the update and after an hour at most), and when WordPress starts unpacking it checks the file: if it was deleted or no longer matches the verified fingerprint, the verified copy is put back first. Only ever restores the exact file this updater downloaded.

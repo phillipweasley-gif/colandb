@@ -99,6 +99,26 @@ ok "damaged package restored and installed" $(echo "$out" | grep -q 'Restored th
 ok "verified copy cleaned up" $([ -z "$(ls $WPT/wordpress/wp-content/colandb-updater-cache/*.zip 2>/dev/null)" ] && echo 1 || echo 0)
 rm -f $WPT/wordpress/wp-content/mu-plugins/damage.php
 
+echo "== Something rewrites the download address in WordPress's update list"
+cat > $WPT/wordpress/wp-content/mu-plugins/hostswap.php <<'PHPEOF'
+<?php
+// Test-only: imitates a host that rewrites update download addresses.
+add_filter( 'site_transient_update_plugins', function ( $t ) {
+	if ( is_object( $t ) && ! empty( $t->response ) ) {
+		foreach ( $t->response as $file => $item ) {
+			if ( 0 === strpos( $file, 'community-member-planning/' ) ) { $t->response[ $file ]->package = 'https://downloads.example.invalid/elsewhere.zip'; }
+		}
+	}
+	return $t;
+} );
+PHPEOF
+rm -rf wp-content/plugins/community-member-planning && cp -r $REPO/community-member-planning wp-content/plugins/ && $W plugin activate community-member-planning >/dev/null 2>&1
+ev 'delete_site_transient("colandb_updater_releases"); delete_site_transient("update_plugins");' >/dev/null
+out=$($W plugin update community-member-planning 2>&1)
+ok "rewritten address replaced with the GitHub release" $(echo "$out" | grep -q 'using its GitHub release' && [ "$($W plugin get community-member-planning --field=version 2>/dev/null)" = 0.2.0 ] && echo 1 || echo 0)
+ok "replacement recorded for the settings page" $(ev '$a=get_option("colandb_updater")["last_attempt"]; echo !empty($a["replaced"]) && false!==strpos($a["received"],"example.invalid")?1:0;')
+rm -f $WPT/wordpress/wp-content/mu-plugins/hostswap.php
+
 echo "== Test download button"
 ok "fetch_asset reports each step" $(ev 'delete_site_transient("colandb_updater_releases"); $t=wp_tempnam("x.zip"); $r=COLANDB_Updater::fetch_asset(COLANDB_Updater::api_base()."/repos/phillipweasley-gif/colandb/releases/assets/2",$t); @unlink($t); echo is_array($r) && false!==strpos(implode("|",$r),"Redirected to 127.0.0.1") && false!==strpos(implode("|",$r),"Received a zip")?1:0;')
 

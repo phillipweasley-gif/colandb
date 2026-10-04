@@ -2,7 +2,7 @@
 /**
  * Plugin Name: COL&B Plugin Updater
  * Description: Keeps this site's custom plugins (Community Events Calendar, Community Member Planning, and any future plugin from the same GitHub repository) up to date from the repository's releases. On a staging site it installs pre-releases automatically; on the live site it offers stable releases as a normal one-click "Update now". Setup: Settings → Plugin Updates.
- * Version: 1.0.5
+ * Version: 1.0.6
  * Requires at least: 6.5
  * Requires PHP: 7.4
  * Author: RA Marketing
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'COLANDB_UPDATER_VERSION', '1.0.5' );
+define( 'COLANDB_UPDATER_VERSION', '1.0.6' );
 
 /**
  * How it works
@@ -47,6 +47,11 @@ final class COLANDB_Updater {
 		// token), so another plugin "helpfully" downloading the address
 		// itself gets GitHub's "Not Found" reply instead of a zip.
 		add_filter( 'upgrader_pre_download', array( __CLASS__, 'download' ), -1000, 4 );
+		// Last word on which file an update of one of our plugins installs:
+		// whatever wrote the download address into WordPress's update list
+		// (on Elementor Cloud something replaces it), it is set back to this
+		// plugin's GitHub release here, right before WordPress downloads it.
+		add_filter( 'upgrader_package_options', array( __CLASS__, 'package_options' ), PHP_INT_MAX );
 		add_filter( 'plugins_api', array( __CLASS__, 'plugin_info' ), 20, 3 );
 		// Diagnostics: runs at the start of every unzip_file(), before either
 		// zip reader can fail, and last (so it sees other plugins' choice).
@@ -77,7 +82,7 @@ final class COLANDB_Updater {
 	}
 
 	private static function settings() {
-		return wp_parse_args( (array) get_option( self::OPTION, array() ), array( 'token' => '', 'channel' => '', 'last_check' => 0, 'last_error' => '', 'last_download' => array(), 'last_test' => array(), 'last_unzip' => array() ) );
+		return wp_parse_args( (array) get_option( self::OPTION, array() ), array( 'token' => '', 'channel' => '', 'last_check' => 0, 'last_error' => '', 'last_download' => array(), 'last_test' => array(), 'last_unzip' => array(), 'last_attempt' => array() ) );
 	}
 
 	private static function update_settings( $changes ) {
@@ -545,6 +550,41 @@ final class COLANDB_Updater {
 		return true;
 	}
 
+	public static function package_options( $options ) {
+		$plugin = isset( $options['hook_extra']['plugin'] ) ? (string) $options['hook_extra']['plugin'] : '';
+		$slug   = $plugin ? dirname( $plugin ) : '';
+		if ( ! $slug || ! in_array( $slug, self::managed_slugs(), true ) ) {
+			return $options;
+		}
+		$received = isset( $options['package'] ) ? (string) $options['package'] : '';
+		$latest   = self::latest( $slug );
+		$attempt  = array(
+			'time'     => time(),
+			'plugin'   => $plugin,
+			'received' => $received,
+			'replaced' => false,
+			'version'  => $latest ? $latest['version'] : '',
+		);
+		if ( $latest && $received !== $latest['asset_url'] ) {
+			$options['package']  = $latest['asset_url'];
+			$attempt['replaced'] = true;
+			self::say( 'COL&B Plugin Updater: WordPress was about to download ' . self::short_url( $received ) . ' for this plugin; using its GitHub release ' . $latest['version'] . ' instead.' );
+		}
+		self::update_settings( array( 'last_attempt' => $attempt ) );
+		return $options;
+	}
+
+	private static function short_url( $url ) {
+		if ( '' === $url ) {
+			return '(no address)';
+		}
+		$parts = wp_parse_url( $url );
+		if ( empty( $parts['host'] ) ) {
+			return 'a local file';
+		}
+		return $parts['host'] . ( isset( $parts['path'] ) ? $parts['path'] : '' );
+	}
+
 	public static function plugin_info( $result, $action, $args ) {
 		if ( 'plugin_information' !== $action || empty( $args->slug ) || ! in_array( $args->slug, self::managed_slugs(), true ) ) {
 			return $result;
@@ -839,6 +879,13 @@ final class COLANDB_Updater {
 				<?php submit_button( 'Test download', 'secondary', 'submit', false ); ?>
 				<span class="description">Downloads the newest release of each plugin listed above from GitHub without installing anything, and shows each step.</span>
 			</form>
+			<?php if ( ! empty( $s['last_attempt']['time'] ) ) : $a = $s['last_attempt']; ?>
+				<h2>Last update</h2>
+				<ul style="list-style:disc;margin-left:20px">
+					<li><?php echo esc_html( human_time_diff( $a['time'] ) . ' ago: ' . $a['plugin'] . ( $a['version'] ? ' → ' . $a['version'] : '' ) ); ?></li>
+					<li>Download address WordPress had: <?php echo esc_html( self::short_url( $a['received'] ) ); ?><?php echo $a['replaced'] ? esc_html( ' — replaced with the GitHub release' ) : esc_html( ' — the GitHub release (unchanged)' ); ?></li>
+				</ul>
+			<?php endif; ?>
 			<?php if ( ! empty( $s['last_download']['time'] ) && '' === $s['last_download']['error'] ) : ?>
 				<h2>Last install attempt</h2>
 				<ul style="list-style:disc;margin-left:20px">
