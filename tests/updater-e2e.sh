@@ -144,6 +144,28 @@ rm -rf wp-content/plugins/community-member-planning && cp -r $REPO/community-mem
 ev 'require_once ABSPATH."wp-admin/includes/admin.php"; require_once ABSPATH."wp-admin/includes/class-wp-upgrader.php"; delete_site_transient("update_plugins"); wp_update_plugins(); delete_option("auto_updater.lock"); $u=new WP_Automatic_Updater(); echo $u->is_disabled()?"disabled\n":"enabled\n"; $u->run();' | sed 's/^/   auto-updater: /' | head -3
 ok "auto-updated 0.1.0 -> 0.2.0 with no click" $([ "$($W plugin get community-member-planning --field=version 2>/dev/null)" = 0.2.0 ] && echo 1 || echo 0)
 
+echo "== Remote diagnostics (REST, application password)"
+$W config set WP_ENVIRONMENT_TYPE local --type=constant >/dev/null  # application passwords over plain http
+sleep 3  # let the web server notice the wp-config.php change (opcache)
+AP=$($W user application-password create admin e2e --porcelain 2>&1 | tail -1); echo "   app password: ${#AP} chars"
+R="http://localhost:8899/?rest_route=/colandb-updater/v1"
+curl -s -u "admin:$AP" "$R/status" -o $M/status.json
+ok "status: version, channel, hooks" $(php -r '$j=json_decode(file_get_contents($argv[1]),true); echo ($j["channel"]==="staging" && isset($j["installed"]["community-member-planning/community-member-planning.php"]) && false!==strpos(implode("|",$j["hooks"]["upgrader_pre_download"]),"COLANDB_Updater::download") && false===strpos(file_get_contents($argv[1]),"good-token"))?1:0;' $M/status.json)
+ok "status refused when signed out" $([ "$(curl -s -o /dev/null -w '%{http_code}' "$R/status")" = 401 ] && echo 1 || echo 0)
+rm -rf wp-content/plugins/community-member-planning && cp -r $REPO/community-member-planning wp-content/plugins/ && $W plugin activate community-member-planning >/dev/null 2>&1
+curl -s -u "admin:$AP" -X POST "$R/update" --data-urlencode "plugin=community-member-planning/community-member-planning.php" -o $M/update.json
+ok "update over REST installs 0.2.0 and reports messages" $(php -r '$j=json_decode(file_get_contents($argv[1]),true); echo ($j["ok"] && "0.2.0"===$j["version_now"] && count($j["messages"])>1)?1:0;' $M/update.json)
+ok "still active after REST update" $([ "$($W plugin get community-member-planning --field=status 2>/dev/null)" = active ] && echo 1 || echo 0)
+ok "upload of an unmanaged zip refused" $([ "$(curl -s -o /dev/null -w '%{http_code}' -u "admin:$AP" -F "package=@$M/zips/3.zip" "$R/install")" = 400 ] && [ ! -e wp-content/plugins/evil ] && echo 1 || echo 0)
+(cd $M && rm -f up.zip && cd $REPO && zip -rq $M/up.zip community-member-planning)
+curl -s -u "admin:$AP" -F "package=@$M/up.zip" "$R/install" -o $M/install.json
+ok "upload says nothing about downloads" $(php -r '$j=json_decode(file_get_contents($argv[1]),true); echo empty($j["updater_said"])?1:0;' $M/install.json)
+ok "upload installs the managed plugin over the old one" $([ "$(php -r '$j=json_decode(file_get_contents($argv[1]),true); echo $j["ok"]?1:0;' $M/install.json)" = 1 ] && [ "$($W plugin get community-member-planning --field=version 2>/dev/null)" = "$(grep -m1 'Version:' $REPO/community-member-planning/community-member-planning.php | awk '{print $NF}')" ] && echo 1 || echo 0)
+ev '$o=get_option("colandb_updater"); $o["channel"]="stable"; update_option("colandb_updater",$o,false);' >/dev/null
+ok "routes do not exist on the live (stable) channel" $([ "$(curl -s -o /dev/null -w '%{http_code}' -u "admin:$AP" "$R/status")" = 404 ] && echo 1 || echo 0)
+ev '$o=get_option("colandb_updater"); $o["channel"]="staging"; update_option("colandb_updater",$o,false);' >/dev/null
+$W config delete WP_ENVIRONMENT_TYPE --type=constant >/dev/null 2>&1
+
 echo "== Settings screen never shows the token"
 $W user get admin >/dev/null 2>&1
 J=$M/jar; rm -f $J; curl -s -c $J -b $J -o /dev/null http://localhost:8899/wp-login.php; curl -s -c $J -b $J -o /dev/null -d "log=admin&pwd=admin&wp-submit=Log+In&testcookie=1" http://localhost:8899/wp-login.php

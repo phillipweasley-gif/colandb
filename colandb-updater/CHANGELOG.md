@@ -1,5 +1,15 @@
 # Changelog — COL&B Plugin Updater
 
+## 1.0.7
+
+- **Remote diagnostics for the staging site.** Debugging the staging "Update now" failure (PCLZIP_ERR_BAD_FORMAT, still present with 1.0.6) has relied on screenshots. On the **staging channel only**, the updater now offers three REST routes under `colandb-updater/v1` so the developer can check and run updates directly with an administrator's application password:
+  - `GET /status`: installed and newest versions, the download address WordPress has in its update list, the last update/download/unpack diagnostics, the site's plugins, must-use plugins and drop-ins, and every callback hooked into the update, download, unzip and HTTP steps (with the file it lives in). Never includes the token.
+  - `POST /update` (`plugin`): runs WordPress's own plugin updater, exactly as "Update now" does, and returns every message it printed plus the diagnostics.
+  - `POST /install` (`package` file): installs an uploaded zip over one of the managed plugins (the same as Plugins → Add New → Upload → Replace current). Zips that aren't exactly one managed plugin folder are refused.
+  Every route requires a signed-in user who can update plugins (and install plugins, for uploads). On the live (stable) channel the routes do not exist.
+- The update screen's diagnostic lines are also returned to these routes, and an uploaded zip no longer triggers the "not the file this updater downloaded" note.
+- Verified against the mock GitHub: 44/44 (8 new checks: status content and no token, signed-out refusal, update over REST, stays active, unmanaged zip refused, upload install, no routes on stable).
+
 ## 1.0.6
 
 - **Fix: updates on the staging site downloading something other than our release.** After 1.0.5, Settings → Plugin Updates on staging showed neither "Last install attempt" nor "Last failed download" after a failed update, so this plugin's download code was never called: the download address WordPress used for the update was not our GitHub release address (something on the host replaces it in WordPress's update list), WordPress fetched that address itself, and the result was not our zip ("PCLZIP_ERR_BAD_FORMAT"). The updater now hooks `upgrader_package_options`, the last point before WordPress downloads, and for its own plugins sets the address back to the GitHub release; its own download (with the token) then runs as designed.
