@@ -71,6 +71,10 @@ class CEC_Event_Helper {
 
 		$time_mode = get_post_meta( $post_id, '_cec_time_mode', true );
 		$time_mode = in_array( $time_mode, self::TIME_MODES, true ) ? $time_mode : 'exact';
+		// What the visitor sees, which can differ from the stored mode: see
+		// display_time_mode(). Exports (ICS/Google/schema.org) keep using
+		// the stored $time_mode and the real stored times.
+		$display_mode = self::display_time_mode( $start_raw, $end_raw, $time_mode );
 
 		$admission_status = self::admission_status( $post_id );
 
@@ -96,6 +100,11 @@ class CEC_Event_Helper {
 		return array(
 			'id'               => $post_id,
 			'title'            => get_the_title( $post_id ),
+			// The title exactly as entered — no wptexturize() dash/quote
+			// entities. For anything that leaves the site (ICS, Google
+			// Calendar link, schema.org, share links), where "&#8211;" would
+			// otherwise show up literally.
+			'title_plain'      => self::plain_text( get_post_field( 'post_title', $post_id, 'raw' ) ),
 			'permalink'        => get_permalink( $post_id ),
 			'excerpt'          => get_the_excerpt( $post_id ),
 			'content'          => apply_filters( 'the_content', get_post_field( 'post_content', $post_id ) ),
@@ -105,11 +114,13 @@ class CEC_Event_Helper {
 			'start_ts'         => $start_raw ? strtotime( $start_raw ) : 0,
 			'end_ts'           => $end_raw ? strtotime( $end_raw ) : 0,
 			'time_mode'        => $time_mode,
+			'display_time_mode' => $display_mode,
 			'timezone'         => $timezone,
-			'timezone_abbr'    => in_array( $time_mode, array( 'exact', 'start_only' ), true ) ? self::timezone_abbr( $timezone, $start_raw ) : '',
-			'start_display'    => self::format_start_display( $start_raw, $time_mode ),
-			'end_display'      => ( 'exact' === $time_mode && $end_raw ) ? date_i18n( 'g:i a', strtotime( $end_raw ) ) : '',
-			'date_range_display' => self::format_date_range( $start_raw, $end_raw, $time_mode ),
+			'timezone_abbr'    => in_array( $display_mode, array( 'exact', 'start_only' ), true ) ? self::timezone_abbr( $timezone, $start_raw ) : '',
+			'start_display'    => self::format_start_display( $start_raw, $display_mode ),
+			'end_display'      => ( 'exact' === $display_mode && $end_raw ) ? date_i18n( 'g:i a', strtotime( $end_raw ) ) : '',
+			'date_range_display' => self::format_date_range( $start_raw, $end_raw, $display_mode ),
+			'when_display'     => self::format_when( $start_raw, $end_raw, $display_mode ),
 			'host_org_name'    => get_post_meta( $post_id, '_cec_host_org_name', true ),
 			'host_org_url'     => get_post_meta( $post_id, '_cec_host_org_url', true ),
 			'official_website_url' => get_post_meta( $post_id, '_cec_official_website_url', true ),
@@ -182,6 +193,75 @@ class CEC_Event_Helper {
 	 * exactly the fake-precision the brief calls out, so those modes
 	 * deliberately drop the time off the stored datetime value entirely.
 	 */
+	/**
+	 * An "exact" event stored as midnight to 11:59 pm (or to midnight) on a
+	 * later day is really a run of whole days with no posted hours — the
+	 * .ics import and the national-events list both store weekends that
+	 * way. Showing "12:00 am – 11:59 pm" there is fake precision, so for
+	 * display only, treat it as all-day. Stored data is not changed.
+	 */
+	private static function display_time_mode( $start_raw, $end_raw, $time_mode ) {
+		if ( 'exact' !== $time_mode || ! $start_raw || ! $end_raw ) {
+			return $time_mode;
+		}
+		$start_ts = strtotime( $start_raw );
+		$end_ts   = strtotime( $end_raw );
+		if ( '00:00' !== date( 'H:i', $start_ts ) || ! in_array( date( 'H:i', $end_ts ), array( '23:59', '00:00' ), true ) ) {
+			return $time_mode;
+		}
+		if ( date( 'Y-m-d', $end_ts ) <= date( 'Y-m-d', $start_ts ) && '23:59' !== date( 'H:i', $end_ts ) ) {
+			return $time_mode;
+		}
+		return 'all_day';
+	}
+
+	/**
+	 * The single-event page's full "When" line. Unlike start_display +
+	 * end_display (end *time* only), this keeps the end *date* for an event
+	 * that runs over several days, e.g. "Fri, Oct 9 – Sun, Oct 11, 2026".
+	 */
+	private static function format_when( $start_raw, $end_raw, $time_mode ) {
+		if ( ! $start_raw ) {
+			return '';
+		}
+		$start_ts = strtotime( $start_raw );
+		$end_ts   = $end_raw ? strtotime( $end_raw ) : 0;
+		// A run of whole days ending at midnight really ends the day before.
+		if ( $end_ts && 'all_day' === $time_mode && '00:00' === date( 'H:i', $end_ts ) && $end_ts > $start_ts ) {
+			$end_ts -= DAY_IN_SECONDS;
+		}
+
+		if ( ! $end_ts || date( 'Y-m-d', $start_ts ) === date( 'Y-m-d', $end_ts ) ) {
+			$line = self::format_start_display( $start_raw, $time_mode );
+			if ( 'exact' === $time_mode && $end_ts ) {
+				$line .= ' – ' . date_i18n( 'g:i a', $end_ts );
+			}
+			return $line;
+		}
+
+		if ( in_array( $time_mode, array( 'exact', 'start_only' ), true ) ) {
+			$end_part = 'exact' === $time_mode ? date_i18n( 'D, M j, Y g:i a', $end_ts ) : date_i18n( 'D, M j, Y', $end_ts );
+			return date_i18n( 'D, M j, Y g:i a', $start_ts ) . ' – ' . $end_part;
+		}
+
+		$start_part = date( 'Y', $start_ts ) === date( 'Y', $end_ts ) ? date_i18n( 'D, M j', $start_ts ) : date_i18n( 'D, M j, Y', $start_ts );
+		$line       = $start_part . ' – ' . date_i18n( 'D, M j, Y', $end_ts );
+		if ( 'varies' === $time_mode ) {
+			/* translators: %s: event date range, e.g. "Fri, Oct 9 – Sun, Oct 11, 2026" */
+			$line = sprintf( __( '%s (schedule varies)', 'cec' ), $line );
+		}
+		return $line;
+	}
+
+	/**
+	 * Stored text as plain characters: tags stripped and HTML entities
+	 * (&#8211;, &amp;, &#8217; …) turned back into the real characters.
+	 * Used for text that leaves the site in a non-HTML format.
+	 */
+	public static function plain_text( $text ) {
+		return trim( html_entity_decode( wp_strip_all_tags( (string) $text ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+	}
+
 	private static function format_start_display( $start_raw, $time_mode ) {
 		if ( ! $start_raw ) {
 			return '';
@@ -262,9 +342,9 @@ class CEC_Event_Helper {
 
 		if ( $same_day ) {
 			$suffix = '';
-			if ( 'varies' === $data['time_mode'] ) {
+			if ( 'varies' === $data['display_time_mode'] ) {
 				$suffix = ' · ' . __( 'Schedule varies', 'cec' );
-			} elseif ( in_array( $data['time_mode'], array( 'exact', 'start_only' ), true ) ) {
+			} elseif ( in_array( $data['display_time_mode'], array( 'exact', 'start_only' ), true ) ) {
 				$suffix = ' · ' . date_i18n( 'g:i a', $start_ts ) . ( $data['timezone_abbr'] ? ' ' . $data['timezone_abbr'] : '' );
 			}
 			return array(
@@ -362,7 +442,7 @@ class CEC_Event_Helper {
 				return array( 'label' => $label, 'class' => 'cec-badge-varies' );
 			case 'paid':
 				$label = $data['price_amount'] ? self::format_price( $data['price_amount'], $data['price_currency'] ) : __( 'Paid', 'cec' );
-				if ( $data['price_note'] ) {
+				if ( $data['price_note'] && ! self::note_repeats_price( $data['price_note'], $data['price_amount'] ) ) {
 					$label .= ' — ' . $data['price_note'];
 				}
 				return array( 'label' => $label, 'class' => 'cec-badge-paid' );
@@ -370,6 +450,20 @@ class CEC_Event_Helper {
 			default:
 				return array( 'label' => __( 'Price Not Posted', 'cec' ), 'class' => 'cec-badge-not-posted' );
 		}
+	}
+
+	/**
+	 * True when a price note says nothing beyond the amount itself ("$20",
+	 * "20", "$20.00", "20 USD") — the Phase 1a migration copied the amount
+	 * out of the old free-text note and kept the note, which displayed as
+	 * "$20 — $20". A note with any other words ("$20 at the door") is kept.
+	 */
+	private static function note_repeats_price( $note, $amount ) {
+		if ( '' === (string) $amount ) {
+			return false;
+		}
+		$bare = preg_replace( '/^\$?\s*([0-9]+(?:\.[0-9]{1,2})?)\s*(usd)?$/i', '$1', trim( $note ) );
+		return is_numeric( $bare ) && (float) $bare === (float) $amount;
 	}
 
 	public static function format_price( $amount, $currency = 'USD' ) {
@@ -444,12 +538,12 @@ class CEC_Event_Helper {
 			'cancelled' => 'https://schema.org/EventCancelled',
 		);
 
-		$description = $data['excerpt'] ? $data['excerpt'] : wp_strip_all_tags( $data['content'] );
+		$description = self::plain_text( $data['excerpt'] ? $data['excerpt'] : $data['content'] );
 
 		$schema = array(
 			'@context'            => 'https://schema.org',
 			'@type'               => 'Event',
-			'name'                => $data['title'],
+			'name'                => $data['title_plain'],
 			'url'                 => $data['permalink'],
 			'eventAttendanceMode' => self::schema_attendance_mode( $data['location_mode'] ),
 			'eventStatus'         => isset( $status_map[ $data['event_status'] ] ) ? $status_map[ $data['event_status'] ] : $status_map['scheduled'],
@@ -894,7 +988,7 @@ class CEC_Event_Helper {
 	 */
 	public static function share_links( $data ) {
 		$url   = $data['permalink'];
-		$title = $data['title'];
+		$title = $data['title_plain'];
 		$text  = $title . ( $data['start_display'] ? ' — ' . $data['start_display'] : '' );
 
 		// iOS and Android expect a different separator before the sms: body

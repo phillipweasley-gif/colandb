@@ -23,7 +23,7 @@ rm -f wp-content/mail.log wp-content/debug.log
 $W user delete alice bob --yes >/dev/null 2>&1
 $W user create alice alice@example.com --role=subscriber --user_pass=alicepass >/dev/null
 $W user create bob bob@example.com --role=subscriber --user_pass=bobpass >/dev/null
-$W eval 'global $wpdb; $wpdb->query("DELETE FROM ".CMP_Install::table("notifications")); $wpdb->query("DELETE FROM ".CMP_Install::table("audit_log"));' >/dev/null
+$W eval 'global $wpdb; $wpdb->query("DELETE FROM ".CMP_Install::table("notifications")); $wpdb->query("DELETE FROM ".CMP_Install::table("audit_log")); delete_user_meta(1,"cmp_timezone");' >/dev/null
 # Decodes the JSON line written by the mail-capture mu-plugin and pulls out the verification link.
 maillink(){ php -r '$m=json_decode(trim($argv[1]),true); preg_match("~https?://\S*cmp_verify=[0-9a-f]+\S*~",$m["message"],$x); echo $x[0];' "$1"; }
 

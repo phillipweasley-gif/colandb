@@ -28,6 +28,7 @@ class CEC_Public_API {
 	const FIELDS = array(
 		'id',
 		'title',
+		'title_plain',
 		'permalink',
 		'start_raw',
 		'start_ts',
@@ -38,6 +39,8 @@ class CEC_Public_API {
 		'start_display',
 		'end_display',
 		'date_range_display',
+		'when_display',
+		'display_time_mode',
 		'host_org_name',
 		'official_website_url',
 		'location_mode',

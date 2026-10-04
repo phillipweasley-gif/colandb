@@ -1,6 +1,3 @@
 # Plugins listed here (one folder name per line) are never published by
 # tools/release.sh until their line is removed.
 
-# Held until the other Claude session's 1.25.2/1.25.3 work is imported and
-# merged; releasing 1.26.0 now would replace their fixes running on staging.
-community-events-calendar

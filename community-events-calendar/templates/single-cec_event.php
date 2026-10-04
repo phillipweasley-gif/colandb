@@ -51,7 +51,7 @@ while ( have_posts() ) :
 			<aside class="cec-single-sidebar">
 				<div class="cec-info-box">
 					<h3><?php esc_html_e( 'When', 'cec' ); ?></h3>
-					<p><?php echo esc_html( $data['start_display'] ); ?><?php echo $data['end_display'] ? ' &ndash; ' . esc_html( $data['end_display'] ) : ''; ?><?php echo $data['timezone_abbr'] ? ' ' . esc_html( $data['timezone_abbr'] ) : ''; ?></p>
+					<p><?php echo esc_html( $data['when_display'] ); ?><?php echo $data['timezone_abbr'] ? ' ' . esc_html( $data['timezone_abbr'] ) : ''; ?></p>
 					<?php if ( $data['start_ts'] ) : ?>
 						<p class="cec-add-to-calendar">
 							<a class="cec-btn cec-btn-outline cec-btn-small" href="<?php echo esc_url( CEC_Ical::google_calendar_url( $data ) ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Add to Google Calendar', 'cec' ); ?></a>

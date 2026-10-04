@@ -1,7 +1,7 @@
 # Community Events Calendar — Technical Handoff Brief
 
 **Prepared for:** incoming developer/maintainer
-**Plugin version documented:** 1.25.0, plus 1.25.1 (timezone-export fix, see the `_cec_timezone` row in Appendix A1) and 1.26.0 (integration API and `CEC_Month_Grid`, see §2a)
+**Plugin version documented:** 1.25.0, plus 1.25.1 (timezone-export fix, see the `_cec_timezone` row in Appendix A1), 1.25.2 (display fixes found on staging, see CHANGELOG), 1.26.0 (integration API and `CEC_Month_Grid`, see §2a) and 1.26.1 (merge of 1.25.2 and 1.26.0)
 **Codebase reviewed:** full source, read directly from the files in this repository
 **This revision prepared:** October 2026 (supersedes the version of this document dated August 2026 / written against 1.6.2)
 
