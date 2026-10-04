@@ -347,7 +347,7 @@ class CEC_Submission_Form {
 		if ( 'pending' === $status ) {
 			wp_mail(
 				get_option( 'admin_email' ),
-				sprintf( __( '[%s] New event submitted for approval', 'cec' ), get_bloginfo( 'name' ) ),
+				sprintf( __( '[%s] New event submitted for approval', 'cec' ), CEC_Event_Helper::site_name() ),
 				sprintf( __( "A new event \"%1\$s\" was submitted and is awaiting your approval:\n%2\$s", 'cec' ), $title, admin_url( 'post.php?post=' . $post_id . '&action=edit' ) )
 			);
 		}
@@ -375,7 +375,7 @@ class CEC_Submission_Form {
 
 		wp_mail(
 			$email,
-			sprintf( __( '[%s] Manage your event: %s', 'cec' ), get_bloginfo( 'name' ), $title ),
+			sprintf( __( '[%s] Manage your event: %s', 'cec' ), CEC_Event_Helper::site_name(), $title ),
 			sprintf( __( "Thanks for submitting \"%1\$s\"! It's awaiting admin approval.\n\nUse this link anytime to edit it, mark it postponed/cancelled, or withdraw it (valid for 7 days, request a fresh one from the page if it expires):\n%2\$s", 'cec' ), $title, $url )
 		);
 	}

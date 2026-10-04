@@ -100,7 +100,7 @@ class CEC_Admin_Settings {
 		$user = wp_get_current_user();
 		$sent = wp_mail(
 			$user->user_email,
-			sprintf( __( '[%s] Community Events Calendar test email', 'cec' ), get_bloginfo( 'name' ) ),
+			sprintf( __( '[%s] Community Events Calendar test email', 'cec' ), CEC_Event_Helper::site_name() ),
 			__( "This is a test email from the Community Events Calendar plugin's Settings page. If you received this, outgoing email is working.", 'cec' )
 		);
 

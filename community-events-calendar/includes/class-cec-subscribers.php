@@ -201,7 +201,7 @@ class CEC_Subscribers {
 		if ( ! empty( $links ) ) {
 			wp_mail(
 				$email,
-				sprintf( __( '[%s] Confirm your subscription', 'cec' ), get_bloginfo( 'name' ) ),
+				sprintf( __( '[%s] Confirm your subscription', 'cec' ), CEC_Event_Helper::site_name() ),
 				__( "One more step — click each link below to confirm:\n\n", 'cec' ) . implode( "\n\n", $links )
 			);
 		}
@@ -243,11 +243,11 @@ class CEC_Subscribers {
 		$where = CEC_Event_Helper::location_display( $data );
 		$details = sprintf(
 			"%s\n%s: %s\n%s: %s\n%s\n\n%s",
-			$data['title'],
+			$data['title_plain'],
 			__( 'When', 'cec' ),
 			$data['start_display'],
 			__( 'Where', 'cec' ),
-			$where['label'],
+			CEC_Event_Helper::plain_text( $where['label'] ),
 			$data['permalink'],
 			$body_intro
 		);
@@ -280,7 +280,7 @@ class CEC_Subscribers {
 		}
 		self::send_to_matches(
 			$post->ID,
-			sprintf( __( '[%s] New event: %s', 'cec' ), get_bloginfo( 'name' ), $post->post_title ),
+			sprintf( __( '[%s] New event: %s', 'cec' ), CEC_Event_Helper::site_name(), CEC_Event_Helper::plain_text( $post->post_title ) ),
 			__( 'A new event was just added to the community calendar.', 'cec' )
 		);
 	}
@@ -304,7 +304,7 @@ class CEC_Subscribers {
 
 		self::send_to_matches(
 			$event_id,
-			sprintf( __( '[%s] Event update: %s is now %s', 'cec' ), get_bloginfo( 'name' ), get_the_title( $event_id ), $label ),
+			sprintf( __( '[%s] Event update: %s is now %s', 'cec' ), CEC_Event_Helper::site_name(), CEC_Event_Helper::plain_text( get_post_field( 'post_title', $event_id, 'raw' ) ), $label ),
 			sprintf( __( 'This event is now marked: %s.', 'cec' ), $label )
 		);
 	}

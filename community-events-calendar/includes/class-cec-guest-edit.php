@@ -129,7 +129,7 @@ class CEC_Guest_Edit {
 
 		wp_mail(
 			$email,
-			sprintf( __( '[%s] Manage your submitted events', 'cec' ), get_bloginfo( 'name' ) ),
+			sprintf( __( '[%s] Manage your submitted events', 'cec' ), CEC_Event_Helper::site_name() ),
 			$body
 		);
 	}

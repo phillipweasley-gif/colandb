@@ -205,12 +205,12 @@ class CEC_RSVP {
 		$where = CEC_Event_Helper::location_display( $data );
 		$body = sprintf(
 			__( "Just a reminder — %1\$s is happening soon!\n\nWhen: %2\$s\nWhere: %3\$s\n\n%4\$s", 'cec' ),
-			$data['title'],
+			$data['title_plain'],
 			$data['start_display'],
-			$where['label'],
+			CEC_Event_Helper::plain_text( $where['label'] ),
 			$data['permalink']
 		);
-		$subject = sprintf( __( '[%s] Reminder: %s is coming up', 'cec' ), get_bloginfo( 'name' ), $data['title'] );
+		$subject = sprintf( __( '[%s] Reminder: %s is coming up', 'cec' ), CEC_Event_Helper::site_name(), $data['title_plain'] );
 
 		foreach ( $rows as $row ) {
 			wp_mail( $row->email, $subject, $body );

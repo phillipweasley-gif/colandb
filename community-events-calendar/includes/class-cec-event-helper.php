@@ -262,6 +262,16 @@ class CEC_Event_Helper {
 		return trim( html_entity_decode( wp_strip_all_tags( (string) $text ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 	}
 
+	/**
+	 * The site name as plain text ("Central Ohio Leather & Beyond"), for
+	 * email subjects/bodies, calendar files and JSON. get_bloginfo( 'name' )
+	 * returns the HTML-escaped display form ("&amp;"), which showed up
+	 * literally in email subjects before 1.26.2.
+	 */
+	public static function site_name() {
+		return self::plain_text( get_bloginfo( 'name' ) );
+	}
+
 	private static function format_start_display( $start_raw, $time_mode ) {
 		if ( ! $start_raw ) {
 			return '';
@@ -588,12 +598,12 @@ class CEC_Event_Helper {
 			// to the site itself rather than omit it when no venue/address is set.
 			$schema['location'] = array(
 				'@type' => 'Place',
-				'name'  => get_bloginfo( 'name' ),
+				'name'  => self::site_name(),
 				'url'   => home_url( '/' ),
 			);
 		}
 
-		$organizer_name = $data['host_org_name'] ? $data['host_org_name'] : get_bloginfo( 'name' );
+		$organizer_name = $data['host_org_name'] ? $data['host_org_name'] : self::site_name();
 		$schema['organizer'] = array(
 			'@type' => 'Organization',
 			'name'  => $organizer_name,

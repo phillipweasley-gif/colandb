@@ -6,6 +6,13 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.26.2
+
+**Fix: emails and calendar files showed HTML codes instead of characters** (spotted in the staging site's FluentSMTP log, e.g. "[Central Ohio Leather &amp;amp; Beyond] New event submitted for approval").
+- `get_bloginfo( 'name' )` returns WordPress's HTML-escaped display form of the site name. New `CEC_Event_Helper::site_name()` returns it as plain text and is now used in every email subject (test email, subscription confirm, new event, event update, guest edit link, volunteer inquiry, RSVP reminder, submission notices), the `.ics` `PRODID`/`X-WR-CALNAME`, and the schema.org location/organizer fallback.
+- Event titles and place names in the subscriber and RSVP-reminder emails now use the plain title (`title_plain`, from 1.25.2) and plain place name, so "MAsT:Columbus - October Meeting" no longer arrives as "&#8211;".
+- **Verified in a local WordPress 7.1.2 install** with the site name "Central Ohio Leather &amp; Beyond": the new-event, event-update and RSVP-reminder emails were triggered for real and captured; subjects and bodies contain no `&amp;` or `&#…;` codes. A before/after capture of all public pages, feeds and calendars differs only in the `.ics` `PRODID`/`X-WR-CALNAME` lines (now "&" instead of "&amp;"). `php -l` clean.
+
 ## 1.26.1
 
 **Merge: brings the other session's 1.25.2 fixes and this repository's 1.26.0 together.** 1.25.2 (multi-day end dates, midnight-to-11:59 pm events, plain-text titles in exports, duplicate price notes, filter bar layout) was built from 1.25.1 and ran only on the staging site; 1.26.0 (integration API and `CEC_Month_Grid`) was built from 1.25.1 here. Both sets of changes are kept unchanged; they touched different files apart from the version number and this file. 1.25.2 was recovered from staging with CMP Hosting Check 1.1.0 and committed as its own import first, so the history shows who changed what. A 1.25.3 is known to have existed but was never installed on either site and could not be recovered.

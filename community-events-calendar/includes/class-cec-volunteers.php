@@ -126,7 +126,7 @@ class CEC_Volunteers {
 		$notify = CEC_Admin_Settings::get( 'volunteer_notify_email' );
 		wp_mail(
 			$notify ? $notify : get_option( 'admin_email' ),
-			sprintf( __( '[%s] New volunteer inquiry: %s', 'cec' ), get_bloginfo( 'name' ), $name ),
+			sprintf( __( '[%s] New volunteer inquiry: %s', 'cec' ), CEC_Event_Helper::site_name(), $name ),
 			sprintf(
 				__( "Name: %1\$s\nEmail: %2\$s\nPhone: %3\$s\nInterests: %4\$s\nAvailability: %5\$s\n\nMessage:\n%6\$s\n\nReview all inquiries: %7\$s", 'cec' ),
 				$name,

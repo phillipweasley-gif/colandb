@@ -41,7 +41,7 @@ class CEC_Ical {
 		nocache_headers();
 		header( 'Content-Type: text/calendar; charset=utf-8' );
 		header( 'Content-Disposition: attachment; filename="' . sanitize_file_name( $data['title'] ) . '.ics"' );
-		echo self::build_ics( array( $data ), get_bloginfo( 'name' ) . ' - ' . $data['title'] ); // phpcs:ignore
+		echo self::build_ics( array( $data ), CEC_Event_Helper::site_name() . ' - ' . $data['title'] ); // phpcs:ignore
 		exit;
 	}
 
@@ -72,7 +72,7 @@ class CEC_Ical {
 		nocache_headers();
 		header( 'Content-Type: text/calendar; charset=utf-8' );
 		header( 'Content-Disposition: inline; filename="events.ics"' );
-		echo self::build_ics( $events, get_bloginfo( 'name' ) . ' Events' ); // phpcs:ignore
+		echo self::build_ics( $events, CEC_Event_Helper::site_name() . ' Events' ); // phpcs:ignore
 		exit;
 	}
 
@@ -80,7 +80,7 @@ class CEC_Ical {
 		$lines   = array();
 		$lines[] = 'BEGIN:VCALENDAR';
 		$lines[] = 'VERSION:2.0';
-		$lines[] = 'PRODID:-//' . self::escape( get_bloginfo( 'name' ) ) . '//Community Events Calendar//EN';
+		$lines[] = 'PRODID:-//' . self::escape( CEC_Event_Helper::site_name() ) . '//Community Events Calendar//EN';
 		$lines[] = 'CALSCALE:GREGORIAN';
 		$lines[] = 'X-WR-CALNAME:' . self::escape( $calname );
 
