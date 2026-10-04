@@ -2,7 +2,7 @@
 /**
  * Plugin Name: COL&B Plugin Updater
  * Description: Keeps this site's custom plugins (Community Events Calendar, Community Member Planning, and any future plugin from the same GitHub repository) up to date from the repository's releases. On a staging site it installs pre-releases automatically; on the live site it offers stable releases as a normal one-click "Update now". Setup: Settings → Plugin Updates.
- * Version: 1.0.6
+ * Version: 1.0.7
  * Requires at least: 6.5
  * Requires PHP: 7.4
  * Author: RA Marketing
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'COLANDB_UPDATER_VERSION', '1.0.6' );
+define( 'COLANDB_UPDATER_VERSION', '1.0.7' );
 
 /**
  * How it works
@@ -40,6 +40,12 @@ final class COLANDB_Updater {
 	const PAGE       = 'colandb-updater';
 	const UA         = 'colandb-updater';
 
+	/** Diagnostic lines said during this request (also returned by the REST routes). */
+	private static $said = array();
+
+	/** True while installing an uploaded zip (no download of ours to check). */
+	private static $uploading = false;
+
 	public static function init() {
 		add_filter( 'pre_set_site_transient_update_plugins', array( __CLASS__, 'inject_updates' ) );
 		// Runs before anything else hooked into downloads: our packages are
@@ -64,6 +70,7 @@ final class COLANDB_Updater {
 		add_action( 'admin_post_colandb_updater_update', array( __CLASS__, 'handle_update' ) );
 		add_action( 'admin_post_colandb_updater_test', array( __CLASS__, 'handle_test' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( __CLASS__, 'action_links' ) );
+		add_action( 'rest_api_init', array( __CLASS__, 'rest_routes' ) );
 	}
 
 	/* ------------------------------------------------------------------
@@ -398,7 +405,7 @@ final class COLANDB_Updater {
 	 */
 	public static function record_unzip( $use_ziparchive ) {
 		$last = self::settings()['last_download'];
-		if ( empty( $last['time'] ) || time() - (int) $last['time'] > 600 ) {
+		if ( self::$uploading || empty( $last['time'] ) || time() - (int) $last['time'] > 600 ) {
 			return $use_ziparchive;
 		}
 		$file = null;
@@ -465,6 +472,7 @@ final class COLANDB_Updater {
 	 * Diagnostic line on the update screen (never in AJAX/JSON responses).
 	 */
 	private static function say( $message ) {
+		self::$said[] = $message;
 		if ( wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
 			return;
 		}
@@ -622,6 +630,235 @@ final class COLANDB_Updater {
 			return true;
 		}
 		return $update;
+	}
+
+	/* ------------------------------------------------------------------
+	 * Remote diagnostics (REST, staging channel only)
+	 *
+	 * Lets the developer check and run updates on the staging site with an
+	 * administrator's application password instead of screenshots. Every
+	 * route needs a signed-in user who can update plugins, and they exist
+	 * only while this site is on the staging channel, never on live.
+	 * ---------------------------------------------------------------- */
+
+	public static function rest_routes() {
+		if ( 'staging' !== self::channel() ) {
+			return;
+		}
+		$can = static function () {
+			return current_user_can( 'update_plugins' );
+		};
+		register_rest_route( 'colandb-updater/v1', '/status', array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'rest_status' ), 'permission_callback' => $can ) );
+		register_rest_route(
+			'colandb-updater/v1',
+			'/update',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( __CLASS__, 'rest_update' ),
+				'permission_callback' => $can,
+				'args'                => array( 'plugin' => array( 'type' => 'string', 'required' => true ) ),
+			)
+		);
+		register_rest_route(
+			'colandb-updater/v1',
+			'/install',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( __CLASS__, 'rest_install' ),
+				'permission_callback' => static function () {
+					return current_user_can( 'install_plugins' ) && current_user_can( 'update_plugins' );
+				},
+			)
+		);
+	}
+
+	private static function callbacks_on( $hook ) {
+		global $wp_filter;
+		$out = array();
+		if ( ! isset( $wp_filter[ $hook ] ) ) {
+			return $out;
+		}
+		foreach ( $wp_filter[ $hook ]->callbacks as $priority => $callbacks ) {
+			foreach ( $callbacks as $cb ) {
+				$f    = $cb['function'];
+				$name = 'closure';
+				$where = '';
+				if ( is_array( $f ) ) {
+					$name = ( is_object( $f[0] ) ? get_class( $f[0] ) : $f[0] ) . '::' . $f[1];
+					try {
+						$where = ( new ReflectionMethod( $f[0], $f[1] ) )->getFileName();
+					} catch ( Exception $e ) {
+						$where = '';
+					}
+				} elseif ( is_string( $f ) ) {
+					$name = $f;
+					try {
+						$where = function_exists( $f ) ? ( new ReflectionFunction( $f ) )->getFileName() : '';
+					} catch ( Exception $e ) {
+						$where = '';
+					}
+				} elseif ( $f instanceof Closure ) {
+					$where = ( new ReflectionFunction( $f ) )->getFileName();
+				}
+				$out[] = $name . ' @' . $priority . ( $where ? ' (' . str_replace( ABSPATH, '', $where ) . ')' : '' );
+			}
+		}
+		return $out;
+	}
+
+	public static function rest_status() {
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		$s        = self::settings();
+		$releases = self::releases();
+		$latest   = array();
+		$plugins  = array();
+		foreach ( self::installed() as $file => $data ) {
+			$slug             = dirname( $file );
+			$l                = self::latest( $slug );
+			$latest[ $slug ]  = $l ? array( 'version' => $l['version'], 'asset_url' => $l['asset_url'] ) : null;
+			$plugins[ $file ] = array( 'version' => $data['Version'], 'active' => is_plugin_active( $file ) );
+		}
+		$transient = get_site_transient( 'update_plugins' );
+		$offered   = array();
+		foreach ( array_keys( $plugins ) as $file ) {
+			if ( isset( $transient->response[ $file ] ) ) {
+				$offered[ $file ] = array(
+					'new_version' => isset( $transient->response[ $file ]->new_version ) ? $transient->response[ $file ]->new_version : '',
+					'package'     => isset( $transient->response[ $file ]->package ) ? $transient->response[ $file ]->package : '',
+				);
+			}
+		}
+		$all = array();
+		foreach ( get_plugins() as $file => $data ) {
+			$all[] = $file . ' ' . $data['Version'] . ( is_plugin_active( $file ) ? ' (active)' : '' );
+		}
+		$hooks = array();
+		foreach ( array( 'pre_set_site_transient_update_plugins', 'site_transient_update_plugins', 'upgrader_pre_download', 'upgrader_package_options', 'upgrader_pre_install', 'upgrader_source_selection', 'unzip_file_use_ziparchive', 'pre_unzip_file', 'unzip_file', 'http_request_args', 'pre_http_request', 'http_response', 'wp_unique_filename', 'filesystem_method' ) as $hook ) {
+			$hooks[ $hook ] = self::callbacks_on( $hook );
+		}
+		$temp = get_temp_dir();
+		return rest_ensure_response(
+			array(
+				'updater'        => COLANDB_UPDATER_VERSION,
+				'channel'        => self::channel(),
+				'token'          => self::token_source() ? self::token_source() : 'none',
+				'releases_error' => is_wp_error( $releases ) ? $releases->get_error_message() : '',
+				'installed'      => $plugins,
+				'latest'         => $latest,
+				'offered'        => $offered,
+				'diagnostics'    => array(
+					'last_attempt'  => isset( $s['last_attempt'] ) ? $s['last_attempt'] : null,
+					'last_download' => isset( $s['last_download'] ) ? $s['last_download'] : null,
+					'last_unzip'    => isset( $s['last_unzip'] ) ? $s['last_unzip'] : null,
+				),
+				'environment'    => array(
+					'php'              => PHP_VERSION,
+					'wordpress'        => get_bloginfo( 'version' ),
+					'ziparchive'       => class_exists( 'ZipArchive' ),
+					'filesystem'       => get_filesystem_method(),
+					'temp_dir'         => $temp,
+					'temp_writable'    => wp_is_writable( $temp ),
+					'file_mods'        => wp_is_file_mod_allowed( 'colandb_updater' ),
+					'mu_plugins'       => array_keys( get_mu_plugins() ),
+					'dropins'          => array_keys( get_dropins() ),
+					'plugins'          => $all,
+				),
+				'hooks'          => $hooks,
+			)
+		);
+	}
+
+	private static function run_upgrader( $callback ) {
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		require_once ABSPATH . 'wp-admin/includes/misc.php';
+		require_once ABSPATH . 'wp-admin/includes/plugin-install.php';
+		require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+		self::$said = array();
+		$skin       = new WP_Ajax_Upgrader_Skin();
+		$upgrader   = new Plugin_Upgrader( $skin );
+		$result     = $callback( $upgrader );
+		$s          = self::settings();
+		$errors     = $skin->get_errors();
+		return array(
+			'ok'          => true === $result || ( ! is_wp_error( $result ) && $result && ! $errors->has_errors() ),
+			'result'      => is_wp_error( $result ) ? $result->get_error_message() : $result,
+			'errors'      => $errors->get_error_messages(),
+			'messages'    => $skin->get_upgrade_messages(),
+			'updater_said' => self::$said,
+			'last_attempt' => isset( $s['last_attempt'] ) ? $s['last_attempt'] : null,
+			'last_download' => isset( $s['last_download'] ) ? $s['last_download'] : null,
+			'last_unzip'  => isset( $s['last_unzip'] ) ? $s['last_unzip'] : null,
+		);
+	}
+
+	/**
+	 * Runs exactly what "Update now" runs (WordPress's Plugin_Upgrader) and
+	 * returns every message plus this updater's diagnostics.
+	 */
+	public static function rest_update( WP_REST_Request $request ) {
+		$file = (string) $request['plugin'];
+		if ( ! isset( self::installed()[ $file ] ) ) {
+			return new WP_Error( 'colandb_unknown', 'That plugin is not managed by COL&B Plugin Updater.', array( 'status' => 400 ) );
+		}
+		if ( ! wp_is_file_mod_allowed( 'colandb_updater' ) ) {
+			return new WP_Error( 'colandb_file_mods', 'File changes are disabled on this site.', array( 'status' => 403 ) );
+		}
+		delete_site_transient( self::CACHE );
+		delete_site_transient( 'update_plugins' );
+		wp_update_plugins();
+		$was_active = is_plugin_active( $file );
+		$out        = self::run_upgrader(
+			static function ( $upgrader ) use ( $file ) {
+				return $upgrader->upgrade( $file );
+			}
+		);
+		// Like WordPress's update screen, which reactivates in a separate request.
+		if ( $out['ok'] && $was_active && ! is_plugin_active( $file ) ) {
+			$out['reactivated'] = ! is_wp_error( activate_plugin( $file, '', false, true ) );
+		}
+		$out['version_now'] = self::installed()[ $file ]['Version'] ?? '';
+		return rest_ensure_response( $out );
+	}
+
+	/**
+	 * Installs an uploaded zip ("package" field) over one of the managed
+	 * plugins, the same as Plugins → Add New → Upload → Replace current.
+	 * Only zips that contain exactly one managed plugin folder are accepted.
+	 */
+	public static function rest_install( WP_REST_Request $request ) {
+		$files = $request->get_file_params();
+		if ( empty( $files['package']['tmp_name'] ) || ! is_uploaded_file( $files['package']['tmp_name'] ) ) {
+			return new WP_Error( 'colandb_no_file', 'Send the zip as the "package" file field.', array( 'status' => 400 ) );
+		}
+		if ( ! wp_is_file_mod_allowed( 'colandb_updater' ) ) {
+			return new WP_Error( 'colandb_file_mods', 'File changes are disabled on this site.', array( 'status' => 403 ) );
+		}
+		$tmp  = $files['package']['tmp_name'];
+		$slug = '';
+		foreach ( self::managed_slugs() as $candidate ) {
+			if ( true === self::verify_zip( $tmp, $candidate ) ) {
+				$slug = $candidate;
+			}
+		}
+		if ( ! $slug ) {
+			return new WP_Error( 'colandb_zip', 'The zip is not one of the plugins managed by COL&B Plugin Updater.', array( 'status' => 400 ) );
+		}
+		$file       = $slug . '/' . $slug . '.php';
+		$was_active = is_plugin_active( $file );
+		self::$uploading = true;
+		$out             = self::run_upgrader(
+			static function ( $upgrader ) use ( $tmp ) {
+				return $upgrader->install( $tmp, array( 'overwrite_package' => true ) );
+			}
+		);
+		self::$uploading = false;
+		if ( $out['ok'] && $was_active && ! is_plugin_active( $file ) ) {
+			$out['reactivated'] = ! is_wp_error( activate_plugin( $file, '', false, true ) );
+		}
+		$out['plugin'] = $file;
+		return rest_ensure_response( $out );
 	}
 
 	/* ------------------------------------------------------------------
