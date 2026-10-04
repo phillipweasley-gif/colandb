@@ -19,7 +19,9 @@ pkill -f "php -S 127.0.0.1:8899" 2>/dev/null; (PHP_CLI_SERVER_WORKERS=4 php -S 1
 rm -f $M/requests.log; echo '{}' > $M/state.json
 
 # Fresh state: member plugin 0.1.0 from the repo, updater from the repo.
-for p in community-member-planning colandb-updater; do rm -rf wp-content/plugins/$p; cp -r $REPO/$p wp-content/plugins/; done
+# An old (0.1.0) copy of the member plugin, whatever version the repo is at, so the mock's 0.2.0 release is an update.
+freshcmp(){ rm -rf wp-content/plugins/community-member-planning && cp -r $REPO/community-member-planning wp-content/plugins/ && sed -i "s/^ \* Version: [0-9.]*/ * Version: 0.1.0/" wp-content/plugins/community-member-planning/community-member-planning.php; }
+rm -rf wp-content/plugins/colandb-updater; cp -r $REPO/colandb-updater wp-content/plugins/; freshcmp
 $W plugin activate colandb-updater community-member-planning >/dev/null 2>&1
 $W config set COLANDB_UPDATER_API http://127.0.0.1:8900 --type=constant >/dev/null
 # Keep WordPress's background jobs from updating the plugin mid-test; the background update is triggered explicitly later.
@@ -92,7 +94,7 @@ cat > $WPT/wordpress/wp-content/mu-plugins/damage.php <<'PHPEOF'
 // Test-only: cuts the package in half at the start of unpacking.
 add_filter( 'unzip_file_use_ziparchive', function ( $v ) { foreach ( debug_backtrace( 0, 10 ) as $f ) { if ( 'unzip_file' === ( $f['function'] ?? '' ) ) { $p = $f['args'][0]; $d = file_get_contents( $p ); file_put_contents( $p, substr( $d, 0, intdiv( strlen( $d ), 2 ) ) ); break; } } return $v; }, 1 );
 PHPEOF
-rm -rf wp-content/plugins/community-member-planning && cp -r $REPO/community-member-planning wp-content/plugins/ && $W plugin activate community-member-planning >/dev/null 2>&1
+freshcmp && $W plugin activate community-member-planning >/dev/null 2>&1
 ev 'delete_site_transient("colandb_updater_releases"); delete_site_transient("update_plugins");' >/dev/null
 out=$($W plugin update community-member-planning 2>&1)
 ok "damaged package restored and installed" $(echo "$out" | grep -q 'Restored the verified copy' && [ "$($W plugin get community-member-planning --field=version 2>/dev/null)" = 0.2.0 ] && echo 1 || echo 0)
@@ -112,7 +114,7 @@ add_filter( 'site_transient_update_plugins', function ( $t ) {
 	return $t;
 } );
 PHPEOF
-rm -rf wp-content/plugins/community-member-planning && cp -r $REPO/community-member-planning wp-content/plugins/ && $W plugin activate community-member-planning >/dev/null 2>&1
+freshcmp && $W plugin activate community-member-planning >/dev/null 2>&1
 ev 'delete_site_transient("colandb_updater_releases"); delete_site_transient("update_plugins");' >/dev/null
 out=$($W plugin update community-member-planning 2>&1)
 ok "rewritten address replaced with the GitHub release" $(echo "$out" | grep -q 'using its GitHub release' && [ "$($W plugin get community-member-planning --field=version 2>/dev/null)" = 0.2.0 ] && echo 1 || echo 0)
@@ -132,7 +134,7 @@ add_action( 'plugins_loaded', function () {
 	}, PHP_INT_MAX );
 }, 99 );
 PHPEOF
-rm -rf wp-content/plugins/community-member-planning && cp -r $REPO/community-member-planning wp-content/plugins/ && $W plugin activate community-member-planning >/dev/null 2>&1
+freshcmp && $W plugin activate community-member-planning >/dev/null 2>&1
 ev 'delete_site_transient("colandb_updater_releases"); delete_site_transient("update_plugins");' >/dev/null
 out=$($W plugin update community-member-planning 2>&1)
 ok "host's local copy replaced by the GitHub release, installs" $(echo "$out" | grep -q 'instead of this plugin' && [ "$($W plugin get community-member-planning --field=version 2>/dev/null)" = 0.2.0 ] && echo 1 || echo 0)
@@ -148,7 +150,7 @@ cat > $WPT/wordpress/wp-content/mu-plugins/greedy-downloader.php <<'PHPEOF'
 // Test-only: imitates a plugin that downloads every package itself, without the token.
 add_filter( 'upgrader_pre_download', function ( $reply, $package ) { return $reply ? $reply : download_url( $package ); }, 10, 2 );
 PHPEOF
-rm -rf wp-content/plugins/community-member-planning && cp -r $REPO/community-member-planning wp-content/plugins/ && $W plugin activate community-member-planning >/dev/null 2>&1
+freshcmp && $W plugin activate community-member-planning >/dev/null 2>&1
 ev 'delete_site_transient("colandb_updater_releases"); delete_site_transient("update_plugins");' >/dev/null
 out=$($W plugin update community-member-planning 2>&1)
 ok "still installs when another plugin hooks downloads" $([ "$($W plugin get community-member-planning --field=version 2>/dev/null)" = 0.2.0 ] && echo 1 || echo 0)
@@ -160,7 +162,7 @@ ok "asset for an unmanaged plugin refused" $(ev '$r=COLANDB_Updater::download(fa
 
 echo "== Background auto-update on staging (WordPress's own updater)"
 ev '$o=get_option("colandb_updater"); delete_site_transient("colandb_updater_releases");' >/dev/null
-rm -rf wp-content/plugins/community-member-planning && cp -r $REPO/community-member-planning wp-content/plugins/ && $W plugin activate community-member-planning >/dev/null 2>&1
+freshcmp && $W plugin activate community-member-planning >/dev/null 2>&1
 ev 'require_once ABSPATH."wp-admin/includes/admin.php"; require_once ABSPATH."wp-admin/includes/class-wp-upgrader.php"; delete_site_transient("update_plugins"); wp_update_plugins(); delete_option("auto_updater.lock"); $u=new WP_Automatic_Updater(); echo $u->is_disabled()?"disabled\n":"enabled\n"; $u->run();' | sed 's/^/   auto-updater: /' | head -3
 ok "auto-updated 0.1.0 -> 0.2.0 with no click" $([ "$($W plugin get community-member-planning --field=version 2>/dev/null)" = 0.2.0 ] && echo 1 || echo 0)
 
@@ -172,7 +174,7 @@ R="http://localhost:8899/?rest_route=/colandb-updater/v1"
 curl -s -u "admin:$AP" "$R/status" -o $M/status.json
 ok "status: version, channel, hooks" $(php -r '$j=json_decode(file_get_contents($argv[1]),true); echo ($j["channel"]==="staging" && isset($j["installed"]["community-member-planning/community-member-planning.php"]) && false!==strpos(implode("|",$j["hooks"]["upgrader_pre_download"]),"COLANDB_Updater::download") && false===strpos(file_get_contents($argv[1]),"good-token"))?1:0;' $M/status.json)
 ok "status refused when signed out" $([ "$(curl -s -o /dev/null -w '%{http_code}' "$R/status")" = 401 ] && echo 1 || echo 0)
-rm -rf wp-content/plugins/community-member-planning && cp -r $REPO/community-member-planning wp-content/plugins/ && $W plugin activate community-member-planning >/dev/null 2>&1
+freshcmp && $W plugin activate community-member-planning >/dev/null 2>&1
 curl -s -u "admin:$AP" -X POST "$R/update" --data-urlencode "plugin=community-member-planning/community-member-planning.php" -o $M/update.json
 ok "update over REST installs 0.2.0 and reports messages" $(php -r '$j=json_decode(file_get_contents($argv[1]),true); echo ($j["ok"] && "0.2.0"===$j["version_now"] && count($j["messages"])>1)?1:0;' $M/update.json)
 ok "still active after REST update" $([ "$($W plugin get community-member-planning --field=status 2>/dev/null)" = active ] && echo 1 || echo 0)

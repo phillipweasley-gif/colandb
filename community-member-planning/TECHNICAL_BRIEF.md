@@ -24,7 +24,9 @@ community-member-planning/
 │   ├── class-cmp-email-verification.php
 │   ├── class-cmp-notifications.php in-app inbox, quiet hours, category opt-out
 │   ├── class-cmp-rest.php          cmp/v1 routes + no-store headers
-│   └── class-cmp-member-area.php   [cmp_member_area] page, form handlers, page protection
+│   ├── class-cmp-member-area.php   [cmp_member_area] page, tabs, gate form handlers, page protection
+│   └── class-cmp-account.php       Account tab (details, email change, password, devices, privacy requests),
+│                                   dashboard lockout, WordPress privacy exporter/eraser
 └── assets/{css/member.css, js/member.js}
 ```
 
@@ -36,9 +38,10 @@ community-member-planning/
 | `{prefix}cmp_notifications` | id, user_id, category, message, url, created_at, deliver_at (quiet hours), read_at. All UTC. |
 | user meta `cmp_verified_email`, `cmp_email_verified_at` | The address that was verified. Verified ⇔ equals the current `user_email` (case-insensitive). |
 | user meta `cmp_verify_token_hash` / `_expires` / `_email` | Outstanding verification link (SHA-256 of the token, expiry, address sent to). Cleared on use, expiry or email change. |
+| user meta `cmp_email_change_hash` / `_expires` / `_email` | Pending email change (SHA-256 of the token, 24-hour expiry, new address). The address changes only when the link is opened; that also verifies it. Cleared on use, expiry or cancel. |
 | user meta `cmp_age_attested_at`, `cmp_age_attestation_version` | 18+ attestation (UTC timestamp, wording version). Never a date of birth. |
 | user meta `cmp_notify_disabled_categories`, `cmp_timezone` | Notification opt-outs; member timezone for quiet hours (UI arrives with profiles). |
-| option `cmp_settings` | member_page_id, privacy_notice_url, attestation_text, attestation_version, delete_data_on_delete |
+| option `cmp_settings` | member_page_id, privacy_notice_url, attestation_text, attestation_version, delete_data_on_delete, lock_dashboard (default on) |
 | option `cmp_db_version` | Schema version. Don't delete on a live site. |
 
 Adding a table: add it to `CMP_Install::schema()` and `table_names()`, add it to `uninstall.php`, bump `CMP_DB_VERSION`.
@@ -48,7 +51,8 @@ Adding a table: add it to `CMP_Install::schema()` and `table_names()`, add it to
 - **Audit:** call `CMP_Audit::log()` for every invitation/confirmation, permission change, profile privacy change, task status/review change, report edit and file upload/removal (brief §5). Updates pass old and new; deletes pass old and a reason.
 - **Notifications:** `CMP_Notifications::add( $user_id, $category, $message, $url, $respect_quiet_hours = true )`. Pass `false` only for an immediate response to the member's own action.
 - **REST:** new routes go under `cmp/v1` with `permission_callback => array( 'CMP_Rest', 'require_member' )` plus an ownership check in the handler. Return 404 (not 403) for records the user may not see, so IDs can't be probed. `no_store_headers()` already covers the whole namespace.
-- **Forms:** `admin-post.php` + `_cmp_nonce` + `check_nonce()`, redirect back with `cmp_notice` (add the message to `notice_html()`).
+- **Forms:** `admin-post.php` + `_cmp_nonce` + `check_nonce()`, redirect back with `cmp_notice` (add the message to `notice_html()`, or to `CMP_Account::notices()` for Account-tab forms). Anything that changes sign-in details asks for the current password (5 wrong tries per 15 minutes per account, then locked).
+- **No wp-admin for members:** members never get a link to wp-admin. Account changes belong on the Account tab (`CMP_Account::url()`); `CMP_Account::is_kept_out()` says who is kept out (accounts without `edit_posts`, `cec_manage_events` or `manage_options`; filter `cmp_keep_out_of_dashboard`). With the events plugin active, it already routes non-administrators out of wp-admin except `profile.php`, so this plugin takes over only `profile.php` (and sign-ins aimed at it).
 - **CSS:** scope under `.cmp-member-area`, `!important` on the visual properties of every interactive element (same reason as CEC `TECHNICAL_BRIEF.md` §7). Icon + text for every status, never colour alone. Test at 320/375/768/1440 px.
 - **Timestamps:** store UTC; display with `wp_date()` in the member's timezone (`CMP_Notifications::user_timezone()`).
 
@@ -58,7 +62,7 @@ No live PHP environment is needed: the repo's `tests/` folder has the local Word
 
 ## 6. Not built yet (by increment)
 
-- 2.1 Profiles: field dictionary, per-field visibility, age rules, avatar/cover with private delivery, admin option lists, notification preferences UI, member timezone.
+- 2.1 Profiles (0.2.0 shipped the Account tab ahead of it): field dictionary, per-field visibility, age rules, avatar/cover with private delivery, admin option lists, notification preferences UI, member timezone.
 - 2.2 My Calendars: calendars, linked public events, responses + history, private ICS feeds.
 - 2.3 Connections, two-sided confirmation, calendar sharing, block and report.
 - 2.4 Member directory, own-data export, accessibility/permission test pass.

@@ -4,6 +4,28 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.2.0
+
+**Front-end account management: members never need the WordPress dashboard.** On the owner's request (staging, 2026-10-04), the account part of increment 2.1 ships ahead of profiles.
+
+- **New Account tab** on the member area (`?cmp_tab=account`), with Home | Account tabs and a Sign out link. It's open to every signed-in account, including one that hasn't confirmed its email yet, so a mistyped address can be fixed before verifying.
+  - **Your details:** first name, last name and display name (required; up to 80 characters each). The username is shown but can't be changed.
+  - **Email address:** shows the current address and whether it's confirmed. A change needs the current password. A single-use link goes to the *new* address (256-bit token, only its hash stored, 24-hour expiry, one request per 5 minutes, cancellable), and the address changes only when the link is opened. Opening it also confirms the new address for the member area, so members aren't asked again. WordPress emails the old address about the change. An address another account uses is refused.
+  - **Password:** needs the current password; at least 10 characters, not the username or email, typed twice, with a "Show passwords" option. Changing it signs out every other device and keeps this browser signed in, and WordPress emails a confirmation.
+  - **Signed-in devices:** shows how many other devices are signed in, with "Sign out everywhere else" and "Sign out".
+  - **Your data:** "Email me a copy of my data" and "Ask to delete my account" use WordPress's own privacy requests. The person confirms by email, then an administrator completes the request under Tools → Export / Erase Personal Data.
+  - Wrong current passwords are limited to 5 per 15 minutes per account, across the email and password forms.
+- **Members are kept out of wp-admin** (new setting under Settings → Member Planning, on by default; needs the member page to be set). Accounts that can't write posts, manage calendar events or administer the site are sent from `wp-admin/profile.php`, or a sign-in aimed at it, to the Account tab, and WordPress's "Edit profile" links point there too. The rest of wp-admin was already closed to them by the events plugin (and by WordPress, which answers other screens with "not allowed"); without the events plugin, this plugin sends them from any wp-admin screen to the member area and hides the admin bar. Editors, calendar managers and administrators are unaffected. Form posts and background requests (`admin-post.php`, `admin-ajax.php`) keep working.
+- **The "Wrong address?" link** on the confirm-email step now opens the Account tab instead of wp-admin's profile screen.
+- **Privacy exporter and eraser** registered with WordPress. The export includes the member-area access record (verified address, attestation time and wording version) and notifications. Erasure removes notifications and member-area account data; the security audit log is kept, and the erasure is logged.
+- **Audit log:** account details changed, email change requested, cancelled or confirmed (as `email_verified` via `email_change`), password changed, other sessions ended, privacy request made, personal data erased.
+- Status notices now appear under the tabs.
+- **Verified** in the local WordPress 7.1.2 install with Community Events Calendar 1.26.2:
+  - New `tests/account-e2e.sh`, 64/64 over real HTTP. It covers signed-out access; the lockout for subscriber, editor, calendar manager and administrator, and with the setting off; every form's validation, nonces, rate and wrong-password limits; email-change tokens (tampered, another account's, reused, cancelled, opened signed out); session handling across devices; the privacy requests; and the exporter and eraser.
+  - Existing `tests/e2e.sh`: 57/57.
+  - Browser at 320/375/1440 px: no horizontal scrolling, 44 px inputs at 16 px text, and "Show passwords" works.
+  - `php -l` and `node --check` pass.
+
 ## 0.1.2
 
 - The administrator-only "this page is not set as the member area page" note no longer appears by mistake in Elementor's editor. The editor renders the shortcode outside the normal page request, so the check now also recognises the page ID Elementor passes (`elementor-preview`, `editor_post_id`) and `get_the_ID()`.

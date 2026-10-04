@@ -2,6 +2,43 @@
    Notification inbox: mark one / all as read through the cmp/v1 REST
    routes. Every failure path ends in a visible, announced state
    (offline, permission denied, server error with retry) per the brief. */
+/* Account tab: show/hide passwords, confirm before risky requests, and
+   no double submits. Forms work without JavaScript too. */
+( function () {
+	'use strict';
+
+	var toggle = document.querySelector( '[data-cmp-show-passwords]' );
+	if ( toggle ) {
+		toggle.addEventListener( 'change', function () {
+			var fields = toggle.form.querySelectorAll( 'input[type="password"], input[data-cmp-was-password]' );
+			Array.prototype.forEach.call( fields, function ( input ) {
+				input.setAttribute( 'data-cmp-was-password', '1' );
+				input.type = toggle.checked ? 'text' : 'password';
+			} );
+		} );
+	}
+
+	Array.prototype.forEach.call( document.querySelectorAll( '.cmp-member-area form.cmp-form' ), function ( form ) {
+		form.addEventListener( 'submit', function ( event ) {
+			var button = event.submitter || form.querySelector( 'button[type="submit"]' );
+			var question = button && button.getAttribute( 'data-cmp-confirm' );
+			if ( question && ! window.confirm( question ) ) {
+				event.preventDefault();
+				return;
+			}
+			if ( form.getAttribute( 'data-cmp-sent' ) ) {
+				event.preventDefault();
+				return;
+			}
+			form.setAttribute( 'data-cmp-sent', '1' );
+			if ( button ) {
+				button.setAttribute( 'aria-disabled', 'true' );
+				button.classList.add( 'is-busy' );
+			}
+		} );
+	} );
+}() );
+
 ( function () {
 	'use strict';
 

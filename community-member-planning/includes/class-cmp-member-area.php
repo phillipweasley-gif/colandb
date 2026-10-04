@@ -172,11 +172,12 @@ class CMP_Member_Area {
 			'verify_failed'   => array( 'error', __( 'That verification link is invalid, already used, or expired. Request a new one below.', 'cmp' ) ),
 			'rate_limited'    => array( 'error', __( 'A verification email was sent a few minutes ago. Please check your inbox (and spam folder) before requesting another.', 'cmp' ) ),
 			'mail_failed'     => array( 'error', __( "We couldn't send the verification email. Please try again later or contact the site administrator.", 'cmp' ) ),
-			'no_email'        => array( 'error', __( 'Your account has no valid email address. Please update it in your profile.', 'cmp' ) ),
+			'no_email'        => array( 'error', __( 'Your account has no valid email address. Please change it on the Account tab.', 'cmp' ) ),
 			'attest_required' => array( 'error', __( 'Please tick the box to confirm before continuing.', 'cmp' ) ),
 			'expired'         => array( 'error', __( 'Your session expired. Please try again.', 'cmp' ) ),
 			'welcome'         => array( 'success', __( "You're in. Welcome to the member area.", 'cmp' ) ),
 		);
+		$map += CMP_Account::notices();
 		if ( ! isset( $map[ $notice ] ) ) {
 			return '';
 		}
@@ -194,9 +195,18 @@ class CMP_Member_Area {
 
 		$out  = '<div class="cmp-member-area">';
 		$out .= self::config_warning_html();
+		$state = CMP_Access::state();
+		$tab   = self::current_tab();
+		if ( CMP_Access::STATE_LOGGED_OUT !== $state ) {
+			$out .= self::tabs_html( $tab, $state );
+		}
 		$out .= self::notice_html();
+		if ( CMP_Access::STATE_LOGGED_OUT !== $state && CMP_Account::TAB === $tab ) {
+			wp_enqueue_script( 'cmp-member' );
+			return $out . CMP_Account::render() . '</div>';
+		}
 
-		switch ( CMP_Access::state() ) {
+		switch ( $state ) {
 			case CMP_Access::STATE_LOGGED_OUT:
 				$out .= self::render_logged_out();
 				break;
@@ -210,6 +220,33 @@ class CMP_Member_Area {
 				$out .= self::render_home();
 		}
 		return $out . '</div>';
+	}
+
+	private static function current_tab() {
+		$tab = isset( $_GET['cmp_tab'] ) ? sanitize_key( wp_unslash( $_GET['cmp_tab'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return CMP_Account::TAB === $tab ? $tab : 'home';
+	}
+
+	/**
+	 * Home | Account. Before the account is a full member, "Home" is the
+	 * next step of the sign-up (confirm email, 18+).
+	 */
+	private static function tabs_html( $current, $state ) {
+		$tabs = array(
+			'home'           => array( CMP_Access::STATE_MEMBER === $state ? __( 'Home', 'cmp' ) : __( 'Get started', 'cmp' ), CMP_Settings::member_page_url() ),
+			CMP_Account::TAB => array( __( 'Account', 'cmp' ), CMP_Account::url() ),
+		);
+		$html = '<nav class="cmp-tabs" aria-label="' . esc_attr__( 'Member area', 'cmp' ) . '"><ul>';
+		foreach ( $tabs as $key => $tab ) {
+			$html .= sprintf(
+				'<li><a href="%1$s"%2$s>%3$s</a></li>',
+				esc_url( $tab[1] ),
+				$key === $current ? ' aria-current="page" class="is-current"' : '',
+				esc_html( $tab[0] )
+			);
+		}
+		$html .= '</ul><a class="cmp-tabs-signout" href="' . esc_url( wp_logout_url( CMP_Settings::member_page_url() ) ) . '">' . esc_html__( 'Sign out', 'cmp' ) . '</a></nav>';
+		return $html;
 	}
 
 	/**
@@ -297,9 +334,9 @@ class CMP_Member_Area {
 			<p class="cmp-muted">
 				<?php
 				printf(
-					/* translators: %s: link to the WordPress profile screen */
-					esc_html__( 'Wrong address? Update it in %s first.', 'cmp' ),
-					'<a href="' . esc_url( admin_url( 'profile.php' ) ) . '">' . esc_html__( 'your profile', 'cmp' ) . '</a>'
+					/* translators: %s: link to the Account tab */
+					esc_html__( 'Wrong address? Change it in %s first.', 'cmp' ),
+					'<a href="' . esc_url( CMP_Account::url() . '#cmp-email' ) . '">' . esc_html__( 'your account', 'cmp' ) . '</a>'
 				);
 				?>
 			</p>
