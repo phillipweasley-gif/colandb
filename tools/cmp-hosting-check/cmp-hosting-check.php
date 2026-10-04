@@ -2,7 +2,7 @@
 /**
  * Plugin Name: CMP Hosting Check
  * Description: Temporary, read-only diagnostic for the Community Member Planning build. Tools → Hosting Check reports whether private member pages stay uncached through the host/CDN, where private photos can be stored, which image formats the server can process, and the server limits. Creates only short-lived test files and deletes them in the same request. Delete this plugin once the report has been sent.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Requires PHP: 7.4
  * Author: RA Marketing
  * Text Domain: cmp-hosting-check
@@ -14,7 +14,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class CMP_Hosting_Check {
 
-	const VERSION   = '1.0.0';
+	const VERSION   = '1.1.0';
+
+	// Plugins whose installed code can be downloaded from Tools → Hosting Check.
+	const EXPORTABLE = array( 'community-events-calendar', 'community-member-planning', 'colandb-updater', 'cmp-hosting-check' );
 	const PAGE      = 'cmp-hosting-check';
 	const PROBE_KEY = 'cmp_hc_probe';
 	const TOKEN_TTL = HOUR_IN_SECONDS;
@@ -22,6 +25,65 @@ final class CMP_Hosting_Check {
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'template_redirect', array( __CLASS__, 'serve_probe' ), 0 );
+		add_action( 'admin_post_cmp_hc_export', array( __CLASS__, 'export_plugin' ) );
+	}
+
+	/* ------------------------------------------------------------------
+	 * Download the code of one of our installed plugins as a zip, exactly
+	 * as it is on this site (e.g. to bring work that only exists on a site
+	 * back into the GitHub repository). Administrators only; limited to
+	 * the plugins in EXPORTABLE.
+	 * ---------------------------------------------------------------- */
+
+	private static function exportable_installed() {
+		if ( ! function_exists( 'get_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+		$out = array();
+		foreach ( get_plugins() as $file => $data ) {
+			$slug = dirname( $file );
+			if ( in_array( $slug, self::EXPORTABLE, true ) ) {
+				$out[ $slug ] = $data;
+			}
+		}
+		return $out;
+	}
+
+	public static function export_plugin() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Not allowed.' );
+		}
+		check_admin_referer( 'cmp_hc_export' );
+		$slug      = isset( $_POST['slug'] ) ? sanitize_key( wp_unslash( $_POST['slug'] ) ) : '';
+		$installed = self::exportable_installed();
+		if ( ! isset( $installed[ $slug ] ) || ! class_exists( 'ZipArchive' ) ) {
+			wp_die( 'That plugin cannot be exported here.' );
+		}
+
+		$root = wp_normalize_path( WP_PLUGIN_DIR . '/' . $slug );
+		$tmp  = wp_tempnam( $slug . '.zip' );
+		$zip  = new ZipArchive();
+		if ( true !== $zip->open( $tmp, ZipArchive::OVERWRITE ) ) {
+			wp_die( 'Could not create the zip.' );
+		}
+		$files = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS ) );
+		foreach ( $files as $f ) {
+			if ( $f->isFile() ) {
+				$path = wp_normalize_path( $f->getPathname() );
+				$zip->addFile( $path, $slug . '/' . substr( $path, strlen( $root ) + 1 ) );
+			}
+		}
+		$zip->close();
+
+		$host = preg_replace( '/[^a-z0-9.-]/', '', strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) ) );
+		$name = $slug . '-' . preg_replace( '/[^0-9.]/', '', $installed[ $slug ]['Version'] ) . '-from-' . $host . '.zip';
+		nocache_headers();
+		header( 'Content-Type: application/zip' );
+		header( 'Content-Disposition: attachment; filename="' . $name . '"' );
+		header( 'Content-Length: ' . filesize( $tmp ) );
+		readfile( $tmp ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		@unlink( $tmp ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		exit;
 	}
 
 	public static function menu() {
@@ -346,6 +408,14 @@ final class CMP_Hosting_Check {
 
 		echo '<div class="wrap"><h1>Hosting Check</h1>';
 		echo '<p style="max-width:720px">Runs read-only checks for the Community Member Planning build. It creates a few test files and deletes them straight away. Run it on the <strong>staging</strong> site first, then (if asked) on the live site. When done, copy or download the report, send it to your developer, and delete this plugin.</p>';
+		echo '<h2>Download an installed plugin</h2><p>Saves the plugin exactly as it is installed on this site, as a zip you can send to your developer.</p><p>';
+		foreach ( self::exportable_installed() as $slug => $data ) {
+			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block;margin:0 8px 8px 0">';
+			wp_nonce_field( 'cmp_hc_export' );
+			echo '<input type="hidden" name="action" value="cmp_hc_export" /><input type="hidden" name="slug" value="' . esc_attr( $slug ) . '" />';
+			echo '<button type="submit" class="button">Download ' . esc_html( $data['Name'] . ' ' . $data['Version'] ) . '</button></form>';
+		}
+		echo '</p><h2>Hosting checks</h2>';
 		echo '<form method="post">';
 		wp_nonce_field( 'cmp_hc_run' );
 		echo '<p><button type="submit" name="cmp_hc_run" value="1" class="button button-primary">' . ( $run ? 'Run checks again' : 'Run checks' ) . '</button></p></form>';
