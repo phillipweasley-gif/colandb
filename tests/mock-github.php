@@ -24,6 +24,10 @@ if ( $uri === $repo . '/releases' ) {
 			'assets' => array( array( 'name' => 'community-events-calendar-1.26.0.zip', 'url' => "$base$repo/releases/assets/5" ) ) ),
 		array( 'tag_name' => 'some-other-thing', 'prerelease' => false, 'draft' => false, 'assets' => array() ),
 	);
+	if ( ! empty( $state['html_release'] ) ) {
+		$rel[] = array( 'tag_name' => 'community-member-planning-v0.4.0', 'prerelease' => true, 'draft' => false, 'body' => 'html', 'html_url' => '', 'published_at' => '',
+			'assets' => array( array( 'name' => 'community-member-planning-0.4.0.zip', 'url' => "$base$repo/releases/assets/4" ) ) );
+	}
 	if ( ! empty( $state['bad_release'] ) ) {
 		$rel[] = array( 'tag_name' => 'community-member-planning-v0.3.0', 'prerelease' => true, 'draft' => false, 'body' => 'bad', 'html_url' => '', 'published_at' => '',
 			'assets' => array( array( 'name' => 'community-member-planning-0.3.0.zip', 'url' => "$base$repo/releases/assets/3" ) ) );
@@ -39,6 +43,7 @@ if ( preg_match( '#^' . preg_quote( $repo, '#' ) . '/releases/assets/(\d+)$#', $
 }
 if ( preg_match( '#^/storage/(\d+)$#', $uri, $m ) ) {
 	if ( $auth ) { http_response_code( 400 ); echo '<Error>Only one auth mechanism allowed</Error>'; return true; }
+	if ( '4' === $m[1] ) { header( 'Content-Type: text/html' ); echo '<html><body><h1>Access denied</h1><p>Request blocked by proxy</p></body></html>'; return true; }
 	$f = $dir . '/zips/' . $m[1] . '.zip';
 	if ( ! file_exists( $f ) ) { http_response_code( 404 ); return true; }
 	header( 'Content-Type: application/octet-stream' ); readfile( $f );
