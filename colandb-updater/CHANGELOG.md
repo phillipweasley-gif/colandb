@@ -1,5 +1,11 @@
 # Changelog — COL&B Plugin Updater
 
+## 1.0.5
+
+- **Fix: updates failing on the staging site at "Unpacking the update…" with PclZip's "Unable to find End of Central Dir Record".** 1.0.4's checks showed the download itself is complete and valid every time (all four plugins, sizes matching, strict ZipArchive check passing), and the update screen skipped WordPress's own "Downloading update from…" line, so this plugin's download was being used; the file was being removed or altered on the host between download and unpack. The updater now keeps a second verified copy of each download in its own folder (`wp-content/colandb-updater-cache/`, random names, removed after the update and after an hour at most), and when WordPress starts unpacking it checks the file: if it was deleted or no longer matches the verified fingerprint, the verified copy is put back first. Only ever restores the exact file this updater downloaded.
+- The update screen now says what happened when that repair is needed (deleted, or changed with sizes and first bytes), and so does "Last install attempt".
+- Verified locally against the previous version: with the download deleted before unpacking (temporary folder set to WordPress's upgrade folder) and with it cut in half, 1.0.4 fails and 1.0.5 installs. Updater suite 34/34.
+
 ## 1.0.4
 
 - **Install diagnostics.** On staging, 1.0.3's Test download succeeded (valid zip, nothing else hooked into downloads) but installing still failed in WordPress's unpack step with PclZip's error. Our release zips open cleanly with both ZipArchive (strict) and PclZip, so the file WordPress unpacks there must differ from the one downloaded. The updater now records the downloaded file (path, size, fingerprint) and, at the start of WordPress's `unzip_file()` (via `unzip_file_use_ziparchive`, which runs before either zip reader can fail), the file WordPress actually unpacks, whether ZipArchive is switched off by another plugin, and how both zip readers judge it. Shown under "Last install attempt" on Settings → Plugin Updates. Purely diagnostic.

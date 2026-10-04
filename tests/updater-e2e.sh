@@ -86,6 +86,19 @@ out=$($W plugin update community-member-planning 2>&1)
 ok "truncated zip refused before WordPress unpacks it" $(echo "$out" | grep -q 'not a valid zip' && ! echo "$out" | grep -q PCLZIP && echo 1 || echo 0)
 echo '{}' > $M/state.json
 
+echo "== The download is removed or damaged before WordPress unpacks it"
+cat > $WPT/wordpress/wp-content/mu-plugins/damage.php <<'PHPEOF'
+<?php
+// Test-only: cuts the package in half at the start of unpacking.
+add_filter( 'unzip_file_use_ziparchive', function ( $v ) { foreach ( debug_backtrace( 0, 10 ) as $f ) { if ( 'unzip_file' === ( $f['function'] ?? '' ) ) { $p = $f['args'][0]; $d = file_get_contents( $p ); file_put_contents( $p, substr( $d, 0, intdiv( strlen( $d ), 2 ) ) ); break; } } return $v; }, 1 );
+PHPEOF
+rm -rf wp-content/plugins/community-member-planning && cp -r $REPO/community-member-planning wp-content/plugins/ && $W plugin activate community-member-planning >/dev/null 2>&1
+ev 'delete_site_transient("colandb_updater_releases"); delete_site_transient("update_plugins");' >/dev/null
+out=$($W plugin update community-member-planning 2>&1)
+ok "damaged package restored and installed" $(echo "$out" | grep -q 'Restored the verified copy' && [ "$($W plugin get community-member-planning --field=version 2>/dev/null)" = 0.2.0 ] && echo 1 || echo 0)
+ok "verified copy cleaned up" $([ -z "$(ls $WPT/wordpress/wp-content/colandb-updater-cache/*.zip 2>/dev/null)" ] && echo 1 || echo 0)
+rm -f $WPT/wordpress/wp-content/mu-plugins/damage.php
+
 echo "== Test download button"
 ok "fetch_asset reports each step" $(ev 'delete_site_transient("colandb_updater_releases"); $t=wp_tempnam("x.zip"); $r=COLANDB_Updater::fetch_asset(COLANDB_Updater::api_base()."/repos/phillipweasley-gif/colandb/releases/assets/2",$t); @unlink($t); echo is_array($r) && false!==strpos(implode("|",$r),"Redirected to 127.0.0.1") && false!==strpos(implode("|",$r),"Received a zip")?1:0;')
 

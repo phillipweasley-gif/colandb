@@ -2,7 +2,7 @@
 /**
  * Plugin Name: COL&B Plugin Updater
  * Description: Keeps this site's custom plugins (Community Events Calendar, Community Member Planning, and any future plugin from the same GitHub repository) up to date from the repository's releases. On a staging site it installs pre-releases automatically; on the live site it offers stable releases as a normal one-click "Update now". Setup: Settings → Plugin Updates.
- * Version: 1.0.4
+ * Version: 1.0.5
  * Requires at least: 6.5
  * Requires PHP: 7.4
  * Author: RA Marketing
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'COLANDB_UPDATER_VERSION', '1.0.4' );
+define( 'COLANDB_UPDATER_VERSION', '1.0.5' );
 
 /**
  * How it works
@@ -51,6 +51,7 @@ final class COLANDB_Updater {
 		// Diagnostics: runs at the start of every unzip_file(), before either
 		// zip reader can fail, and last (so it sees other plugins' choice).
 		add_filter( 'unzip_file_use_ziparchive', array( __CLASS__, 'record_unzip' ), PHP_INT_MAX );
+		add_action( 'upgrader_process_complete', array( __CLASS__, 'cleanup_copy' ) );
 		add_filter( 'auto_update_plugin', array( __CLASS__, 'auto_update' ), 10, 2 );
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_post_colandb_updater_save', array( __CLASS__, 'handle_save' ) );
@@ -318,12 +319,13 @@ final class COLANDB_Updater {
 		self::update_settings(
 			array(
 				'last_download' => array(
-					'time'  => time(),
-					'slug'  => $slug,
-					'error' => '',
-					'file'  => $tmp,
-					'size'  => (int) filesize( $tmp ),
-					'md5'   => (string) md5_file( $tmp ),
+					'time'   => time(),
+					'slug'   => $slug,
+					'error'  => '',
+					'file'   => $tmp,
+					'size'   => (int) filesize( $tmp ),
+					'md5'    => (string) md5_file( $tmp ),
+					'backup' => self::keep_verified_copy( $tmp ),
 				),
 				'last_unzip'    => array(),
 			)
@@ -430,8 +432,76 @@ final class COLANDB_Updater {
 			$pcl            = new PclZip( $file );
 			$info['pclzip'] = is_array( $pcl->properties() ) ? 'ok' : $pcl->errorInfo( true );
 		}
+
+		// The file we verified a moment ago has been removed or changed before
+		// WordPress could unpack it. Put the verified copy back (only ever for
+		// the exact file this updater downloaded, matched by fingerprint), and
+		// say so on the update screen.
+		$changed = $info['same_file'] && ( ! $info['exists'] || $info['md5'] !== $last['md5'] );
+		if ( $changed ) {
+			$backup = isset( $last['backup'] ) ? (string) $last['backup'] : '';
+			if ( $backup && file_exists( $backup ) && md5_file( $backup ) === $last['md5'] && @copy( $backup, $file ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors
+				$info['repaired'] = true;
+			} else {
+				$info['repaired'] = false;
+			}
+			$what = $info['exists']
+				? sprintf( 'had changed (%d bytes, starts %s; expected %d bytes)', $info['size'], $info['head'], (int) $last['size'] )
+				: 'had been deleted';
+			self::say( 'COL&B Plugin Updater: the downloaded file ' . $what . ' before WordPress could unpack it. ' . ( $info['repaired'] ? 'Restored the verified copy and continuing.' : 'Could not restore the verified copy.' ) );
+		} elseif ( ! $info['same_file'] ) {
+			self::say( 'COL&B Plugin Updater: WordPress is unpacking ' . $file . ', not the file this updater downloaded (' . ( isset( $last['file'] ) ? $last['file'] : '?' ) . ').' );
+		}
 		self::update_settings( array( 'last_unzip' => $info ) );
 		return $result;
+	}
+
+	/**
+	 * Diagnostic line on the update screen (never in AJAX/JSON responses).
+	 */
+	private static function say( $message ) {
+		if ( wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
+			return;
+		}
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			WP_CLI::log( $message );
+			return;
+		}
+		echo '<p><strong>' . esc_html( $message ) . '</strong></p>';
+	}
+
+	/**
+	 * A second, verified copy of a download, in this plugin's own folder
+	 * (outside WordPress's temporary and upgrade folders), so the update can
+	 * continue if the original is removed or changed before unpacking.
+	 * Copies older than an hour are cleaned up on each download.
+	 */
+	private static function keep_verified_copy( $tmp ) {
+		$dir = WP_CONTENT_DIR . '/colandb-updater-cache';
+		if ( ! wp_mkdir_p( $dir ) ) {
+			return '';
+		}
+		if ( ! file_exists( $dir . '/index.php' ) ) {
+			@file_put_contents( $dir . '/index.php', "<?php // Silence.\n" ); // phpcs:ignore WordPress.PHP.NoSilencedErrors,WordPress.WP.AlternativeFunctions
+			@file_put_contents( $dir . '/.htaccess', "Require all denied\n" ); // phpcs:ignore WordPress.PHP.NoSilencedErrors,WordPress.WP.AlternativeFunctions
+		}
+		foreach ( (array) glob( $dir . '/*.zip' ) as $old ) {
+			if ( $old && filemtime( $old ) < time() - HOUR_IN_SECONDS ) {
+				@unlink( $old ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+			}
+		}
+		$copy = $dir . '/' . wp_generate_password( 32, false ) . '.zip';
+		return @copy( $tmp, $copy ) ? $copy : ''; // phpcs:ignore WordPress.PHP.NoSilencedErrors
+	}
+
+	/**
+	 * Removes the verified copy once WordPress has finished an update.
+	 */
+	public static function cleanup_copy() {
+		$last = self::settings()['last_download'];
+		if ( ! empty( $last['backup'] ) && file_exists( $last['backup'] ) ) {
+			@unlink( $last['backup'] ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		}
 	}
 
 	private static function describe_file( $file ) {
@@ -776,6 +846,9 @@ final class COLANDB_Updater {
 					<?php if ( ! empty( $s['last_unzip'] ) ) : $u = $s['last_unzip']; ?>
 						<li>WordPress unpacked: <?php echo esc_html( $u['file'] . ' — ' . ( $u['same_file'] ? 'same file' : 'a DIFFERENT file' ) . ', ' . ( $u['exists'] ? $u['size'] . ' bytes, fingerprint ' . substr( $u['md5'], 0, 12 ) . ', starts ' . $u['head'] : 'file missing' ) ); ?></li>
 						<li>Zip readers: <?php echo esc_html( 'ZipArchive in use: ' . ( $u['use_ziparchive'] ? 'yes' : 'NO (switched off)' ) . '; strict check: ' . ( $u['checkcons'] ? $u['checkcons'] : 'n/a' ) . '; PclZip: ' . ( $u['pclzip'] ? $u['pclzip'] : 'n/a' ) ); ?></li>
+						<?php if ( isset( $u['repaired'] ) ) : ?>
+							<li>Repair: <?php echo esc_html( $u['repaired'] ? 'the file had been removed or changed; the verified copy was restored' : 'the file had been removed or changed and could not be restored' ); ?></li>
+						<?php endif; ?>
 					<?php else : ?>
 						<li>WordPress did not reach the unpack step after this download.</li>
 					<?php endif; ?>
