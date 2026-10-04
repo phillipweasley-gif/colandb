@@ -217,7 +217,20 @@ class CMP_Member_Area {
 	 * no-cache/noindex protection only applies to the configured page.
 	 */
 	private static function config_warning_html() {
-		if ( ! current_user_can( 'manage_options' ) || ( is_singular() && (int) CMP_Settings::get( 'member_page_id' ) === get_queried_object_id() ) ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return '';
+		}
+		// The page being shown or edited. In Elementor's editor the shortcode
+		// is rendered outside the normal page request, so the queried object
+		// isn't the page; Elementor passes the page ID instead.
+		$member_page = (int) CMP_Settings::get( 'member_page_id' );
+		$candidates  = array(
+			get_queried_object_id(),
+			(int) get_the_ID(),
+			isset( $_GET['elementor-preview'] ) ? absint( $_GET['elementor-preview'] ) : 0, // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			isset( $_REQUEST['editor_post_id'] ) ? absint( $_REQUEST['editor_post_id'] ) : 0, // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		);
+		if ( $member_page && in_array( $member_page, $candidates, true ) ) {
 			return '';
 		}
 		return '<div class="cmp-notice cmp-notice-error" role="alert">' . esc_html__( 'Administrator note: this page is not set as the member area page under Settings → Member Planning, so it is not protected from page caching and search indexing. Only administrators see this message.', 'cmp' ) . '</div>';

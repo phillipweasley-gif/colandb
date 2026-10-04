@@ -4,6 +4,10 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.1.2
+
+- The administrator-only "this page is not set as the member area page" note no longer appears by mistake in Elementor's editor. The editor renders the shortcode outside the normal page request, so the check now also recognises the page ID Elementor passes (`elementor-preview`, `editor_post_id`) and `get_the_ID()`.
+
 ## 0.1.1
 
 Fixes from the first run on the staging site (Elementor Cloud, Hello Elementor theme).
