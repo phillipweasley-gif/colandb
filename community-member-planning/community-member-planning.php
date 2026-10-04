@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Community Member Planning
- * Description: Private member area for the Community Events Calendar: member access (verified email + 18+ self-attestation), in-app notifications, an append-only audit log, and a front-end Account page (name, email, password, devices, privacy requests) that replaces the WordPress dashboard for members. Profiles, My Calendars, connections, sharing and the member directory are added in later releases. Reads public events only through the Community Events Calendar's read-only API. Shortcode: [cmp_member_area]. Setup: Settings → Member Planning.
- * Version: 0.2.0
+ * Description: Private member area for the Community Events Calendar: member access (verified email + 18+ self-attestation), in-app notifications, an append-only audit log, and a front-end Account page (name, email, password, devices, privacy requests) that replaces the WordPress dashboard for members, and member profiles with per-field visibility and private profile/cover photos. My Calendars, connections, sharing and the member directory are added in later releases. Reads public events only through the Community Events Calendar's read-only API. Shortcode: [cmp_member_area]. Setup: Settings → Member Planning.
+ * Version: 0.3.0
  * Requires at least: 6.5
  * Requires PHP: 8.1
  * Author: RA Marketing
@@ -13,8 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CMP_VERSION', '0.2.0' );
-define( 'CMP_DB_VERSION', 1 );
+define( 'CMP_VERSION', '0.3.0' );
+define( 'CMP_DB_VERSION', 2 );
 define( 'CMP_FILE', __FILE__ );
 define( 'CMP_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CMP_URL', plugin_dir_url( __FILE__ ) );
@@ -31,6 +31,12 @@ require_once CMP_DIR . 'includes/class-cmp-notifications.php';
 require_once CMP_DIR . 'includes/class-cmp-rest.php';
 require_once CMP_DIR . 'includes/class-cmp-member-area.php';
 require_once CMP_DIR . 'includes/class-cmp-account.php';
+require_once CMP_DIR . 'includes/class-cmp-profile-fields.php';
+require_once CMP_DIR . 'includes/class-cmp-profiles.php';
+require_once CMP_DIR . 'includes/class-cmp-profile-images.php';
+require_once CMP_DIR . 'includes/class-cmp-profile-options-admin.php';
+require_once CMP_DIR . 'includes/class-cmp-site-menu.php';
+require_once CMP_DIR . 'includes/class-cmp-account-bar.php';
 
 register_activation_hook( __FILE__, array( 'CMP_Install', 'activate' ) );
 
@@ -45,6 +51,11 @@ final class CMP_Plugin {
 		CMP_Rest::init();
 		CMP_Member_Area::init();
 		CMP_Account::init();
+		CMP_Profiles::init();
+		CMP_Profile_Images::init();
+		CMP_Profile_Options_Admin::init();
+		CMP_Site_Menu::init();
+		CMP_Account_Bar::init();
 	}
 
 	/**

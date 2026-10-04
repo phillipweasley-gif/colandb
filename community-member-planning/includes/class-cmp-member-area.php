@@ -177,7 +177,7 @@ class CMP_Member_Area {
 			'expired'         => array( 'error', __( 'Your session expired. Please try again.', 'cmp' ) ),
 			'welcome'         => array( 'success', __( "You're in. Welcome to the member area.", 'cmp' ) ),
 		);
-		$map += CMP_Account::notices();
+		$map += CMP_Account::notices() + CMP_Profiles::notices() + CMP_Profile_Images::notices();
 		if ( ! isset( $map[ $notice ] ) ) {
 			return '';
 		}
@@ -205,6 +205,15 @@ class CMP_Member_Area {
 			wp_enqueue_script( 'cmp-member' );
 			return $out . CMP_Account::render() . '</div>';
 		}
+		// Profiles are for full members only; anyone else sees their next step.
+		if ( CMP_Access::STATE_MEMBER === $state && CMP_Profiles::TAB === $tab ) {
+			wp_enqueue_script( 'cmp-member' );
+			return $out . CMP_Profiles::render() . '</div>';
+		}
+		$member_id = isset( $_GET['cmp_member'] ) ? absint( $_GET['cmp_member'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( CMP_Access::STATE_MEMBER === $state && $member_id ) {
+			return $out . CMP_Profiles::render_member( $member_id ) . '</div>';
+		}
 
 		switch ( $state ) {
 			case CMP_Access::STATE_LOGGED_OUT:
@@ -224,7 +233,7 @@ class CMP_Member_Area {
 
 	private static function current_tab() {
 		$tab = isset( $_GET['cmp_tab'] ) ? sanitize_key( wp_unslash( $_GET['cmp_tab'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		return CMP_Account::TAB === $tab ? $tab : 'home';
+		return in_array( $tab, array( CMP_Account::TAB, CMP_Profiles::TAB ), true ) ? $tab : 'home';
 	}
 
 	/**
@@ -236,6 +245,9 @@ class CMP_Member_Area {
 			'home'           => array( CMP_Access::STATE_MEMBER === $state ? __( 'Home', 'cmp' ) : __( 'Get started', 'cmp' ), CMP_Settings::member_page_url() ),
 			CMP_Account::TAB => array( __( 'Account', 'cmp' ), CMP_Account::url() ),
 		);
+		if ( CMP_Access::STATE_MEMBER === $state ) {
+			$tabs = array_slice( $tabs, 0, 1, true ) + array( CMP_Profiles::TAB => array( __( 'Profile', 'cmp' ), CMP_Profiles::url() ) ) + array_slice( $tabs, 1, null, true );
+		}
 		$html = '<nav class="cmp-tabs" aria-label="' . esc_attr__( 'Member area', 'cmp' ) . '"><ul>';
 		foreach ( $tabs as $key => $tab ) {
 			$html .= sprintf(

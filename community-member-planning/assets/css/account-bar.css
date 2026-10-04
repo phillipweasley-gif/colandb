@@ -1,0 +1,57 @@
+/* Community Member Planning: [cmp_account_bar], the header's sign-in
+   controls. Hardened with !important against the theme's global link and
+   button styles (same rule as the member area). Colours follow the
+   calendar's site-wide variables with fallbacks. */
+.cmp-account-bar {
+	--cmp-bar-primary: var(--cec-primary, #c6ff00);
+	--cmp-bar-secondary: var(--cec-secondary, #ff2d95);
+	display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap;
+	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	position: relative; z-index: 1000;
+}
+.cmp-account-bar .cmp-bar-link,
+.cmp-account-bar .cmp-bar-toggle {
+	display: inline-flex !important; align-items: center; gap: 8px; min-height: 40px;
+	padding: 8px 18px !important; border-radius: 100px !important;
+	border: 2px solid var(--cmp-bar-primary) !important; background: transparent !important;
+	color: var(--cmp-bar-primary) !important; font-weight: 700 !important; font-size: 13px !important;
+	letter-spacing: 0.05em; text-transform: uppercase; text-decoration: none !important;
+	line-height: 1.2 !important; cursor: pointer; box-shadow: none !important;
+}
+.cmp-account-bar .cmp-bar-link.cmp-bar-primary { background: var(--cmp-bar-primary) !important; color: #111 !important; }
+.cmp-account-bar .cmp-bar-toggle { list-style: none; text-transform: none; letter-spacing: 0; font-size: 15px !important; padding-left: 6px !important; }
+.cmp-account-bar .cmp-bar-toggle::-webkit-details-marker { display: none; }
+.cmp-account-bar .cmp-bar-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; }
+.cmp-account-bar .cmp-bar-initial { display: inline-flex; align-items: center; justify-content: center; background: var(--cmp-bar-primary); color: #111; font-weight: 700; }
+.cmp-account-bar .cmp-bar-hello { max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-account-bar .cmp-bar-caret { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid currentColor; transition: transform .15s; }
+.cmp-account-bar details[open] .cmp-bar-caret { transform: rotate(180deg); }
+.cmp-account-bar .cmp-bar-badge {
+	display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px;
+	border-radius: 100px; background: var(--cmp-bar-secondary); color: #fff; font-size: 12px; font-weight: 700;
+}
+.cmp-account-bar .cmp-bar-menu { position: relative; }
+.cmp-account-bar .cmp-bar-list {
+	position: absolute; right: 0; top: calc(100% + 8px); min-width: 230px; margin: 0 !important; padding: 8px 0 !important;
+	list-style: none !important; background: #1b1826; border: 1px solid var(--cmp-bar-secondary); border-radius: 12px;
+	box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+.cmp-account-bar .cmp-bar-list li { margin: 0 !important; padding: 0 !important; list-style: none !important; }
+.cmp-account-bar .cmp-bar-list a {
+	display: flex !important; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px;
+	padding: 10px 18px !important; color: #f4f2fa !important; text-decoration: none !important; font-size: 15px !important;
+	font-weight: 600 !important; background: transparent !important;
+}
+.cmp-account-bar .cmp-bar-list a:hover,
+.cmp-account-bar .cmp-bar-list a:focus-visible { background: rgba(255, 255, 255, 0.08) !important; color: var(--cmp-bar-primary) !important; }
+.cmp-account-bar .cmp-bar-list .cmp-bar-signout { border-top: 1px solid rgba(255, 255, 255, 0.12); margin-top: 6px; }
+.cmp-account-bar a:focus-visible,
+.cmp-account-bar summary:focus-visible { outline: 3px solid var(--cmp-bar-secondary) !important; outline-offset: 2px !important; }
+.cmp-account-bar .screen-reader-text {
+	border: 0; clip: rect(1px, 1px, 1px, 1px); clip-path: inset(50%); height: 1px; margin: -1px;
+	overflow: hidden; padding: 0; position: absolute !important; width: 1px; word-wrap: normal !important;
+}
+@media (max-width: 600px) {
+	.cmp-account-bar .cmp-bar-hello { max-width: 10ch; }
+	.cmp-account-bar .cmp-bar-link { padding: 6px 12px !important; font-size: 12px !important; }
+}

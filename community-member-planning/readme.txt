@@ -1,17 +1,20 @@
 === Community Member Planning ===
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.2.0
+Stable tag: 0.3.0
 
 Private member area for the Community Events Calendar site.
 
 == Description ==
 
-Adds a signed-in member area. In this release (0.2.0):
+Adds a signed-in member area. In this release (0.3.0):
 
 * Members must verify their email address and confirm they are 18 or older before entering.
 * An in-app notification inbox.
 * An Account tab where members change their name, email address and password, sign out other devices, and request a copy or deletion of their data, so they never need the WordPress dashboard.
+* A Profile tab: every profile item has its own "Who can see this" (Only me, My connections, All members), starting as Only me, plus a profile photo and cover image cropped in the browser and kept private in the database.
+* Users → Member Profile Options, where administrators manage the profile's pick-lists.
+* Site menus that switch "Log In" to "Sign Out" once signed in, and an `[cmp_account_bar]` shortcode ("Hello, name" with the account menu) for the header.
 * An append-only audit log of account and access changes.
 
 Profiles, personal calendars (My Calendars), connections and calendar sharing, and the member directory come in later releases.
@@ -32,6 +35,8 @@ Member information never appears on public pages, public feeds, the public REST 
    * replace the placeholder 18+ wording once it's approved;
    * add the member privacy notice link once it's published.
 4. Link to the page from your menu. Visitors are asked to sign in using the Community Events Calendar's login page.
+5. Add the account bar to the header: in Elementor's header template, drop a Shortcode widget in the top-right area containing `[cmp_account_bar]`.
+6. Fill in the profile pick-lists under Users → Member Profile Options.
 
 == What a member sees ==
 
