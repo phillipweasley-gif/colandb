@@ -21,7 +21,8 @@ More than one Claude session works on this repository. **This repository is the 
 3. **Test before merging:** `php -l` every changed PHP file. For anything beyond trivial, use the real-WordPress kit in `tests/` (`tests/README.md`). For calendar month-view changes, the `tests/snap.php` before/after comparison must be identical unless the change is intentional.
 4. **Rebuild the zips:** `bash tools/build-dist.sh` and commit `dist/` with the change.
 5. **Open a pull request to `main`.** CI checks syntax and versions. Merging to `main` publishes each new plugin version as a GitHub **pre-release**, which the staging site installs automatically.
-6. **Going live is the owner's decision:** after checking staging, the owner runs the "Promote release to live" workflow, and the live site then offers the update. Never mark releases stable yourself unless the owner asks.
+6. **Held plugins:** a plugin listed in `release-hold.txt` is never published. Only remove a line when the reason given there is resolved.
+7. **Going live is the owner's decision:** after checking staging, the owner runs the "Promote release to live" workflow, and the live site then offers the update. Never mark releases stable yourself unless the owner asks.
 
 ## Importing outside work
 

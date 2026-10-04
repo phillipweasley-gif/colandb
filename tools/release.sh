@@ -54,6 +54,14 @@ for entry in $PLUGINS; do
 	version=$(plugin_version "$dir/$main")
 	tag="$slug-v$version"
 
+	# release-hold.txt: one plugin folder name per line (# comments allowed).
+	# A held plugin is checked but never published, e.g. while outside work
+	# on it is being merged. Remove the line to release it.
+	if [ -f release-hold.txt ] && sed 's/#.*//' release-hold.txt | grep -qxF "$slug"; then
+		echo "held      $slug $version (listed in release-hold.txt; not published)"
+		continue
+	fi
+
 	# Highest version already released for this plugin.
 	highest=$(git tag -l "$slug-v*" | sed "s/^$slug-v//" | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -V | tail -1 || true)
 
