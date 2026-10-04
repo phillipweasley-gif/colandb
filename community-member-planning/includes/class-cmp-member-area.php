@@ -17,6 +17,10 @@ class CMP_Member_Area {
 	public static function init() {
 		add_shortcode( 'cmp_member_area', array( __CLASS__, 'render' ) );
 		add_action( 'init', array( __CLASS__, 'register_assets' ) );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue_on_member_page' ) );
+		// Elementor's editor preview renders the shortcode without running the
+		// page's normal head, so the stylesheet is loaded there explicitly.
+		add_action( 'elementor/preview/enqueue_styles', array( __CLASS__, 'enqueue_style' ) );
 
 		add_action( 'admin_post_cmp_send_verification', array( __CLASS__, 'handle_send_verification' ) );
 		add_action( 'admin_post_cmp_attest', array( __CLASS__, 'handle_attest' ) );
@@ -34,6 +38,20 @@ class CMP_Member_Area {
 		wp_register_script( 'cmp-member', CMP_URL . 'assets/js/member.js', array(), CMP_VERSION, true );
 	}
 
+	public static function enqueue_style() {
+		wp_enqueue_style( 'cmp-member' );
+	}
+
+	/**
+	 * In the <head> on the member page, so it never renders unstyled first.
+	 * (render() also enqueues it, for the shortcode used on another page.)
+	 */
+	public static function enqueue_on_member_page() {
+		if ( self::is_member_page() ) {
+			self::enqueue_style();
+		}
+	}
+
 	private static function is_member_page() {
 		$page_id = (int) CMP_Settings::get( 'member_page_id' );
 		return $page_id && is_page( $page_id );
@@ -49,6 +67,12 @@ class CMP_Member_Area {
 		nocache_headers();
 		header( 'Cache-Control: private, no-store, max-age=0' );
 		header( 'X-Robots-Tag: noindex, nofollow' );
+		// The host replaces Cache-Control with "public, max-age=300" for
+		// signed-out visitors, so a browser could otherwise show its stored
+		// signed-out copy for 5 minutes after the visitor signs in. Vary:
+		// Cookie makes the browser treat a different login state as a
+		// different page.
+		header( 'Vary: Cookie', false );
 	}
 
 	public static function robots( $robots ) {
@@ -125,7 +149,9 @@ class CMP_Member_Area {
 	}
 
 	private static function login_url() {
-		$back = CMP_Settings::member_page_url();
+		// A unique address to come back to after signing in, so no cached
+		// signed-out copy of the member page can be shown instead.
+		$back = add_query_arg( 'cmp_in', wp_rand( 100000, 999999 ), CMP_Settings::member_page_url() );
 		return class_exists( 'CEC_Admin_Settings' ) ? CEC_Admin_Settings::login_url( $back ) : wp_login_url( $back );
 	}
 

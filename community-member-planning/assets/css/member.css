@@ -4,7 +4,12 @@
    so the member area matches the calendar. Interactive elements are scoped
    under .cmp-member-area with !important on their visual properties — the
    same rule CEC's TECHNICAL_BRIEF §7 makes mandatory, because the site
-   theme styles buttons and links globally with !important. */
+   theme styles buttons and links globally with !important.
+   Typography follows the calendar's own pages (Archivo Black display
+   headings, Inter text, uppercase pill buttons) so the member area reads
+   as part of the same site. */
+
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700&display=swap');
 
 .cmp-member-area {
 	--cmp-primary: var(--cec-primary, #c6ff00);
@@ -27,15 +32,33 @@
 .cmp-member-area .cmp-step,
 .cmp-member-area .cmp-panel {
 	background: var(--cmp-card);
-	border: 1px solid var(--cmp-border);
+	border: 1px solid var(--cmp-secondary);
 	border-radius: var(--cmp-radius);
 	padding: 24px;
 	margin: 0 0 16px;
 }
 /* A titled sub-section inside a card (e.g. the inbox on the member home). */
 .cmp-member-area .cmp-section { border-top: 1px solid var(--cmp-border); margin-top: 16px; padding-top: 16px; }
-.cmp-member-area .cmp-title { margin: 0 0 12px; color: var(--cmp-text); font-size: 1.5rem; line-height: 1.25; }
-.cmp-member-area .cmp-panel-title { margin: 0; color: var(--cmp-text); font-size: 1.125rem; display: flex; align-items: center; gap: 8px; }
+.cmp-member-area .cmp-title {
+	margin: 0 0 14px;
+	font-family: 'Archivo Black', 'Arial Black', sans-serif !important;
+	font-weight: 400 !important;
+	font-size: 1.6rem;
+	line-height: 1.2;
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+	color: var(--cmp-primary) !important;
+}
+.cmp-member-area .cmp-panel-title {
+	margin: 0;
+	font-family: 'Archivo Black', 'Arial Black', sans-serif !important;
+	font-weight: 400 !important;
+	font-size: 1rem;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--cmp-secondary) !important;
+	display: flex; align-items: center; gap: 8px;
+}
 .cmp-member-area .cmp-panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .cmp-member-area p { margin: 0 0 12px; line-height: 1.55; }
 .cmp-member-area .cmp-muted { color: var(--cmp-muted); font-size: 0.9rem; }
@@ -57,14 +80,18 @@
 	align-items: center;
 	justify-content: center;
 	min-height: 44px; /* WCAG 2.2 target size, comfortably above 24px */
-	padding: 10px 20px !important;
+	padding: 12px 26px !important;
 	border-radius: 100px !important;
 	border: 2px solid var(--cmp-primary) !important;
 	background: var(--cmp-primary) !important;
 	color: #111 !important;
-	font: 700 0.95rem/1.2 inherit !important;
+	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+	font-weight: 700 !important;
+	font-size: 13px !important;
+	line-height: 1.2 !important;
+	letter-spacing: 0.05em !important;
 	text-decoration: none !important;
-	text-transform: none !important;
+	text-transform: uppercase !important;
 	box-shadow: none !important;
 	cursor: pointer;
 }
@@ -78,7 +105,7 @@
 .cmp-member-area button.cmp-btn.cmp-btn-small {
 	min-height: 36px;
 	padding: 6px 14px !important;
-	font-size: 0.85rem !important;
+	font-size: 12px !important;
 }
 .cmp-member-area .cmp-btn:hover,
 .cmp-member-area a.cmp-btn:hover,

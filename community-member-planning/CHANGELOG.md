@@ -4,6 +4,13 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.1.1
+
+Fixes from the first run on the staging site (Elementor Cloud, Hello Elementor theme).
+- **Looks like the rest of the site.** Headings now use the site's display font (Archivo Black, uppercase, lime; section titles pink), buttons match the calendar's uppercase pill buttons, and cards have the site's pink border. Also fixes an invalid `font:` shorthand on buttons that browsers ignored, which let the theme's button font show through.
+- **Styled in the Elementor editor too.** The stylesheet now also loads in Elementor's preview, and in the page `<head>` on the member page so it never flashes unstyled.
+- **Signing in no longer risks showing the signed-out page.** Elementor Cloud replaces the member page's `Cache-Control: no-store` with `public, max-age=300` for signed-out visitors (Hosting Check report, 2026-10-04), so a browser could show its stored "Sign in" copy for up to 5 minutes after the visitor signed in. The page now also sends `Vary: Cookie`, and the sign-in link returns to a unique member-page address. Signed-in responses were already uncached (`private, no-store` survives, Cloudflare `DYNAMIC`).
+
 ## 0.1.0
 
 **Phase 2 increment 2.0: plugin foundation and the member-area access gate.** Built to the approved plan (decisions D1: plugin name, D2: email verification).
