@@ -1,5 +1,12 @@
 # Changelog — COL&B Plugin Updater
 
+## 1.0.8
+
+- **Fix: "Update now" on the staging site failing with "PCLZIP_ERR_BAD_FORMAT … Unable to find End of Central Dir Record".** Found with 1.0.7's remote diagnostics. Elementor Cloud adds its own code to WordPress's update process (`wp-upgrade-accelerator` and the "Shared Stack" engine, both in `/var/wp-agent-modules/`). The Shared Stack engine runs after every plugin at the last point before downloading, and swaps the download for its own local copy. That copy is GitHub's 1.7 KB JSON description of the release file, not the zip, because the file itself has to be requested with a header the engine doesn't send. WordPress then skips downloading and unpacks the JSON. That's why this updater's download code never ran and 1.0.6's fix at the same hook came too early. The updater now also checks at the download step itself (`upgrader_pre_download`, which WordPress runs after all of that): for an update of one of its own plugins, it downloads the GitHub release whatever it was handed. Uploads ("Replace current with uploaded") are never touched.
+- "Last update" on Settings → Plugin Updates, and the update screen, now say when the host swapped the package, with its size and opening text.
+- **Verified on the staging site itself** (through 1.0.7's routes): 1.0.8 was installed by upload, then Community Events Calendar updated from 1.26.1 to 1.26.2 with WordPress's own updater. The update reported the swap, downloaded the 206 KB release, both zip readers passed, and the plugin was reactivated.
+- Also verified against the mock GitHub, with a stand-in for the Shared Stack swap: 1.0.7 fails it, and 1.0.8 installs. 46/46.
+
 ## 1.0.7
 
 - **Remote diagnostics for the staging site.** Debugging the staging "Update now" failure (PCLZIP_ERR_BAD_FORMAT, still present with 1.0.6) has relied on screenshots. On the **staging channel only**, the updater now offers three REST routes under `colandb-updater/v1` so the developer can check and run updates directly with an administrator's application password:
