@@ -82,6 +82,18 @@ echo '{}' > $M/state.json
 echo "== Test download button"
 ok "fetch_asset reports each step" $(ev 'delete_site_transient("colandb_updater_releases"); $t=wp_tempnam("x.zip"); $r=COLANDB_Updater::fetch_asset(COLANDB_Updater::api_base()."/repos/phillipweasley-gif/colandb/releases/assets/2",$t); @unlink($t); echo is_array($r) && false!==strpos(implode("|",$r),"Redirected to 127.0.0.1") && false!==strpos(implode("|",$r),"Received a zip")?1:0;')
 
+echo "== Another plugin intercepting downloads first"
+cat > $WPT/wordpress/wp-content/mu-plugins/greedy-downloader.php <<'PHPEOF'
+<?php
+// Test-only: imitates a plugin that downloads every package itself, without the token.
+add_filter( 'upgrader_pre_download', function ( $reply, $package ) { return $reply ? $reply : download_url( $package ); }, 10, 2 );
+PHPEOF
+rm -rf wp-content/plugins/community-member-planning && cp -r $REPO/community-member-planning wp-content/plugins/ && $W plugin activate community-member-planning >/dev/null 2>&1
+ev 'delete_site_transient("colandb_updater_releases"); delete_site_transient("update_plugins");' >/dev/null
+out=$($W plugin update community-member-planning 2>&1)
+ok "still installs when another plugin hooks downloads" $([ "$($W plugin get community-member-planning --field=version 2>/dev/null)" = 0.2.0 ] && echo 1 || echo 0)
+rm -f $WPT/wordpress/wp-content/mu-plugins/greedy-downloader.php
+
 echo "== Packages from elsewhere are ignored"
 ok "non-GitHub package passes through untouched" $(ev 'echo false===COLANDB_Updater::download(false,"https://downloads.wordpress.org/plugin/akismet.zip",null,array())?1:0;')
 ok "asset for an unmanaged plugin refused" $(ev '$r=COLANDB_Updater::download(false,COLANDB_Updater::api_base()."/repos/phillipweasley-gif/colandb/releases/assets/2",null,array("plugin"=>"akismet/akismet.php")); echo is_wp_error($r)?1:0;')

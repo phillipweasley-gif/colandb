@@ -1,5 +1,9 @@
 # Changelog — COL&B Plugin Updater
 
+## 1.0.3
+
+- **Fix: updates failing with "PCLZIP_ERR_BAD_FORMAT … Unable to find End of Central Dir Record" on the staging site.** The failure came back with WordPress's own unzip message rather than 1.0.2's new zip check, so this plugin's download code was not the one fetching the file: another plugin hooked into WordPress's download step got there first and fetched the private GitHub address without the token, receiving GitHub's "Not Found" reply instead of the zip. The updater now handles its own GitHub packages before anything else (priority -1000) and regardless of what an earlier filter returned; every other download is left alone.
+
 ## 1.0.2
 
 Diagnostics for a failed update on the staging site ("PCLZIP_ERR_BAD_FORMAT … Unable to find End of Central Dir Record": the file handed to WordPress was not a zip).

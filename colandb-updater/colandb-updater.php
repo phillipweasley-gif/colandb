@@ -2,7 +2,7 @@
 /**
  * Plugin Name: COL&B Plugin Updater
  * Description: Keeps this site's custom plugins (Community Events Calendar, Community Member Planning, and any future plugin from the same GitHub repository) up to date from the repository's releases. On a staging site it installs pre-releases automatically; on the live site it offers stable releases as a normal one-click "Update now". Setup: Settings → Plugin Updates.
- * Version: 1.0.2
+ * Version: 1.0.3
  * Requires at least: 6.5
  * Requires PHP: 7.4
  * Author: RA Marketing
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'COLANDB_UPDATER_VERSION', '1.0.2' );
+define( 'COLANDB_UPDATER_VERSION', '1.0.3' );
 
 /**
  * How it works
@@ -42,7 +42,11 @@ final class COLANDB_Updater {
 
 	public static function init() {
 		add_filter( 'pre_set_site_transient_update_plugins', array( __CLASS__, 'inject_updates' ) );
-		add_filter( 'upgrader_pre_download', array( __CLASS__, 'download' ), 10, 4 );
+		// Runs before anything else hooked into downloads: our packages are
+		// private GitHub assets that only this plugin can fetch (it has the
+		// token), so another plugin "helpfully" downloading the address
+		// itself gets GitHub's "Not Found" reply instead of a zip.
+		add_filter( 'upgrader_pre_download', array( __CLASS__, 'download' ), -1000, 4 );
 		add_filter( 'plugins_api', array( __CLASS__, 'plugin_info' ), 20, 3 );
 		add_filter( 'auto_update_plugin', array( __CLASS__, 'auto_update' ), 10, 2 );
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
@@ -274,9 +278,10 @@ final class COLANDB_Updater {
 	 */
 	public static function download( $reply, $package, $upgrader, $hook_extra = array() ) {
 		$prefix = self::api_base() . '/repos/' . self::REPO . '/releases/assets/';
-		if ( false !== $reply || ! is_string( $package ) || 0 !== strpos( $package, $prefix ) ) {
+		if ( ! is_string( $package ) || 0 !== strpos( $package, $prefix ) ) {
 			return $reply;
 		}
+		// Our own package: handled here whatever an earlier filter returned.
 
 		$slug = '';
 		if ( ! empty( $hook_extra['plugin'] ) ) {
