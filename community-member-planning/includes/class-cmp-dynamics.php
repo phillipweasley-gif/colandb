@@ -227,7 +227,7 @@ class CMP_Dynamics {
 		// phpcs:enable
 		$profile = add_query_arg( 'cmp_member', $to, CMP_Settings::member_page_url() );
 		$types   = self::types();
-		if ( ! $to || $to === $user_id || ! CMP_Access::is_member( $to ) ) {
+		if ( ! $to || $to === $user_id || ! CMP_Access::is_member( $to ) || CMP_Messages::is_blocked( $user_id, $to ) ) {
 			self::back( 'dyn_gone' );
 		}
 		if ( ! isset( $types[ $type ] ) || ( $types[ $type ]['lead'] && ! in_array( $side, array( 'a', 'b' ), true ) ) || mb_strlen( $message ) > self::MAX_MESSAGE ) {

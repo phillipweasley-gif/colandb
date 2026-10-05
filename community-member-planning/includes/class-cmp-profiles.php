@@ -907,13 +907,15 @@ class CMP_Profiles {
 		if ( $owner_id && $owner_id === $viewer ) {
 			return self::render_self( $viewer );
 		}
-		$ok     = $owner_id && $owner_id !== $viewer && CMP_Access::is_member( $owner_id );
+		// A block either way hides the profile, exactly like one that doesn't exist (0.11.0).
+		$ok     = $owner_id && $owner_id !== $viewer && CMP_Access::is_member( $owner_id ) && ! CMP_Messages::is_blocked( $viewer, $owner_id );
 		ob_start();
 		?>
 		<section class="cmp-step" aria-labelledby="cmp-member-title">
 			<h2 id="cmp-member-title" class="cmp-title"><?php esc_html_e( 'Member profile', 'cmp' ); ?></h2>
 			<?php if ( $ok ) : ?>
 				<?php echo self::card_html( $owner_id, $viewer ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<?php echo CMP_Messages::profile_actions_html( $viewer, $owner_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 				<?php echo CMP_Dynamics::propose_html( $viewer, $owner_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 				<?php echo CMP_Feed::profile_html( $owner_id, $viewer ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 			<?php else : ?>

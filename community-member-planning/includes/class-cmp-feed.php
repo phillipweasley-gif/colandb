@@ -84,7 +84,7 @@ class CMP_Feed {
 		if ( (int) $post->author_id === (int) $viewer_id ) {
 			return true;
 		}
-		if ( 'published' !== $post->status || ! CMP_Access::is_member( $post->author_id ) ) {
+		if ( 'published' !== $post->status || ! CMP_Access::is_member( $post->author_id ) || CMP_Messages::is_blocked( $viewer_id, $post->author_id ) ) {
 			return false;
 		}
 		return 'members' === $post->visibility || ( 'connections' === $post->visibility && in_array( (int) $post->author_id, self::connected_ids( $viewer_id ), true ) );
@@ -104,6 +104,10 @@ class CMP_Feed {
 			$where .= " OR ( p.visibility = 'connections' AND p.author_id IN (" . implode( ',', array_map( 'intval', $connected ) ) . ') )';
 		}
 		$where .= ' ) ) )';
+		$blocked = CMP_Messages::blocked_ids( $viewer_id );
+		if ( $blocked ) {
+			$where .= ' AND p.author_id NOT IN (' . implode( ',', array_map( 'intval', $blocked ) ) . ')';
+		}
 		if ( $args['author'] ) {
 			$where .= $wpdb->prepare( ' AND p.author_id = %d', $args['author'] );
 		}
