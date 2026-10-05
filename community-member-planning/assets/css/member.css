@@ -23,10 +23,14 @@
 	--cmp-radius: 12px;
 	color: var(--cmp-text);
 	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-	max-width: 760px;
+	/* 0.13.1: wide enough for profiles, Members, the feed and messages on
+	   desktop (was 760px, sized for forms). Long forms keep a reading width
+	   below. */
+	max-width: 1200px;
 	margin: 0 auto;
 	box-sizing: border-box;
 }
+.cmp-member-area.is-narrow > :not(.cmp-tabs) { max-width: 860px; margin-left: auto; margin-right: auto; }
 .cmp-member-area *, .cmp-member-area *::before, .cmp-member-area *::after { box-sizing: border-box; }
 
 .cmp-member-area .cmp-step,

@@ -4,6 +4,14 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.13.1
+
+**Wider member area on desktop** (owner, 2026-10-05: "why is it so thin on desktop?"). The member area was capped at 760px (sized for forms in 0.1). It's now up to 1200px, so profiles (Details beside About, buttons beside the name), Members (filters beside a 3-column grid) and messages use the screen. The Profile, Account and Setup tabs and the Feed keep a reading width of 860px for their content; the tab bar stays full width on every tab so it doesn't jump.
+
+- Verification: all suites pass (setup 39, profile 84, dob 34, account 69, feed 41, messages 46, follows 27, directory 21, dynamics 34, homework 44, chastity 55, e2e 60); checked in a browser at 1440 px: a profile, Members, the Profile tab and the Feed.
+
+---
+
 ## 0.13.0
 
 **Facebook / FetLife-style profiles and member search** (owner, 2026-10-05: "Even though I have a cover image it doesn't show in my profile … We want a Facebook or FetLife style profile view. I also need a way to search for members or filter members … click on one of the items in their profile to get a list of members who have that item"). From `docs/mockups/profile-directory.html`, with the owner's answers: everyone listed with an opt-out, location by city / state for now, sections as tabs.
