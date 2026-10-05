@@ -4,6 +4,25 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.15.2
+
+**"Leave site?" when sending a message or posting to the feed, and the dynamic proposal layout** (owner, 2026-10-05: "it shouldn't have the 'leave' that's confusing for users"; "I get the same leave message when I post to the feed as well"; screenshot of "Your side" with stretched buttons).
+
+- **The real cause of "Leave site?" was Elementor's AI assistant (Angie), not our forms.** It loads for administrators on every front-end page inside a frame from Elementor's own site, and that frame makes the browser ask "Leave site?" on every link and form. A page can't switch off another site's frame, so 0.15.1's guard couldn't help. Taking the frame off the page made links and Send work straight away. Members who aren't administrators never had Angie, so they weren't affected. Now:
+  - on the member page (feed, messages, profiles and the rest), Angie's scripts and styles aren't loaded at all;
+  - Angie still works everywhere else, including the Elementor editor;
+  - this also keeps an AI tool off private member pages, as the privacy statement promises;
+  - the `cmp_leave_out_handle` filter can change which scripts are left out.
+- **Propose a dynamic → "Your side":** the text-box rule (full width, 44px tall) also applied to the two radio buttons, stretching them across the form and pushing their labels outside. That rule now applies only to text boxes. Each side is a tappable row, and the whole row selects it.
+- **"Message (optional)" boxes** are dark like the other fields, not bright white.
+- **Verification:**
+  - `messages-e2e.sh` 51/51, with new checks: Angie's scripts, inline setup and styles are left out of the member page; other scripts still load; Angie still loads on other pages; and the radio fix.
+  - All other suites pass.
+  - In a browser on the local test site, the proposal form showed normal radio rows (the whole row taps), with dark message boxes.
+  - On the live site, removing Angie's frame let links and Send work without the pop-up.
+
+---
+
 ## 0.15.1
 
 **Messages and nods fixes** (owner, 2026-10-05: sending a message "just asks if I want to leave", the message wasn't received, "no way for me to see who I nodded to or the messages I sent", and "nods should be limited to once per receiver per 24 hours").

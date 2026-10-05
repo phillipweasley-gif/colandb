@@ -167,6 +167,26 @@ WPN=$(grep -o 'name="_wpnonce" value="[^"]*"' $T/m1.html | head -1 | cut -d'"' -
 curl -s -b $T/mod.jar -o /dev/null "$H/wp-admin/admin-post.php" --data-urlencode "action=cmp_msg_report_close" --data-urlencode "_wpnonce=$WPN" --data-urlencode "report=$RID"
 ok "mark as reviewed" $([ "$(q "SELECT status FROM $R_T WHERE id=$RID")" = closed ] && echo 1 || echo 0)
 
+echo "== Admin AI tools left out of member pages (0.15.2)"
+mkdir -p wp-content/mu-plugins
+cat > wp-content/mu-plugins/zz-fake-angie.php <<'PHP'
+<?php
+add_action( 'wp_enqueue_scripts', function () {
+	wp_enqueue_script( 'angie-app', 'https://example.invalid/angie.umd.cjs', array(), '1', true );
+	wp_add_inline_script( 'angie-app', 'window.zzAngieBefore=1;', 'before' );
+	wp_enqueue_script( 'mcp-to-angie-connector', 'https://example.invalid/angie-mcp-init.js', array(), '1', true );
+	wp_enqueue_style( 'angie-sidebar-css', 'https://example.invalid/sidebar.css', array(), '1' );
+	wp_enqueue_script( 'zz-other-tool', 'https://example.invalid/other.js', array(), '1', true );
+} );
+PHP
+get dana ang1 "$PAGE&cmp_tab=messages"
+ok "member page: Angie scripts, inline setup and styles are not loaded" $([ "$(hasnt $T/ang1.html 'angie.umd.cjs')$(hasnt $T/ang1.html 'zzAngieBefore')$(hasnt $T/ang1.html 'angie-mcp-init.js')$(hasnt $T/ang1.html 'sidebar.css')" = 1111 ] && echo 1 || echo 0)
+ok "member page: other scripts still load" $(has $T/ang1.html 'example.invalid/other.js')
+get dana ang2 "$H/"
+ok "other pages: Angie still loads" $(has $T/ang2.html 'angie.umd.cjs')
+rm -f wp-content/mu-plugins/zz-fake-angie.php
+ok "dynamic \"Your side\" radios aren't stretched by the text-input rule" $(grep -q 'cmp-field input:not(\[type="radio"\]):not(\[type="checkbox"\])' $REPO/community-member-planning/assets/css/member.css && echo 1 || echo 0)
+
 echo "== Privacy"
 ok "export lists messages sent and blocks" $(ev "\$j=wp_json_encode(CMP_Account::export('nosy@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'Member you blocked') ?1:0;")
 ok "erase removes conversations, messages and blocks" $(ev "CMP_Account::erase('carl@example.com'); global \$wpdb; echo 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $C_T WHERE user_a=$CARL OR user_b=$CARL\") && 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $M_T WHERE sender_id=$CARL\") && 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $B_T WHERE blocked_id=$CARL\") ?1:0;")
