@@ -161,7 +161,7 @@ We don't use your information for advertising, profiling for marketing, or autom
 | What | How long |
 |---|---|
 | Your account and member content | Until you delete it or ask us to (see below). |
-| Accounts started but never verified | Deleted after 60 days. |
+| Accounts started but never verified | Deleted 60 days after sign-up (for accounts created from [date the clean-up went live] on). |
 | Event subscriptions | Until you unsubscribe. |
 | RSVPs, waitlists and event submissions | 12 months after the event. |
 | Volunteer sign-ups | 2 years, or until you ask us to remove them. |
@@ -213,7 +213,7 @@ Questions, requests or concerns: **foxxyforce@gmail.com**. If you need a postal 
 
 1. **Still to fill in:** hosting region (Elementor hosting dashboard), email provider (Settings → FluentSMTP), web push provider, and analytics (the live site prefetches Google Tag Manager, so check whether Site Kit or Analytics is on). The effective date goes in when you publish. Retention periods use the suggested values, taken from comparable sites (Recon publishes a detailed retention table; FetLife purges deleted accounts within 7–30 days).
 1a. **Who's responsible:** COL&B isn't incorporated, so the organizer is personally the one responsible for the data. A lawyer can tell you whether forming an LLC or nonprofit would change that. No postal address is published, for the organizer's safety; one is offered on request.
-2. **Behaviour this statement promises** that the software doesn't do automatically yet: deleting RSVPs, submissions and never-verified accounts after a set time, trimming the audit log, and notifying members of changes to the statement. Erase requests are also completed by an administrator rather than automatically. I can build these.
+2. **Automatic clean-up** is built in PR #26 (Calendar 1.29.0 + Member Planning 0.15.0). Once it's live, put its go-live date in the "never verified" row. Still manual: completing erase requests (an admin gets a dashboard reminder after 20 days), and posting a member-area notice when this statement changes.
 3. **Elementor Cloud hosting terms:** still to check that adult content is allowed (open item).
 4. **Washington My Health My Data Act** and similar health-data laws cover health information such as the safer-sex fields. A lawyer should confirm whether COL&B needs a separate consumer health data policy.
 5. **Research basis:** structure and topics were compared with Sniffies (updated May 2026), FetLife (updated Jul 2026), Recon / T101 (updated Aug 2025) and Grindr's US health-data notice. No text was copied. Things we chose deliberately: FetLife's plain-language, values-first style, its court-order-only stance and its no-AI-training commitment; Recon's retention table and its rule that optional fields you leave blank are never searchable. Not adopted: Sniffies' public-by-default profiles and its use of data to train AI.
