@@ -431,3 +431,22 @@
 	.cmp-member-area .cmp-prof-body { display: grid; grid-template-columns: 260px 1fr; gap: 24px; }
 	.cmp-member-area .cmp-prof-body:not(:has(.cmp-prof-side)) { grid-template-columns: 1fr; }
 }
+
+/* Dynamics (0.6.0). */
+.cmp-member-area .cmp-who { display: flex; align-items: center; gap: 12px; }
+.cmp-member-area .cmp-who-av { width: 44px; height: 44px; border-radius: 50%; background: var(--cmp-card-alt); border: 1px solid var(--cmp-border); display: grid; place-items: center; font-weight: 800; color: var(--cmp-muted); flex-shrink: 0; }
+.cmp-member-area .cmp-who b { display: block; }
+.cmp-member-area .cmp-who small { color: var(--cmp-muted); }
+.cmp-member-area .cmp-who small b { display: inline; color: var(--cmp-secondary); }
+.cmp-member-area .cmp-dyn-row { padding: 12px 0; border-top: 1px solid var(--cmp-border); }
+.cmp-member-area .cmp-dyn-row:first-of-type { border-top: 0; }
+.cmp-member-area .cmp-dyn-msg { margin: 8px 0 0 56px; color: var(--cmp-muted); font-style: italic; }
+.cmp-member-area .cmp-dyn-acts { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0 56px; }
+.cmp-member-area .cmp-inline-form { display: inline; margin: 0; }
+.cmp-member-area .cmp-dyn-propose > summary { list-style: none; display: inline-flex; cursor: pointer; }
+.cmp-member-area .cmp-dyn-propose > summary::-webkit-details-marker { display: none; }
+.cmp-member-area .cmp-dyn-propose[open] > summary { margin-bottom: 14px; }
+.cmp-member-area .cmp-dyn-side[hidden] { display: none !important; }
+.cmp-member-area .cmp-prof-dyn ul { list-style: none; margin: 0; padding: 0; }
+.cmp-member-area .cmp-prof-dyn li { padding: 6px 0; border-bottom: 1px solid var(--cmp-border); }
+.cmp-member-area .cmp-prof-dyn li:last-child { border-bottom: 0; }
