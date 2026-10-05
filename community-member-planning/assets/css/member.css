@@ -494,3 +494,28 @@
 .cmp-member-area .cmp-hw-heat span.is-today { outline: 2px solid var(--cmp-primary); }
 .cmp-member-area .cmp-hw-taskedit { border-top: 1px solid var(--cmp-border); padding: 10px 0; }
 .cmp-member-area .cmp-hw-taskedit > summary { cursor: pointer; font-weight: 700; min-height: 32px; }
+
+/* Chastity (0.8.0) */
+.cmp-member-area .cmp-cl-timer { text-align: center; padding: 8px 0 12px; }
+.cmp-member-area .cmp-cl-icon { display: block; font-size: 34px; line-height: 1.2; }
+.cmp-member-area .cmp-cl-timer b { display: block; font-family: 'Archivo Black', 'Arial Black', sans-serif !important; font-size: 30px; color: var(--cmp-primary); letter-spacing: .02em; }
+.cmp-member-area .cmp-cl-timer small { color: var(--cmp-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.cmp-member-area .cmp-cl-left { margin: 10px 0 0; font-size: 14px; }
+.cmp-member-area .cmp-cl-left.is-hidden { color: var(--cmp-secondary); font-weight: 700; }
+.cmp-member-area .cmp-cl-left.is-done { color: #7be495; font-weight: 700; }
+.cmp-member-area .cmp-cl-open { margin: 8px 0 0; color: #ffc857; font-weight: 700; }
+.cmp-member-area .cmp-cl-rule { font-size: 14px; line-height: 1.5; margin: 0; }
+.cmp-member-area .cmp-cl-rule b { display: block; color: var(--cmp-secondary); text-transform: uppercase; font-size: 12px; letter-spacing: .05em; }
+.cmp-member-area .cmp-cl-codewrap { text-align: center; margin: 10px 0; }
+.cmp-member-area .cmp-cl-code { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22px; font-weight: 800; letter-spacing: .2em; border: 1.5px dashed var(--cmp-primary); border-radius: 8px; padding: 6px 12px; color: var(--cmp-primary); }
+.cmp-member-area .cmp-cl-cal .is-locked { background: rgba(255, 80, 215, .30); color: #ffd0f4; }
+.cmp-member-area .cmp-cl-cal .is-verified { box-shadow: inset 0 -3px 0 #7be495; }
+.cmp-member-area .cmp-cl-legend span { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-left: 8px; }
+.cmp-member-area .cmp-cl-legend span.is-locked { background: rgba(255, 80, 215, .30); }
+.cmp-member-area .cmp-cl-legend span.is-verified { background: #2a2636; box-shadow: inset 0 -3px 0 #7be495; }
+.cmp-member-area .cmp-cl-history ul { list-style: none; margin: 0; padding: 0; font-size: 14px; }
+.cmp-member-area .cmp-cl-history li { padding: 8px 0; border-top: 1px solid rgba(255, 255, 255, .08); }
+.cmp-member-area .cmp-cl-history time { color: var(--cmp-muted); margin-right: 6px; }
+.cmp-member-area .cmp-cl-emergency p { margin: 8px 0 0; }
+.cmp-member-area .cmp-cl-badge { display: inline-flex !important; gap: 6px; align-items: center; margin: 6px 0 0 !important; background: rgba(255, 80, 215, .15) !important; color: #ffd0f4 !important; border: 1px solid rgba(255, 80, 215, .4); border-radius: 100px; padding: 4px 12px; font-size: 13px; font-weight: 700; }
+.cmp-member-area .cmp-cl-time .cmp-actions { margin-top: 8px; }

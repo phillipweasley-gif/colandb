@@ -520,3 +520,21 @@
 	type.addEventListener( 'change', sync );
 	sync();
 }() );
+
+/* Chastity (0.8.0): keep the "Locked for" timer current without a reload. */
+( function () {
+	'use strict';
+	var timers = document.querySelectorAll( '.cmp-member-area [data-cmp-since]' );
+	if ( ! timers.length ) {
+		return;
+	}
+	function tick() {
+		var now = Math.floor( Date.now() / 1000 );
+		Array.prototype.forEach.call( timers, function ( el ) {
+			var s = Math.max( 0, now - parseInt( el.getAttribute( 'data-cmp-since' ), 10 ) );
+			var d = Math.floor( s / 86400 ), h = Math.floor( ( s % 86400 ) / 3600 ), m = Math.floor( ( s % 3600 ) / 60 );
+			el.textContent = ( d ? d + 'd ' : '' ) + h + 'h ' + m + 'm';
+		} );
+	}
+	window.setInterval( tick, 30000 );
+}() );
