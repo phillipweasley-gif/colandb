@@ -40,7 +40,7 @@ class CMP_Install {
 	}
 
 	public static function table_names() {
-		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ) );
+		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ) );
 	}
 
 	private static function create_tables() {
@@ -247,6 +247,42 @@ class CMP_Install {
 			KEY idx_lock_type (lock_id,type,created_at)
 		) $charset;";
 
-		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events );
+		// Member feed (0.9.0): posts, their photos (kept here, members only)
+		// and likes.
+		$posts  = 'CREATE TABLE ' . self::table( 'posts' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			author_id bigint(20) unsigned NOT NULL,
+			body text NOT NULL,
+			event_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			visibility varchar(12) NOT NULL DEFAULT 'members',
+			status varchar(10) NOT NULL DEFAULT 'published',
+			reports smallint(5) unsigned NOT NULL DEFAULT 0,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY idx_author (author_id,id),
+			KEY idx_event (event_id,id),
+			KEY idx_status (status,id)
+		) $charset;";
+		$photos = 'CREATE TABLE ' . self::table( 'post_photos' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			post_id bigint(20) unsigned NOT NULL,
+			position tinyint(3) unsigned NOT NULL DEFAULT 0,
+			photo mediumblob NOT NULL,
+			photo_sha char(64) NOT NULL DEFAULT '',
+			width smallint(5) unsigned NOT NULL DEFAULT 0,
+			height smallint(5) unsigned NOT NULL DEFAULT 0,
+			PRIMARY KEY  (id),
+			KEY idx_post (post_id,position)
+		) $charset;";
+		$likes  = 'CREATE TABLE ' . self::table( 'post_likes' ) . " (
+			post_id bigint(20) unsigned NOT NULL,
+			user_id bigint(20) unsigned NOT NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (post_id,user_id),
+			KEY idx_user (user_id)
+		) $charset;";
+
+		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes );
 	}
 }

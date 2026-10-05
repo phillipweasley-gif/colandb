@@ -4,6 +4,25 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.9.0
+
+**Member feed** (owner, 2026-10-04: "there should also be an activity feed for members and a way for them to share text and image posts (like tagging an event for photos they took there etc.)"). Built overnight from `docs/mockups/feed.html`; **not yet approved by the owner.**
+
+- **`CMP_Feed`**, three new tables `cmp_posts`, `cmp_post_photos`, `cmp_post_likes` (`CMP_DB_VERSION` 7), and a **Feed** tab right after Home.
+- **Posts:** text up to 2,000 characters and/or up to 4 photos (JPEG/PNG/WebP under 5 MB, re-encoded to JPEG at most 1600 px, location data removed). Optional **event tag**: a published Community Events Calendar event from the last 60 days or the next 30.
+- **Audience:** "All members" or "My connections" (members in an active dynamic with the author). Members only: signed-out visitors and accounts that aren't full members see nothing, and photos 404 for anyone who can't see the post. If the dynamic ends, connections-only posts disappear for that person at once.
+- **Event filter:** the tag links to the feed filtered to that event (every member's posts and photos from it), with a link to the event page.
+- **Likes** (♥ toggle). No comments yet.
+- **Moderation:** any member can report a post once (reason optional, audit-logged); the site admin email gets a message with a link; administrators see "Hide (admin) · N reports" and can hide any post (the author still sees it, marked hidden); authors delete their own posts with their photos and likes.
+- **Profiles:** a member's profile shows their 5 most recent posts that the viewer may see.
+- **Privacy:** export lists the member's posts; erase deletes their posts, photos and likes.
+- **Verification** (local WordPress 7.1.2):
+  - new `tests/feed-e2e.sh` 41/41;
+  - `chastity-e2e.sh` 55/55, `homework-e2e.sh` 44/44, `dynamics-e2e.sh` 34/34, `setup-e2e.sh` 32/32, `dob-e2e.sh` 34/34, `e2e.sh` 60/60, `account-e2e.sh` 64/64, `profile-e2e.sh` 68 (+12 photo checks needing ImageMagick); no PHP warnings;
+  - rendered at 375 px and 1280 px under Hello Elementor; fixed avatar circles and author links that the member area's own link rule was overriding.
+
+---
+
 ## 0.8.0
 
 **Chastity tracking** (owner, 2026-10-04: "For tracking chastity we can use Chaster as an example"; the tracker's chastity options). Built overnight from `docs/mockups/chastity.html`; **not yet approved by the owner.**
