@@ -4,6 +4,17 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.19.1
+
+**App icons are always square** (found checking 0.19.0 on the live site). colandb.com's site icon is the wide COL&B logo (873×327), so the app icon would have been squashed or cropped on phones.
+
+- **When the site icon isn't square, the app uses it centred on a square** in the app's background colour (80% of the width), at 192 and 512 pixels. The squares are made once with GD and kept in `uploads/cmp-app/`; a changed icon makes new ones. A square site icon is used as it is.
+- **iPhones get the square icon:** an `apple-touch-icon` (180×180) is printed after WordPress's own site-icon tags.
+- **For colandb.com:** a purpose-made square COL&B icon was provided to set as the Site Icon (Appearance → Customize → Site Identity). That also fixes the browser-tab icon.
+- **Verification:** `app-e2e.sh` 29/29, with 3 new checks: a wide icon becomes a true 512×512 square, iPhones get it, and a square icon is used as it is.
+
+---
+
 ## 0.19.0
 
 **Installable app and event reminders** (owner, 2026-10-05: "build the installable app with reminders"; release 1 of 2, with push notifications in release 2). Owner's choices: reminders the evening before (6 pm) and 2 hours before; in the member area, and by email only for members who turn it on; push will come from the site itself, not a third party.
