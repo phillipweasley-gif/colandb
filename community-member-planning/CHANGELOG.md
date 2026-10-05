@@ -4,6 +4,16 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.18.1
+
+**Private calendar feed moved out of the host's CDN cache.** Checked on the live site right after 0.18.0. Elementor Hosting's CDN may keep signed-out front-end responses for up to 7 days (`ec-cdn-cache-control: public, max-age=300, s-maxage=604800`, `ec-cdn-status: miss`), and calendar apps fetch the feed signed out. That could have shown members old events for a week and kept a reset link working.
+
+- **The feed is now served from `wp-admin/admin-post.php?action=cmp_cal_feed&key=…`.** The CDN never caches wp-admin (`ec-cdn-status-reason: excluded uri` on the live site). The Events Calendar already lets visitors reach `admin-post.php` without being sent to the front end.
+- **The old `?cmp_cal_feed=` address no longer serves a calendar.** Nobody had turned a link on before this release, so no subscriptions break.
+- **Verification:** `calendar-e2e.sh` 57/57, with a new check that the old address no longer serves a calendar.
+
+---
+
 ## 0.18.0
 
 **Private calendar feed: your COL&B calendar in your phone's calendar app** (owner, 2026-10-05: "build the private calendar feed next"; the second calendar release, the roadmap's "private, revocable ICS"). Needs Community Events Calendar 1.32.0.

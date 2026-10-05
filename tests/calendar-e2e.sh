@@ -136,13 +136,14 @@ ok "Browse events goes to the calendar page, not the home page with upcoming eve
 ev "update_option('page_on_front',$OLDFRONT);" >/dev/null; $W post delete $HOME_ID $CALP --force >/dev/null 2>&1
 
 echo "== Private calendar feed (Member Planning 0.18.0, Events Calendar 1.32.0)"
-feed(){ curl -s -D $T/feed.h -o $T/feed.ics -w '%{http_code}' "$H/?cmp_cal_feed=$1"; }
+feed(){ curl -s -D $T/feed.h -o $T/feed.ics -w '%{http_code}' "$H/wp-admin/admin-post.php?action=cmp_cal_feed&key=$1"; }
 ok "off until turned on: the tab offers it, a made-up link is not found" $([ "$(has $T/m1.html 'Get my calendar link')$(feed AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA)" = 1404 ] && echo 1 || echo 0)
 r=$(post calann --data-urlencode "action=cmp_cal" --data-urlencode "_cmp_nonce=$MN" --data-urlencode "do=feed_on")
 TOK=$(ev "echo CMP_Calendar::feed_token($ANN);")
 get calann m2 "$PAGE&cmp_tab=calendar"
-ok "turned on: a 40-character private link, Subscribe (webcal) and Copy link on the tab" $(echo "$r" | grep -q 'cal_feed_on' && [ ${#TOK} = 40 ] && [ "$(has $T/m2.html "webcal://")$(has $T/m2.html "cmp_cal_feed=$TOK")$(has $T/m2.html 'Copy link')$(has $T/m2.html 'Get a new link')" = 1111 ] && echo 1 || echo 0)
-ok "the feed is a calendar file, private and never cached or indexed" $([ "$(feed $TOK)" = 200 ] && grep -qi 'content-type: text/calendar' $T/feed.h && grep -qi 'cache-control:.*no-store' $T/feed.h && grep -qi 'x-robots-tag: noindex' $T/feed.h && grep -q 'BEGIN:VCALENDAR' $T/feed.ics && grep -q 'REFRESH-INTERVAL' $T/feed.ics && echo 1 || echo 0)
+ok "turned on: a 40-character private link, Subscribe (webcal) and Copy link on the tab" $(echo "$r" | grep -q 'cal_feed_on' && [ ${#TOK} = 40 ] && [ "$(has $T/m2.html "webcal://")$(has $T/m2.html "admin-post.php?action=cmp_cal_feed&amp;key=$TOK")$(has $T/m2.html 'Copy link')$(has $T/m2.html 'Get a new link')" = 1111 ] && echo 1 || echo 0)
+ok "the feed (under wp-admin, which the host's CDN never caches) is a calendar file, private and never cached or indexed" $([ "$(feed $TOK)" = 200 ] && grep -qi 'content-type: text/calendar' $T/feed.h && grep -qi 'cache-control:.*no-store' $T/feed.h && grep -qi 'x-robots-tag: noindex' $T/feed.h && grep -q 'BEGIN:VCALENDAR' $T/feed.ics && grep -q 'REFRESH-INTERVAL' $T/feed.ics && echo 1 || echo 0)
+ok "the old front-end address (cacheable by the host's CDN) no longer serves a calendar" $(curl -s "$H/?cmp_cal_feed=$TOK" | grep -q 'BEGIN:VCALENDAR' && echo 0 || echo 1)
 ok "it holds everything on Ann's calendar, whoever it's shown to (partners-only Rope Jam too)" $([ "$(grep -c 'SUMMARY:ZZ Rope Jam' $T/feed.ics)$(grep -c 'SUMMARY:ZZ Leather Night' $T/feed.ics)" = 11 ] && echo 1 || echo 0)
 ok "...and nothing else (Kink 101 was removed)" $(grep -q 'SUMMARY:ZZ Kink 101' $T/feed.ics && echo 0 || echo 1)
 ok "Interested is marked tentative, Going confirmed" $(php -r '$t=file_get_contents($argv[1]); preg_match_all("~BEGIN:VEVENT.*?END:VEVENT~s",$t,$m); $ok=0; foreach($m[0] as $e){ if(false!==strpos($e,"ZZ Tiny Workshop")&&false!==strpos($e,"STATUS:TENTATIVE")) $ok++; if(false!==strpos($e,"ZZ Rope Jam")&&false!==strpos($e,"STATUS:CONFIRMED")) $ok++; } echo 2===$ok?1:0;' $T/feed.ics)

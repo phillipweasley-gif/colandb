@@ -43,7 +43,12 @@ class CMP_Calendar {
 		add_filter( 'cec_event_social_label', array( __CLASS__, 'calendar_label' ), 10, 2 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_filter( 'cec_account_links', array( __CLASS__, 'account_links' ), 10, 2 );
-		add_action( 'template_redirect', array( __CLASS__, 'maybe_feed' ), 1 );
+		// The feed lives under wp-admin/admin-post.php (0.18.1): the host's CDN
+		// never caches wp-admin, but it does cache signed-out front-end
+		// URLs for up to 7 days, which would keep showing old events and
+		// keep a reset link working.
+		add_action( 'admin_post_nopriv_cmp_cal_feed', array( __CLASS__, 'serve_feed' ) );
+		add_action( 'admin_post_cmp_cal_feed', array( __CLASS__, 'serve_feed' ) );
 	}
 
 	/**
@@ -407,21 +412,18 @@ class CMP_Calendar {
 
 	public static function feed_url( $user_id ) {
 		$t = self::feed_token( $user_id );
-		return $t ? add_query_arg( 'cmp_cal_feed', $t, home_url( '/' ) ) : '';
+		return $t ? add_query_arg( array( 'action' => 'cmp_cal_feed', 'key' => $t ), admin_url( 'admin-post.php' ) ) : '';
 	}
 
 	/**
-	 * ?cmp_cal_feed=<token>: the member's own calendar as .ics, for calendar
+	 * admin-post.php?action=cmp_cal_feed&key=<token>: the member's own calendar as .ics, for calendar
 	 * apps to subscribe to (they can't sign in, so the secret link is the
 	 * key). Everything on their calendar, whoever it's shown to: upcoming
 	 * and the last 30 days; Interested marked tentative. Unknown, reset or
 	 * turned-off links, and accounts that are no longer members, get 404.
 	 */
-	public static function maybe_feed() {
-		if ( ! isset( $_GET['cmp_cal_feed'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			return;
-		}
-		$token = sanitize_text_field( wp_unslash( $_GET['cmp_cal_feed'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	public static function serve_feed() {
+		$token = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- the key is the credential.
 		$user  = 0;
 		if ( preg_match( '/^[A-Za-z0-9]{40}$/', $token ) ) {
 			$found = get_users( array( 'meta_key' => self::META_FEED, 'meta_value' => $token, 'number' => 2, 'fields' => 'ID' ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
