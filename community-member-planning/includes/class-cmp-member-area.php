@@ -204,10 +204,12 @@ class CMP_Member_Area {
 	public static function render() {
 		wp_enqueue_style( 'cmp-member' );
 
-		$out  = '<div class="cmp-member-area">';
-		$out .= self::config_warning_html();
 		$state = CMP_Access::state();
 		$tab   = self::current_tab();
+		// Forms and the feed keep a reading width; profiles, Members, messages and the rest use the full width (0.13.1).
+		$narrow = in_array( $tab, array( CMP_Profiles::TAB, CMP_Account::TAB, CMP_Onboarding::TAB, CMP_Feed::TAB ), true ) || CMP_Access::STATE_MEMBER !== $state;
+		$out    = '<div class="cmp-member-area' . ( $narrow ? ' is-narrow' : '' ) . '">';
+		$out   .= self::config_warning_html();
 		if ( CMP_Access::STATE_LOGGED_OUT !== $state ) {
 			$out .= self::tabs_html( $tab, $state );
 		}
