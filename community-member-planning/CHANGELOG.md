@@ -4,6 +4,14 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.17.1
+
+**"Browse events" on My calendar went to the home page** (owner, 2026-10-05). It picked the first page showing any calendar shortcode, and the home page shows a few upcoming events. It now prefers a page with the full calendar, then the event list, then an upcoming list, and never the home page. On colandb.com that's Community Events. The `cmp_events_url` filter can still set it.
+
+- **Verification:** `calendar-e2e.sh` 40/40, with a new check using a home page with `[cec_upcoming]` and a calendar page.
+
+---
+
 ## 0.17.0
 
 **My calendar** (owner, 2026-10-05: "I don't have a way to 'Add to my calendar' or have a public, friends/dynamic, or private calendar for my profile. That was the whole goal of merging the two features."). Owner's choices:
