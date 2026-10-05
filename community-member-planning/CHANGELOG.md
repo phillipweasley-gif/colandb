@@ -4,6 +4,33 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.6.0
+
+**Dynamics between members** (owner, 2026-10-04: FetLife's relationships and power dynamics "will be very important for the homework and chastity tasks"). Built overnight from `docs/mockups/dynamics.html`; **not yet approved by the owner.**
+
+- **`CMP_Dynamics`**, a new table `cmp_dynamics` (`CMP_DB_VERSION` 4). A dynamic is a type between a proposer and a partner:
+  - 12 directed types, each a pair of sides: Keyholder / chastity wearer · Dominant / submissive · Daddy / boy · Daddy / girl · Mommy / boy · Owner / property · Master / slave · Handler / pup · Trainer / trainee · Mentor / mentee · Top / bottom · Caregiver / little;
+  - 5 equal types: Partners · Married · Play partners · Leather family · Friends.
+- **Consent rules:**
+  - nothing happens until the partner accepts (pending → active);
+  - either member can end an active dynamic alone, at any time, and it takes effect immediately (`cmp_dynamic_ended` action);
+  - the proposer can withdraw a pending invitation;
+  - only the partner can accept or decline.
+- **Who may direct whom:** `CMP_Dynamics::lead_can_direct( $lead, $member, $type = null )` is true only for the leading side of an active directed dynamic. Releases 0.7.0 (homework) and 0.8.0 (chastity) build on it. Equal types give nobody that.
+- **Connections:** members in an active dynamic count as connected (`cmp_are_connected`), so "My connections" visibility now works.
+- **Screens:**
+  - a new **Dynamics** tab ("Dynamics (N)" when invitations are waiting) with Waiting for you / Active / Sent by you;
+  - "Propose a dynamic" on member profiles (type, your side, optional message up to 500 characters);
+  - a Dynamics card on profiles, shown only while active and only if both members leave "Show on my profile" on.
+- **Limits:** at most 10 pending invitations sent at once; no second pending or active dynamic of the same type between the same two members; members only; not to yourself; nonce-checked; same "no longer available" answer for anything not yours.
+- **Notifications** (invitation; accepted / declined / ended) and an audit trail (proposed, accepted, declined, withdrawn, ended). Export lists a member's dynamics; erase deletes them.
+- **Verification** (local WordPress 7.1.2):
+  - new `tests/dynamics-e2e.sh` 34/34;
+  - `setup-e2e.sh` 32/32, `dob-e2e.sh` 34/34, `e2e.sh` 60/60, `account-e2e.sh` 64/64, `profile-e2e.sh` 68 (+12 photo checks needing ImageMagick);
+  - one profile check now reads only the profile card, because "Leather family" is also a dynamic type in the Propose form on that page;
+  - no PHP warnings;
+  - checked on Hello Elementor at 375px: invitation, accept, active list and the profile Dynamics card.
+
 ## 0.5.0
 
 **Profiles v2 and step-by-step profile setup** (owner requests 2026-10-04: profiles modeled on Sniffies for phones and FetLife for desktop, data points and "Looking for" from Sniffies / FetLife / Chaster, and "filling out a member profile in stages … with a bio" right after sign-up). Built overnight while the owner was away; the mockup is `docs/mockups/profiles-v2.html` and the research notes are linked from the PR. **Not yet approved by the owner.**

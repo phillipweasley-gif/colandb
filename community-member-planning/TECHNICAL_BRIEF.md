@@ -21,6 +21,7 @@ community-member-planning/
 │   ├── class-cmp-settings.php      Settings → Member Planning (cmp_settings option)
 │   ├── class-cmp-audit.php         append-only audit log
 │   ├── class-cmp-access.php        the gate: logged_out → unverified → unattested (no 18+ date of birth, or locked) → member
+│   ├── class-cmp-dynamics.php      dynamics between members: propose/accept/end, lead_can_direct(), connections, Dynamics tab
 │   ├── class-cmp-onboarding.php    step-by-step profile setup (6 steps over the normal profile save; home opens it for new members)
 │   ├── class-cmp-birth-date.php    date of birth: sign-up fields via CEC hooks, one-time step, under-18 lock, age, wp-admin correction
 │   ├── class-cmp-email-verification.php

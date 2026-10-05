@@ -40,7 +40,7 @@ class CMP_Install {
 	}
 
 	public static function table_names() {
-		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ) );
+		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ) );
 	}
 
 	private static function create_tables() {
@@ -130,6 +130,27 @@ class CMP_Install {
 			PRIMARY KEY  (user_id,kind)
 		) $charset;";
 
-		return array( $audit, $notifications, $values, $images );
+		// Dynamics between two members (0.6.0). proposer_side: 'a' = the
+		// proposer is the leading side, 'b' = the partner is, '' = equal type.
+		$dynamics = 'CREATE TABLE ' . self::table( 'dynamics' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			type varchar(40) NOT NULL,
+			proposer_id bigint(20) unsigned NOT NULL,
+			partner_id bigint(20) unsigned NOT NULL,
+			proposer_side char(1) NOT NULL DEFAULT '',
+			status varchar(12) NOT NULL DEFAULT 'pending',
+			message text NULL,
+			proposer_show tinyint(1) NOT NULL DEFAULT 1,
+			partner_show tinyint(1) NOT NULL DEFAULT 1,
+			created_at datetime NOT NULL,
+			responded_at datetime NULL,
+			ended_at datetime NULL,
+			ended_by bigint(20) unsigned NULL,
+			PRIMARY KEY  (id),
+			KEY proposer (proposer_id,status),
+			KEY partner (partner_id,status)
+		) $charset;";
+
+		return array( $audit, $notifications, $values, $images, $dynamics );
 	}
 }

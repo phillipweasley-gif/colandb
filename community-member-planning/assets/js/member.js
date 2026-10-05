@@ -493,3 +493,30 @@
 		row.addEventListener( 'change', sync );
 	} );
 }() );
+
+/* Propose a dynamic (0.6.0): the "Your side" labels follow the chosen type;
+   equal types (Partners, Friends …) have no sides. */
+( function () {
+	'use strict';
+	var type = document.querySelector( '[data-cmp-dyn-type]' );
+	if ( ! type ) {
+		return;
+	}
+	var sides = document.querySelector( '[data-cmp-dyn-side]' );
+	var la = document.querySelector( '[data-cmp-side-a]' );
+	var lb = document.querySelector( '[data-cmp-side-b]' );
+	var tpl = sides ? sides.getAttribute( 'data-tpl' ) : '%s';
+	var sync = function () {
+		var o = type.options[ type.selectedIndex ];
+		var a = o.getAttribute( 'data-a' ), b = o.getAttribute( 'data-b' );
+		if ( sides ) {
+			sides.hidden = ! b;
+		}
+		if ( b && la && lb ) {
+			la.textContent = tpl.replace( '%s', a );
+			lb.textContent = tpl.replace( '%s', b );
+		}
+	};
+	type.addEventListener( 'change', sync );
+	sync();
+}() );

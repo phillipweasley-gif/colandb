@@ -446,7 +446,7 @@ class CMP_Account {
 					$rows[] = array( 'name' => $name, 'value' => (string) $value );
 				}
 			}
-			$rows = array_merge( $rows, CMP_Birth_Date::export_rows( $user->ID ) );
+			$rows = array_merge( $rows, CMP_Birth_Date::export_rows( $user->ID ), CMP_Dynamics::export_rows( $user->ID ) );
 			if ( $rows ) {
 				$data[] = array( 'group_id' => 'cmp-access', 'group_label' => __( 'Member area access', 'cmp' ), 'item_id' => 'cmp-access-' . $user->ID, 'data' => $rows );
 			}
@@ -480,6 +480,7 @@ class CMP_Account {
 			$removed = CMP_Profiles::delete_all( $user->ID ) > 0 || $removed;
 			$removed = CMP_Profile_Images::delete_all( $user->ID ) > 0 || $removed;
 			$removed = CMP_Birth_Date::erase( $user->ID ) || $removed;
+			$removed = CMP_Dynamics::erase( $user->ID ) > 0 || $removed;
 			foreach ( array( CMP_Email_Verification::META_VERIFIED_EMAIL, CMP_Email_Verification::META_VERIFIED_AT, CMP_Email_Verification::META_TOKEN_HASH, CMP_Email_Verification::META_TOKEN_EXPIRES, CMP_Email_Verification::META_TOKEN_EMAIL, CMP_Access::META_ATTESTED_AT, CMP_Access::META_ATTESTED_VERSION, CMP_Notifications::META_DISABLED, CMP_Notifications::META_TIMEZONE, self::META_CHANGE_HASH, self::META_CHANGE_EXPIRES, self::META_CHANGE_EMAIL ) as $key ) {
 				$removed = delete_user_meta( $user->ID, $key ) || $removed;
 			}

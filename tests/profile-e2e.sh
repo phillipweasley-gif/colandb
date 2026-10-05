@@ -121,7 +121,9 @@ ok "bad nonce refused" $(echo "$r" | grep -q 'cmp_notice=expired' && echo 1 || e
 echo "== Who sees what"
 get quinn q1 "$PAGE&cmp_member=$(uid pat)"
 ok "another member sees fields switched on (age calculated)" $([ "$(has $T/q1.html 'Pat Smith')$(has $T/q1.html 'they/them')$(has $T/q1.html 'Leathercraft')$(has $T/q1.html "<dd>$AGE</dd>")$(hasnt $T/q1.html '1983')" = 11111 ] && echo 1 || echo 0)
-ok "...but not Only me or Connections fields" $([ "$(hasnt $T/q1.html 'Columbus')$(hasnt $T/q1.html 'Leather family')" = 11 ] && echo 1 || echo 0)
+# Only the profile card itself ("Leather family" is also a dynamic type in the Propose form).
+php -r '$h=file_get_contents($argv[1]); $a=strpos($h,"<article class=\"cmp-prof\""); echo false===$a?"":substr($h,$a,strpos($h,"</article>",$a)-$a);' $T/q1.html > $T/q1-card.html
+ok "...but not Only me or Connections fields" $([ "$(hasnt $T/q1-card.html 'Columbus')$(hasnt $T/q1-card.html 'Leather family')" = 11 ] && echo 1 || echo 0)
 ok "connections rule: not connected = not shown" $(ev "echo CMP_Profiles::can_view('location',$(uid pat),$(uid quinn))?0:1;")
 ok "connections rule: connected (2.3 filter) = shown" $(ev "add_filter('cmp_are_connected','__return_true'); echo CMP_Profiles::can_view('location',$(uid pat),$(uid quinn))?1:0;")
 get rex r2 "$PAGE&cmp_member=$(uid pat)"
