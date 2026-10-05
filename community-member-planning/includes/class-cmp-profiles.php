@@ -74,6 +74,12 @@ class CMP_Profiles {
 				'searchable' => (bool) $r->searchable,
 			);
 		}
+		// The display name is always shown to members (owner, 0.9.1): it is
+		// how members find and recognise each other, and it already appears
+		// on posts, dynamics and homework.
+		if ( isset( $out['display_name'] ) ) {
+			$out['display_name']['visibility'] = 'members';
+		}
 		return $out;
 	}
 
@@ -555,7 +561,11 @@ class CMP_Profiles {
 			$html .= self::input_html( $key, $f, $value, $errors );
 		}
 		$html .= $is_set ? '</fieldset>' : '</div>';
-		$html .= self::show_switch( $key, $on, $f['label'], ! $filled );
+		if ( 'display_name' === $key ) {
+			$html .= '<span class="cmp-show cmp-show-fixed">' . esc_html__( 'Always shown', 'cmp' ) . '</span>';
+		} else {
+			$html .= self::show_switch( $key, $on, $f['label'], ! $filled );
+		}
 		return $html . '</div>';
 	}
 
@@ -587,6 +597,7 @@ class CMP_Profiles {
 				<li><strong><?php esc_html_e( 'Shown', 'cmp' ); ?></strong> — <?php esc_html_e( 'anyone signed in to the member area. Never the public, search engines or anyone signed out.', 'cmp' ); ?></li>
 				<li><strong><?php esc_html_e( 'Hidden', 'cmp' ); ?></strong> — <?php esc_html_e( 'nobody else, not even site administrators.', 'cmp' ); ?></li>
 			</ul>
+			<p><a class="cmp-btn cmp-btn-small cmp-btn-outline" href="<?php echo esc_url( self::member_url( $user_id ) ); ?>"><?php esc_html_e( 'View my profile as members see it', 'cmp' ); ?></a></p>
 		</section>
 
 		<?php echo CMP_Profile_Images::render_panels( $user_id, $rows ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
@@ -688,7 +699,7 @@ class CMP_Profiles {
 					$labels[] = $o[ $k ];
 				}
 			}
-			if ( ! empty( $v['other'] ) ) {
+			if ( ! empty( $v['other'] ) && ! empty( $f['other'] ) ) {
 				$labels[] = $v['other'];
 			}
 			return $labels;
@@ -812,12 +823,37 @@ class CMP_Profiles {
 		return $html . '</article>';
 	}
 
+	/** A member's own profile page (shareable link). */
+	public static function member_url( $user_id ) {
+		return add_query_arg( 'cmp_member', (int) $user_id, CMP_Settings::member_page_url() );
+	}
+
+	/**
+	 * Your own profile at its member link: exactly what other members see
+	 * (only items shown to all members), with a way back to editing.
+	 */
+	private static function render_self( $user_id ) {
+		ob_start();
+		?>
+		<section class="cmp-step" aria-labelledby="cmp-member-title">
+			<h2 id="cmp-member-title" class="cmp-title"><?php esc_html_e( 'Member profile', 'cmp' ); ?></h2>
+			<div class="cmp-notice cmp-notice-info cmp-self-view"><p><?php esc_html_e( 'This is your profile as other members see it. Items you switched off aren\'t here.', 'cmp' ); ?> <a href="<?php echo esc_url( self::url() ); ?>"><?php esc_html_e( 'Edit my profile', 'cmp' ); ?></a></p></div>
+			<?php echo self::card_html( $user_id, $user_id, true ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+			<?php echo CMP_Feed::profile_html( $user_id, $user_id, true ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
+		</section>
+		<?php
+		return ob_get_clean();
+	}
+
 	/**
 	 * Another member's profile: ?cmp_member=<user ID>. A profile the viewer
 	 * may not see looks exactly like one that doesn't exist.
 	 */
 	public static function render_member( $owner_id ) {
 		$viewer = get_current_user_id();
+		if ( $owner_id && $owner_id === $viewer ) {
+			return self::render_self( $viewer );
+		}
 		$ok     = $owner_id && $owner_id !== $viewer && CMP_Access::is_member( $owner_id );
 		ob_start();
 		?>

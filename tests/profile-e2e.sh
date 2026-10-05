@@ -39,10 +39,11 @@ AGE=$(ev 'echo CMP_Birth_Date::age_from("1983-02-14");')
 ev 'global $wpdb; $wpdb->query("DELETE FROM ".CMP_Install::table("profile_values")); $wpdb->query("DELETE FROM ".CMP_Install::table("profile_images")); delete_option("cmp_profile_options");' >/dev/null
 ev 'foreach(array("interests"=>array("Leatherwork","Hiking","Board games"),"roles"=>array("Volunteer","Organizer"),"identity"=>array("Gay","Bi"),"availability"=>array("Weekends","Evenings"),"looking_for"=>array("Friends","Event buddies")) as $l=>$labels){ $rows=array(); foreach($labels as $i=>$x){ $rows[]=array("label"=>$x,"active"=>true,"order"=>$i); } CMP_Profile_Fields::save_list($l,$rows); }' >/dev/null
 # Test photos: a large JPEG carrying a comment and an Exif block with a marker that must not survive, a small one, a PNG, a non-image, an over-size file.
-convert -size 2400x1600 gradient:red-blue -set comment "SECRET-GPS-MARKER" $T/big.jpg
+# Test photos are made with PHP's GD (0.9.1; no ImageMagick needed).
+php -r '$i=imagecreatetruecolor(2400,1600); for($y=0;$y<1600;$y++){imageline($i,0,$y,2399,$y,imagecolorallocate($i,(int)(255*(1-$y/1600)),0,(int)(255*$y/1600)));} imagejpeg($i,$argv[1],90);' $T/big.jpg
 php -r '$d=file_get_contents($argv[1]); $exif="Exif\0\0"."MM\0*\0\0\0\x08"."GPSLatitude SECRET-GPS-MARKER"; $seg="\xFF\xE1".pack("n",strlen($exif)+2).$exif; file_put_contents($argv[1],substr($d,0,2).$seg.substr($d,2));' $T/big.jpg
-convert -size 120x120 xc:green $T/small.jpg
-convert -size 800x800 xc:orange $T/sq.png
+php -r '$i=imagecreatetruecolor(120,120); imagefill($i,0,0,imagecolorallocate($i,0,128,0)); imagejpeg($i,$argv[1]);' $T/small.jpg
+php -r '$i=imagecreatetruecolor(800,800); imagefill($i,0,0,imagecolorallocate($i,255,165,0)); imagepng($i,$argv[1]);' $T/sq.png
 echo "not a photo" > $T/fake.jpg
 head -c 6000000 /dev/urandom > $T/huge.jpg
 
@@ -67,7 +68,9 @@ get pat p1 "$PROF"
 ok "member sees Home | Profile | Account" $([ "$(has $T/p1.html '>Home<')$(has $T/p1.html '>Profile<')$(has $T/p1.html '>Account<')" = 111 ] && echo 1 || echo 0)
 ok "every field rendered with a Show switch" $([ "$(has $T/p1.html 'id="cmp-row-bio"')$(has $T/p1.html 'id="cmp-row-age"')$(has $T/p1.html 'id="cmp-row-member_since"')$(grep -o 'name="sp\[' $T/p1.html | wc -l | awk '{print ($1>=11)}')" = 1111 ] && echo 1 || echo 0)
 ok "empty fields: switch hidden (and on, ready for when filled)" $(grep -o '<span class="cmp-show" data-cmp-show hidden><input type="hidden" name="sp\[bio\]" value="1" /><input type="checkbox" class="cmp-switch-input" id="cmp_s_bio" name="s\[bio\]" value="1" checked' $T/p1.html | wc -l | awk '{print ($1==1)}')
-ok "existing member's filled fields keep Only me (switch off)" $(grep -o 'id="cmp_s_display_name" name="s\[display_name\]" value="1" />' $T/p1.html | wc -l | awk '{print ($1==1)}')
+ok "display name: no switch, always shown (0.9.1)" $([ "$(hasnt $T/p1.html 'id="cmp_s_display_name"')$(has $T/p1.html 'Always shown')" = 11 ] && echo 1 || echo 0)
+ok "orientation is a fixed list: no free-text Other (0.9.1)" $(hasnt $T/p1.html 'name="f[identity][other]"')
+ok "link to view my profile as members see it" $(has $T/p1.html "cmp_member=$(uid pat)\"")
 ok "age calculated from date of birth, not typed" $([ "$(has $T/p1.html "cmp-age-value\">$AGE<")$(hasnt $T/p1.html 'name="f[age]')" = 11 ] && echo 1 || echo 0)
 ok "options list shows renamed choice" $(has $T/p1.html 'Leathercraft')
 ok "display name read-only, links to Account" $([ "$(has $T/p1.html 'Pat Smith')$(has $T/p1.html 'cmp_tab=account#cmp-details')" = 11 ] && echo 1 || echo 0)
@@ -103,7 +106,7 @@ FULL=(--data-urlencode "action=cmp_profile_save" "${SP[@]}" \
   --data-urlencode "s[age]=1" --data-urlencode "s[display_name]=1" --data-urlencode "s[member_since]=1")
 r=$(post pat "${FULL[@]}" --data-urlencode "_cmp_nonce=$N")
 ok "valid profile saved" $(echo "$r" | grep -q 'profile_saved' && echo 1 || echo 0)
-ok "values stored cleanly" $(ev "\$r=CMP_Profiles::rows($(uid pat)); echo 'Leather & laughs'===\$r['bio']['value'] && 'Columbus'===\$r['location']['value']['city'] && 'Leather family'===\$r['identity']['value']['other'] ?1:0;")
+ok "values stored cleanly; a posted orientation Other is ignored" $(ev "\$r=CMP_Profiles::rows($(uid pat)); echo 'Leather & laughs'===\$r['bio']['value'] && 'Columbus'===\$r['location']['value']['city'] && empty(\$r['identity']['value']['other']) ?1:0;")
 ok "switches stored: on = members, off = Only me, off keeps an old Connections" $(ev "\$r=CMP_Profiles::rows($(uid pat)); echo 'members'===\$r['bio']['visibility'] && 'members'===\$r['age']['visibility'] && 'connections'===\$r['location']['visibility'] && 'private'===\$r['roles']['visibility'] && 'private'===\$r['identity']['visibility'] ?1:0;")
 ok "an empty field's choice is left alone" $(ev "\$r=CMP_Profiles::rows($(uid pat)); echo 'private'===\$r['looking_for']['visibility']?1:0;")
 ok "nothing is searchable (directory not open yet)" $(ev 'global $wpdb; echo 0===(int)$wpdb->get_var("SELECT COUNT(*) FROM ".CMP_Install::table("profile_values")." WHERE searchable=1")?1:0;')
@@ -124,6 +127,9 @@ ok "another member sees fields switched on (age calculated)" $([ "$(has $T/q1.ht
 # Only the profile card itself ("Leather family" is also a dynamic type in the Propose form).
 php -r '$h=file_get_contents($argv[1]); $a=strpos($h,"<article class=\"cmp-prof\""); echo false===$a?"":substr($h,$a,strpos($h,"</article>",$a)-$a);' $T/q1.html > $T/q1-card.html
 ok "...but not Only me or Connections fields" $([ "$(hasnt $T/q1-card.html 'Columbus')$(hasnt $T/q1-card.html 'Leather family')" = 11 ] && echo 1 || echo 0)
+get pat p-self "$H/?page_id=$PAGE_ID&cmp_member=$(uid pat)"
+ok "own profile link: what members see, with a way back to editing" $([ "$(has $T/p-self.html 'as other members see it')$(has $T/p-self.html 'Edit my profile')$(has $T/p-self.html 'Pat Smith')$(hasnt $T/p-self.html 'Columbus')" = 1111 ] && echo 1 || echo 0)
+ok "photo without a description: avatar read as 'Profile photo of <name>', cover decorative" $(ev "\$i=(object)array('decorative'=>1,'alt'=>'','sha256'=>'x','width'=>512,'height'=>512); \$a=CMP_Profile_Images::img_html($(uid pat),'avatar',\$i); \$c=CMP_Profile_Images::img_html($(uid pat),'cover',\$i); echo false!==strpos(\$a,'alt=\"Profile photo of Pat Smith\"') && false!==strpos(\$c,'alt=\"\"')?1:0;")
 ok "connections rule: not connected = not shown" $(ev "echo CMP_Profiles::can_view('location',$(uid pat),$(uid quinn))?0:1;")
 ok "connections rule: connected (2.3 filter) = shown" $(ev "add_filter('cmp_are_connected','__return_true'); echo CMP_Profiles::can_view('location',$(uid pat),$(uid quinn))?1:0;")
 get rex r2 "$PAGE&cmp_member=$(uid pat)"
@@ -140,9 +146,9 @@ echo "== Photos"
 PN=$(pnonce $T/p4.html cmp_profile_image)
 up(){ curl -s -b $T/$1.jar -c $T/$1.jar -o $T/up.out -w '%{redirect_url}' "$H/wp-admin/admin-post.php" -F "action=cmp_profile_image" -F "_cmp_nonce=$PN" "${@:2}"; }
 r=$(up pat -F kind=avatar -F "photo=@$T/big.jpg;type=image/jpeg")
-ok "photo without description refused" $(echo "$r" | grep -q 'photo_error' && [ "$(ev "echo CMP_Profile_Images::get($(uid pat),'avatar')?0:1;")" = 1 ] && echo 1 || echo 0)
 get pat p5 "$PROF"
-ok "the reason is shown next to the photo" $(has $T/p5.html 'or tick &quot;Decorative image&quot;\|or tick "Decorative image"')
+ok "a photo needs no description (0.9.1): never refused for that" $([ "$(hasnt $T/p5.html 'Describe the photo for people')$(hasnt $T/p5.html 'Decorative image')$(has $T/p5.html 'Add a description (optional)')" = 111 ] && echo 1 || echo 0)
+ev "CMP_Profile_Images::delete($(uid pat),'avatar');" >/dev/null
 r=$(up pat -F kind=avatar -F "photo=@$T/fake.jpg;type=image/jpeg" -F "alt=Me")
 ok "non-image named .jpg refused" $(echo "$r" | grep -q 'photo_error' && echo 1 || echo 0)
 r=$(up pat -F kind=avatar -F "photo=@$T/huge.jpg;type=image/jpeg" -F "alt=Me")

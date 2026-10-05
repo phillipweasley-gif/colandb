@@ -75,7 +75,7 @@ get oldtimer o1 "$PAGE"
 ok "shows the one-time date-of-birth step" $([ "$(has $T/o1.html 'One more step')$(has $T/o1.html "only be asked this once")" = 11 ] && echo 1 || echo 0)
 r=$(post oldtimer -d "action=cmp_attest&_cmp_nonce=$(nonce $T/o1.html)&cmp_dob[m]=7&cmp_dob[d]=4&cmp_dob[y]=$ADULT")
 ok "adult date -> member" $([ "$(echo "$r" | grep -c 'cmp_notice=welcome')$(ev "echo CMP_Access::state($OLD);")" = 1member ] && echo 1 || echo 0)
-ok "existing member's fields NOT switched on automatically" $(ev "\$r=CMP_Profiles::rows($OLD); echo 'private'===\$r['display_name']['visibility'] && 'private'===\$r['age']['visibility'] ?1:0;")
+ok "existing member's fields NOT switched on automatically (display name is always shown since 0.9.1)" $(ev "\$r=CMP_Profiles::rows($OLD); echo 'members'===\$r['display_name']['visibility'] && 'private'===\$r['age']['visibility'] ?1:0;")
 get oldtimer o2 "$PAGE"
 r=$(post oldtimer -d "action=cmp_attest&_cmp_nonce=$(nonce $T/o1.html)&cmp_dob[m]=1&cmp_dob[d]=1&cmp_dob[y]=$UNDER")
 ok "can't change the date afterwards from the member area" $(ev "echo sprintf('%04d-07-04',$ADULT)===get_user_meta($OLD,'cmp_birth_date',true)?1:0;")

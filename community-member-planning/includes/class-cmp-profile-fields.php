@@ -136,7 +136,8 @@ class CMP_Profile_Fields {
 			'member_since'    => array( 'section' => 'basics', 'label' => __( 'Member since', 'cmp' ), 'type' => 'system', 'searchable' => false ),
 			// Identity.
 			'gender'          => array( 'section' => 'identity', 'label' => __( 'Gender', 'cmp' ), 'type' => 'multi', 'list' => 'gender', 'limit' => 3, 'other' => 40 ),
-			'identity'        => array( 'section' => 'identity', 'label' => __( 'Orientation', 'cmp' ), 'type' => 'multi', 'list' => 'identity', 'limit' => 10, 'other' => 80 ),
+			// A fixed list, no free text (owner, 0.9.1), so members can be found by it.
+			'identity'        => array( 'section' => 'identity', 'label' => __( 'Orientation', 'cmp' ), 'type' => 'multi', 'list' => 'identity', 'limit' => 10 ),
 			'roles'           => array( 'section' => 'identity', 'label' => __( 'Roles', 'cmp' ), 'type' => 'multi', 'list' => 'roles', 'limit' => 10 ),
 			'position'        => array( 'section' => 'identity', 'label' => __( 'Position', 'cmp' ), 'type' => 'single', 'list' => 'position' ),
 			'expression'      => array( 'section' => 'identity', 'label' => __( 'Expression', 'cmp' ), 'type' => 'text', 'max' => 60, 'help' => __( 'In your own words, e.g. "Leather daddy".', 'cmp' ) ),
@@ -467,7 +468,8 @@ class CMP_Profile_Fields {
 						$labels[] = $o[ $k ];
 					}
 				}
-				if ( ! empty( $value['other'] ) ) {
+				// Only fields that still take "Other" show it (orientation stopped in 0.9.1).
+				if ( ! empty( $value['other'] ) && ! empty( $f['other'] ) ) {
 					$labels[] = $value['other'];
 				}
 				return implode( ', ', $labels );

@@ -4,6 +4,20 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.9.1
+
+**Profile fixes from the owner's review of the live site (2026-10-05).**
+
+- **Photo descriptions are optional.** No more "Describe the photo or tick Decorative image" error. The description sits behind "Add a description (optional)"; without one, a profile photo is read by screen readers as "Profile photo of <display name>" and a cover image is treated as decorative.
+- **Profile photo and cover image can be uploaded together.** Saving one photo used to reload the page at once, dropping a photo already chosen (and cropped) in the other panel. Now one Save uploads every photo that's waiting, then reloads once; if one fails, the others stay saved and the failed one says why.
+- **The display name can't be hidden.** It has no Show switch ("Always shown") and always counts as shown to members, including for existing members who had switched it off. It's already how members appear on posts, dynamics and homework.
+- **Orientation is a fixed list** (no "Other, in your own words"), so members can be found by it. Earlier free-text answers are kept in the database but no longer shown.
+- **"View my profile as members see it"** button on the Profile tab: opens your own member link (`?cmp_member=<your ID>`) showing exactly what other members see, your all-members posts, and an "Edit my profile" link. Author names in the feed now link to member profiles (yours included).
+- **Tests:** `profile-e2e.sh` makes its test photos with PHP's GD instead of ImageMagick, so all 83 checks now run on a Mac (the 12 photo checks used to be skipped); new checks for the display name, orientation, own-profile view and photo alt text. `dob-e2e.sh` updated for the always-shown display name. Also checked in a browser: choosing both photos and pressing Save on one stores both (512×512 and 1500×500) with no description.
+- **Verification** (local WordPress 7.1.2): `profile-e2e.sh` 83/83, `dob-e2e.sh` 34/34, `setup-e2e.sh` 32/32, `feed-e2e.sh` 41/41, `account-e2e.sh` 64/64, `e2e.sh` 60/60.
+
+---
+
 ## 0.9.0
 
 **Member feed** (owner, 2026-10-04: "there should also be an activity feed for members and a way for them to share text and image posts (like tagging an event for photos they took there etc.)"). Built overnight from `docs/mockups/feed.html`; **not yet approved by the owner.**

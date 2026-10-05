@@ -479,7 +479,7 @@ class CMP_Feed {
 		$mine   = (int) $p->author_id === (int) $viewer_id;
 		$back   = self::current_url();
 		$avatar = ( $mine || CMP_Profiles::can_view( 'avatar', $p->author_id, $viewer_id ) ) ? CMP_Profile_Images::get( $p->author_id, 'avatar', false ) : null;
-		$link   = $mine ? CMP_Profiles::url() : add_query_arg( 'cmp_member', (int) $p->author_id, CMP_Settings::member_page_url() );
+		$link   = CMP_Profiles::member_url( $p->author_id );
 		$html   = '<article class="cmp-panel cmp-fd-post' . ( 'hidden' === $p->status ? ' is-hidden' : '' ) . '" id="cmp-post-' . (int) $p->id . '">';
 		$html  .= '<header class="cmp-fd-who"><a class="cmp-fd-av" href="' . esc_url( $link ) . '" aria-hidden="true" tabindex="-1">' . ( $avatar ? CMP_Profile_Images::img_html( $p->author_id, 'avatar', $avatar ) : '<span>' . esc_html( mb_strtoupper( mb_substr( $name, 0, 1 ) ) ) . '</span>' ) . '</a>';
 		$html  .= '<div><a class="cmp-fd-name" href="' . esc_url( $link ) . '">' . esc_html( $name ) . '</a><small>' . esc_html( sprintf( /* translators: %s: time ago */ __( '%s ago', 'cmp' ), human_time_diff( strtotime( $p->created_at . ' UTC' ) ) ) ) . ' · ' . esc_html( self::visibilities()[ $p->visibility ] ) . ( 'hidden' === $p->status ? ' · ' . esc_html__( 'hidden by the site team', 'cmp' ) : '' ) . '</small></div></header>';
@@ -515,8 +515,20 @@ class CMP_Feed {
 	}
 
 	/** Recent posts on a member's profile, as the viewer may see them. */
-	public static function profile_html( $owner_id, $viewer_id ) {
-		$posts = array_slice( self::visible_posts( $viewer_id, array( 'author' => $owner_id ) ), 0, 5 );
+	public static function profile_html( $owner_id, $viewer_id, $as_members = false ) {
+		$posts = self::visible_posts( $viewer_id, array( 'author' => $owner_id ) );
+		if ( $as_members ) {
+			// Your own profile "as members see it": all-members posts only.
+			$posts = array_values(
+				array_filter(
+					$posts,
+					function ( $p ) {
+						return 'published' === $p->status && 'members' === $p->visibility;
+					}
+				)
+			);
+		}
+		$posts = array_slice( $posts, 0, 5 );
 		if ( ! $posts ) {
 			return '';
 		}
