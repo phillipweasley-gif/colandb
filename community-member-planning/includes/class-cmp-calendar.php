@@ -367,11 +367,24 @@ class CMP_Calendar {
 		return $html . ( $month ? '</ul>' : '' );
 	}
 
-	/** The community calendar page: the first page showing the calendar, else the events archive. */
+	/**
+	 * The community calendar page for "Browse events" (0.17.1): a page with
+	 * the full calendar first, then the event list, then an upcoming list;
+	 * never the home page (it may show a few upcoming events). Falls back to
+	 * the events archive. Filter: cmp_events_url.
+	 */
 	public static function events_url() {
 		global $wpdb;
-		$id = (int) $wpdb->get_var( "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'page' AND post_status = 'publish' AND ( post_content LIKE '%[cec_calendar%' OR post_content LIKE '%[cec_events%' OR post_content LIKE '%[cec_upcoming%' ) ORDER BY menu_order, ID LIMIT 1" );
-		return (string) apply_filters( 'cmp_events_url', $id ? get_permalink( $id ) : get_post_type_archive_link( 'cec_event' ) );
+		$front = (int) get_option( 'page_on_front' );
+		$url   = '';
+		foreach ( array( '[cec_calendar', '[cec_events', '[cec_upcoming' ) as $code ) {
+			$id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'page' AND post_status = 'publish' AND ID <> %d AND post_content LIKE %s ORDER BY menu_order, ID LIMIT 1", $front, '%' . $wpdb->esc_like( $code ) . '%' ) );
+			if ( $id ) {
+				$url = get_permalink( $id );
+				break;
+			}
+		}
+		return (string) apply_filters( 'cmp_events_url', $url ? $url : get_post_type_archive_link( 'cec_event' ) );
 	}
 
 	/** The member area's My calendar tab. */
