@@ -18,11 +18,12 @@ More than one Claude session works on this repository. **This repository is the 
 
 1. **Start from the latest `main`:** `git fetch origin && git switch -c <your-branch> origin/main`. Before touching a plugin, read the top of its `CHANGELOG.md` on `main`. Someone else may have released since you last looked.
 2. **Any change inside a plugin folder needs a new version:** raise `Version:` in the plugin header *and* its version constant (`CEC_VERSION`, `CMP_VERSION`, …), and add a `## <version>` entry at the top of its `CHANGELOG.md` saying what changed, why, and how it was verified. Patch = fix, minor = feature. CI rejects a changed plugin with an unchanged or lower version.
-3. **Test before merging:** `php -l` every changed PHP file. For anything beyond trivial, use the real-WordPress kit in `tests/` (`tests/README.md`). For calendar month-view changes, the `tests/snap.php` before/after comparison must be identical unless the change is intentional.
+3. **Test before merging:** `php -l` every changed PHP file. For anything beyond trivial, use the real-WordPress kit in `tests/` (`tests/README.md`). **There is no staging site, so this kit is the only place a change runs before the live site.** Anything that sends email, creates or edits events, or touches member data must be exercised here, never on live. For calendar month-view changes, the `tests/snap.php` before/after comparison must be identical unless the change is intentional. If you could not run the kit, say so plainly in the CHANGELOG entry and the pull request.
 4. **Rebuild the zips:** `bash tools/build-dist.sh` and commit `dist/` with the change.
-5. **Open a pull request to `main`.** CI checks syntax and versions. Merging to `main` publishes each new plugin version as a GitHub **pre-release**, which the staging site installs automatically.
+5. **Open a pull request to `main`.** CI checks syntax and versions. Merging to `main` publishes each new plugin version as a GitHub **pre-release**. No site installs pre-releases (the staging site is retired, see below).
 6. **Held plugins:** a plugin listed in `release-hold.txt` is never published. Only remove a line when the reason given there is resolved.
-7. **Going live is the owner's decision:** after checking staging, the owner runs the "Promote release to live" workflow, and the live site then offers the update. Never mark releases stable yourself unless the owner asks.
+7. **Going live is the owner's decision:** the owner backs up colandb.com, runs the "Promote release to live" workflow (or asks a session to run it), and clicks **Update now** on the live site. Never mark releases stable yourself unless the owner asks.
+8. **After a release reaches live, verify it read-only** (see "Working on the live site").
 
 ## Importing outside work
 
@@ -31,8 +32,17 @@ If plugin code arrives from outside the repository (a zip from another session o
 2. Diff it against `main`. If both sides changed the plugin, merge by hand: keep both sets of changes, give the result a new version higher than both, and write a CHANGELOG entry crediting both.
 3. Never overwrite someone else's version with an older base.
 
+## Working on the live site
+
+Since 2026-10-04 the owner works on colandb.com only. The staging site (`stg-mtbrmv.elementor.cloud`) is retired.
+
+- **Live has real people on it.** Publishing an event emails every matching subscriber (FluentSMTP) and can send a Brevo web push; members get notices. So on live, never publish, create or edit test events, submit forms, subscribe test addresses, or trigger emails. Do that in the `tests/` kit.
+- **Verifying a release on live is read-only:** load public pages, event pages, the `.ics` files and feeds, and check the plugin version in the page source (`?ver=`), the output you changed, and that there are no PHP warnings. Anything you can't check that way, say so rather than test it on live.
+- **Settings changes only when the owner asks**, one at a time. After saving, reload the settings page and check the value really stuck (a click on Save has silently failed on this site before), then confirm the effect on the public site.
+- **Never copy the staging site over live.** Staging still has email simulation on, Brevo auto-push off, "ZZ TEST" events and a fake subscriber.
+
 ## Boundaries that must not be crossed
 
 - The events plugin owns public events only. All member data lives in the member plugin, which reads events only through `cec_get_public_event()` / `cec_get_public_events()` (see each `TECHNICAL_BRIEF.md`).
-- colandb.com is the live production site. Don't run code or change settings on it unless the owner asks; test on staging (`stg-mtbrmv.elementor.cloud`) first.
+- colandb.com is the live production site and the only site. Don't run code or change settings on it unless the owner asks.
 - Never put a GitHub token, password or other secret in this repository.
