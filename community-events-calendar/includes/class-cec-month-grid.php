@@ -409,12 +409,32 @@ class CEC_Month_Grid {
 				<p class="cec-no-events"><?php esc_html_e( 'No events this month.', 'cec' ); ?></p>
 			<?php endif; ?>
 		</div>
-		<script type="application/json" class="cec-cal-data"><?php echo wp_json_encode( $events_by_date ); // phpcs:ignore ?></script>
+		<script type="application/json" class="cec-cal-data"><?php echo wp_json_encode( self::plain_payload( $events_by_date ) ); // phpcs:ignore ?></script>
 		<div class="cec-cal-day-detail" hidden>
 			<h3 class="cec-cal-day-detail-heading"></h3>
 			<ul class="cec-cal-day-detail-list"></ul>
 		</div>
 		<?php
 		return ob_get_clean();
+	}
+
+	/**
+	 * The click-a-date panel (frontend.js) inserts these strings with
+	 * jQuery .text(), so they must be plain characters: WordPress's display
+	 * title ("Kinks &amp; Drinks &#8211; …") would otherwise show its codes
+	 * literally. Only the JSON copy is converted; the server-rendered agenda
+	 * above keeps escaping the original strings exactly as before.
+	 */
+	private static function plain_payload( $events_by_date ) {
+		foreach ( $events_by_date as $date => $day_events ) {
+			foreach ( $day_events as $i => $ev ) {
+				foreach ( array( 'title', 'date_range', 'location', 'host', 'badge' ) as $key ) {
+					if ( isset( $ev[ $key ] ) && is_string( $ev[ $key ] ) ) {
+						$events_by_date[ $date ][ $i ][ $key ] = CEC_Event_Helper::plain_text( $ev[ $key ] );
+					}
+				}
+			}
+		}
+		return $events_by_date;
 	}
 }

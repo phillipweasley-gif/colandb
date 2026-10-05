@@ -272,6 +272,15 @@ class CEC_Event_Helper {
 		return self::plain_text( get_bloginfo( 'name' ) );
 	}
 
+	/**
+	 * The full "When" line for plain-text emails: when_display (which keeps
+	 * a multi-day event's end date) plus the timezone abbreviation when
+	 * times are shown. start_display alone gave only the first day.
+	 */
+	public static function when_text( $data ) {
+		return trim( $data['when_display'] . ( $data['timezone_abbr'] ? ' ' . $data['timezone_abbr'] : '' ) );
+	}
+
 	private static function format_start_display( $start_raw, $time_mode ) {
 		if ( ! $start_raw ) {
 			return '';
@@ -694,7 +703,9 @@ class CEC_Event_Helper {
 		}
 
 		$own_parent_id = CEC_Recurrence::is_occurrence( $post_id ) ? CEC_Recurrence::get_parent_id( $post_id ) : $post_id;
-		$own_title     = self::normalize_title_for_matching( $data['title'] );
+		// Plain title: the display title's "&#8211;" would add "8211" to the
+		// words being compared and lower the match score.
+		$own_title     = self::normalize_title_for_matching( $data['title_plain'] );
 		if ( '' === $own_title ) {
 			return array();
 		}

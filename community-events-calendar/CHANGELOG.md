@@ -6,6 +6,14 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.26.3
+
+**Three fixes from the unreleased 1.25.3 (built in another session from 1.25.2) that 1.26.2 didn't cover.** 1.26.2 already did 1.25.3's site-name and email-subject work; these are the rest, ported onto 1.26.2 by hand rather than importing 1.25.3's older base.
+- **Click-a-date panel showed HTML codes.** On the live site the October panel reads "Kinks &amp;amp; Drinks &amp;#8211; Presented by Kink 101" and "MAsT:Columbus &amp;#8211; October Meeting", because `frontend.js` inserts the `.cec-cal-data` JSON with jQuery `.text()`. New `CEC_Month_Grid::plain_payload()` converts the JSON copy only (title, date range, location, host, badge) through `CEC_Event_Helper::plain_text()`. The server-rendered phone agenda above it is unchanged: it still escapes the original strings, so `tests/snap.php` output should differ only inside the `<script class="cec-cal-data">` line.
+- **Subscriber "New event"/"Event update" emails and RSVP reminders showed only the start date** for a multi-day event ("When: Fri, Nov 6, 2026" for Nov 6–8). New `CEC_Event_Helper::when_text()` (`when_display` from 1.25.2 plus the timezone abbreviation) is used instead of `start_display`: "When: Fri, Nov 6 – Sun, Nov 8, 2026".
+- **Duplicate detection compared the display title**, so a typed " - " became "&#8211;" and added "8211" to the words being matched, lowering the score. `find_possible_duplicates()` now uses `title_plain` (candidates already used the raw `post_title`).
+- **Verification so far:** the three *bugs* were observed for real (date-panel codes on colandb.com on 2026-10-04; the start-date-only email and the lowered duplicate score on staging, with FluentSMTP Email Simulation, on 2026-10-03). The *fixes* have not yet run in any WordPress install: this Mac has no PHP, so neither `php -l` nor the `tests/` kit was run locally. Brace/bracket balance checked by script. To be verified by CI `php -l` and on staging via the pre-release before promotion.
+
 ## 1.26.2
 
 **Fix: emails and calendar files showed HTML codes instead of characters** (spotted in the staging site's FluentSMTP log, e.g. "[Central Ohio Leather &amp;amp; Beyond] New event submitted for approval").

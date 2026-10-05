@@ -206,7 +206,7 @@ class CEC_RSVP {
 		$body = sprintf(
 			__( "Just a reminder — %1\$s is happening soon!\n\nWhen: %2\$s\nWhere: %3\$s\n\n%4\$s", 'cec' ),
 			$data['title_plain'],
-			$data['start_display'],
+			CEC_Event_Helper::when_text( $data ),
 			CEC_Event_Helper::plain_text( $where['label'] ),
 			$data['permalink']
 		);
