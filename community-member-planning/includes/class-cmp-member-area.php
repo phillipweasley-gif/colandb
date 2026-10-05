@@ -216,6 +216,13 @@ class CMP_Member_Area {
 			wp_enqueue_script( 'cmp-member' );
 			return $out . CMP_Account::render() . '</div>';
 		}
+		// Step-by-step profile setup (0.5.0): its own tab, and what a new
+		// member's home shows until they finish or leave it.
+		$setup_step = isset( $_GET['cmp_step'] ) ? absint( $_GET['cmp_step'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( CMP_Access::STATE_MEMBER === $state && ( CMP_Onboarding::TAB === $tab || ( 'home' === $tab && ! isset( $_GET['cmp_member'] ) && CMP_Onboarding::should_start( get_current_user_id() ) ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			wp_enqueue_script( 'cmp-member' );
+			return $out . CMP_Onboarding::render( get_current_user_id(), $setup_step ) . '</div>';
+		}
 		// Profiles are for full members only; anyone else sees their next step.
 		if ( CMP_Access::STATE_MEMBER === $state && CMP_Profiles::TAB === $tab ) {
 			wp_enqueue_script( 'cmp-member' );
@@ -244,7 +251,7 @@ class CMP_Member_Area {
 
 	private static function current_tab() {
 		$tab = isset( $_GET['cmp_tab'] ) ? sanitize_key( wp_unslash( $_GET['cmp_tab'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		return in_array( $tab, array( CMP_Account::TAB, CMP_Profiles::TAB ), true ) ? $tab : 'home';
+		return in_array( $tab, array( CMP_Account::TAB, CMP_Profiles::TAB, CMP_Onboarding::TAB ), true ) ? $tab : 'home';
 	}
 
 	/**
@@ -443,6 +450,8 @@ class CMP_Member_Area {
 				printf( esc_html__( 'Welcome, %s', 'cmp' ), esc_html( wp_get_current_user()->display_name ) );
 				?>
 			</h2>
+
+			<?php echo CMP_Onboarding::nudge_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 
 			<div class="cmp-section cmp-inbox" data-cmp-inbox>
 				<div class="cmp-panel-head">

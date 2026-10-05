@@ -91,6 +91,9 @@ ok "audit records that a date was set, never the date" $($W eval '$u=get_user_by
 
 echo "== Alice: member"
 get alice a3 "$PAGE"
+ok "new member's home starts the profile setup (0.5.0)" $(has $T/a3.html 'Step 1 of 6')
+$W eval "update_user_meta(get_user_by('login','alice')->ID,'cmp_setup_done','later');" >/dev/null
+get alice a3 "$PAGE"
 ok "member home shown" $(has $T/a3.html 'Welcome, alice')
 ok "welcome notification listed" $(has $T/a3.html 'Welcome to the member area')
 ok "unread count 1" $(has $T/a3.html 'data-cmp-unread aria-label="1 unread">1<')
@@ -105,7 +108,7 @@ ok "REST write without X-WP-Nonce rejected" $([ "$code" != 200 ] && echo 1 || ec
 
 echo "== Bob: another full member"
 BOB=$($W user get bob --field=ID)
-$W eval "update_user_meta($BOB,'cmp_verified_email','bob@example.com'); update_user_meta($BOB,'cmp_age_attested_at',gmdate('Y-m-d H:i:s')); update_user_meta($BOB,'cmp_birth_date','1979-11-03');" >/dev/null
+$W eval "update_user_meta($BOB,'cmp_verified_email','bob@example.com'); update_user_meta($BOB,'cmp_age_attested_at',gmdate('Y-m-d H:i:s')); update_user_meta($BOB,'cmp_birth_date','1979-11-03'); update_user_meta($BOB,'cmp_setup_done','later');" >/dev/null
 login bob bobpass
 get bob b1 "$PAGE"
 BN=$(restnonce $T/b1.html)

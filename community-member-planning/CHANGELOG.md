@@ -4,6 +4,35 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.5.0
+
+**Profiles v2 and step-by-step profile setup** (owner requests 2026-10-04: profiles modeled on Sniffies for phones and FetLife for desktop, data points and "Looking for" from Sniffies / FetLife / Chaster, and "filling out a member profile in stages … with a bio" right after sign-up). Built overnight while the owner was away; the mockup is `docs/mockups/profiles-v2.html` and the research notes are linked from the PR. **Not yet approved by the owner.**
+
+- **New fields**, grouped into sections (Basics, Identity, Stats, Scene, Kinks & limits, Health):
+  - Basics: Hosting, How active (FetLife's scale).
+  - Identity: Gender (up to 3, plus "other"), Position, Expression (own words). "Orientation / identity" is now labelled Orientation.
+  - Stats: Height (list, stored in inches, shown 5'11"), Weight (lb).
+  - Scene: Not looking for.
+  - Kinks & limits: Kinks, rated Chaster-style (Love it / Like it / Curious, plus Giving / Receiving / Both); Hard limits.
+  - Health: Safer-sex practices, Last tested (month), Substances.
+  - Bio grows to 1,000 characters.
+- **Starter lists** for every option list, trimmed from the research (e.g. 36 roles instead of FetLife's 813, 30 kinks, 16 "looking for"). `CMP_Profile_Fields::seed_defaults()` runs on upgrade (`CMP_DB_VERSION` 3) and only fills lists that have no options at all, so the site team's own lists are untouched.
+- **Health starts hidden** even when filled in: the one exception to "a filled-in field starts shown" (`'sensitive'` in the dictionary, `data-cmp-sensitive` on the switch).
+- **Left out on purpose** (easy to add if wanted): HIV status as its own field (practices + last tested cover it with less exposure), endowment.
+- **Step-by-step setup** (`CMP_Onboarding`): six steps (Photo & bio · Basics · Identity & roles · Stats · Kinks & limits · Health).
+  - Each step saves only its own fields through the normal profile save (`only[]`, `cmp_return`), so validation and visibility rules are shared. Errors return to the same step with answers kept.
+  - "Skip for now", "Back", "Set up my profile later". "Skip" on the last step finishes.
+  - A new member's home opens the steps and stays there until they finish or choose later, resuming where they left off. Members who already had something on their profile get a "Finish your profile" card instead.
+  - The photo upload returns to the step (`cmp_return` on the photo form).
+- **Profile display redesign** (`card_html()`), laid out by the profile's own width (CSS container queries):
+  - narrow (phones), Sniffies-style: photo first, name with a FetLife-style "41 M Dominant" tag, an auto-built stat line (age · height · weight · body type · orientation · position · roles), the bio as a quote, then chip sections, kinks with level and direction, hard limits and health;
+  - from 600px, FetLife-style: header band with a square photo and a details table (Gender, Pronouns, Orientation, Roles, Expression, Active, Looking for, Member since);
+  - from 820px, a Stats column beside the About column.
+- **Verification** in a local WordPress 7.1.2 (PHP 8.4, SQLite):
+  - new `tests/setup-e2e.sh` 32/32 (starter lists, one-step saves, resume, rated kinks, height/weight/month validation, health hidden until switched on, finish/later/skip, nudge for existing members, display);
+  - `profile-e2e.sh` 68 (+12 photo checks needing ImageMagick), `dob-e2e.sh` 34/34, `e2e.sh` 60/60, `account-e2e.sh` 64/64, no PHP warnings;
+  - checked in the browser on Hello Elementor at 375px, 710px and 1215px wide.
+
 ## 0.4.1
 
 **New accounts land in the member area after sign-up**, not the events plugin's Submit an Event page (owner report 2026-10-04, after registering on the live site). There the next steps are confirming the email address and then the profile. Uses CEC 1.27.2's `cec_register_redirect`, and only when a member page is set. The step-by-step profile setup the owner asked for comes in a later release, from a mockup.
