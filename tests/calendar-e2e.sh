@@ -135,17 +135,18 @@ OLDFRONT=$(ev "echo (int) get_option('page_on_front');"); ev "update_option('pag
 ok "Browse events goes to the calendar page, not the home page with upcoming events (0.17.1)" $([ "$(ev "echo CMP_Calendar::events_url();")" = "$(ev "echo get_permalink($CALP);")" ] && echo 1 || echo 0)
 ev "update_option('page_on_front',$OLDFRONT);" >/dev/null; $W post delete $HOME_ID $CALP --force >/dev/null 2>&1
 
-echo "== Signed-in quick links (Events Calendar 1.31.0, Member Planning 0.17.2)"
+echo "== Signed-in quick link (Events Calendar 1.31.1, Member Planning 0.17.3)"
 LP=$($W post create --post_type=page --post_status=publish --post_title="ZZ Log In" --post_content='[cec_login note="Log in or register to keep track of your events and RSVPs."]' --porcelain 2>/dev/null)
 RP=$($W post create --post_type=page --post_status=publish --post_title="ZZ Register" --post_content='[cec_register]' --porcelain 2>/dev/null)
 get anon q0 "$H/?page_id=$LP"
 ok "signed out: the note and the login form" $([ "$(has $T/q0.html 'Log in or register to keep track of your events and RSVPs.')$(has $T/q0.html 'name="cec_identifier"')$(hasnt $T/q0.html 'Signed in as')" = 111 ] && echo 1 || echo 0)
 get calann q1 "$H/?page_id=$LP"
-ok "member signed in: no 'already logged in', but Signed in as + My calendar first, Member area, Sign out" $([ "$(hasnt $T/q1.html 'already logged in')$(has $T/q1.html 'Signed in as <b>Cal Ann</b>')$(grep -o 'cec-account-nav.*</nav>' $T/q1.html | grep -q 'class="cec-btn cec-btn-small" href="[^"]*cmp_tab=calendar[^"]*">My calendar</a>' && echo 1 || echo 0)$(has $T/q1.html '>Member area</a>')$(has $T/q1.html '>Sign out</a>')$(hasnt $T/q1.html 'Log in or register to keep track')" = 111111 ] && echo 1 || echo 0)
+ok "member signed in: just a My calendar button (nothing the menu or page already has)" $([ "$(hasnt $T/q1.html 'already logged in')$(grep -q 'class="cec-btn cec-btn-small" href="[^"]*cmp_tab=calendar[^"]*">My calendar</a>' $T/q1.html && echo 1 || echo 0)$(grep -o '<nav class="cec-auth-form cec-account-links".*</nav>' $T/q1.html | grep -c '<a ')$(hasnt $T/q1.html 'Signed in as')$(hasnt $T/q1.html 'Log in or register to keep track')" = 11111 ] && echo 1 || echo 0)
 get calann q2 "$H/?page_id=$RP"
-ok "the register box shows the same links when signed in" $([ "$(hasnt $T/q2.html 'already logged in')$(has $T/q2.html '>My calendar</a>')" = 11 ] && echo 1 || echo 0)
+ok "the register box shows the same when signed in" $([ "$(hasnt $T/q2.html 'already logged in')$(has $T/q2.html '>My calendar</a>')" = 11 ] && echo 1 || echo 0)
 get caldee q3 "$H/?page_id=$LP"
-ok "not yet a member: pointed to finish setting up (no My calendar)" $([ "$(has $T/q3.html 'Finish setting up your account')$(hasnt $T/q3.html '>My calendar</a>')" = 11 ] && echo 1 || echo 0)
+ok "not yet a member: nothing shown (the account menu already says finish joining)" $([ "$(hasnt $T/q3.html 'cec-account-links')$(hasnt $T/q3.html 'already logged in')$(hasnt $T/q3.html 'name="cec_identifier"')" = 111 ] && echo 1 || echo 0)
+ok "the account menu has My Calendar for members" $(ev "\$m=CMP_Account_Bar::items(get_userdata($ANN)); echo in_array('My Calendar',wp_list_pluck(\$m,0),true)?1:0;")
 $W post delete $LP $RP --force >/dev/null 2>&1
 
 echo "== RSVP with the event's form, upgrade, retention, privacy"

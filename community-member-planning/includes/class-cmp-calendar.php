@@ -45,18 +45,16 @@ class CMP_Calendar {
 	}
 
 	/**
-	 * The events plugin's signed-in quick links (0.17.2): My calendar and
-	 * the member area first (or the next sign-up step if not a member yet).
+	 * The events plugin's signed-in quick link (0.17.3): just My calendar,
+	 * for members. Everything else is already in the account menu or on the
+	 * page (owner, 2026-10-05: "This all seems very redundant").
 	 */
 	public static function account_links( $links, $user ) {
 		$id = $user instanceof WP_User ? (int) $user->ID : 0;
-		if ( ! $id ) {
+		if ( ! $id || ! CMP_Access::is_member( $id ) ) {
 			return $links;
 		}
-		$ours = CMP_Access::is_member( $id )
-			? array( 'my_calendar' => array( __( 'My calendar', 'cmp' ), self::url() ), 'member_area' => array( __( 'Member area', 'cmp' ), CMP_Settings::member_page_url() ) )
-			: array( 'member_area' => array( __( 'Finish setting up your account', 'cmp' ), CMP_Settings::member_page_url() ) );
-		return $ours + (array) $links;
+		return array( 'my_calendar' => array( __( 'My calendar', 'cmp' ), self::url() ) ) + (array) $links;
 	}
 
 	public static function assets() {

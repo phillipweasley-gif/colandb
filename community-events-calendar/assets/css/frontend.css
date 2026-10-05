@@ -841,11 +841,7 @@ a.cec-cal-day-detail-title:hover, a.cec-cal-day-detail-title:focus-visible { col
 .cec-calendar-wrap .cec-cal-pcard-social::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; }
 .cec-calendar-wrap .screen-reader-text { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
-/* Signed in: quick links instead of "You're already logged in" (1.31.0). */
-.cec-account-links { max-width: 640px !important; margin-left: auto; margin-right: auto; text-align: center; }
-.cec-account-links .cec-account-hello { margin: 0 0 10px !important; color: var(--cec-muted) !important; font-size: 14px; }
-.cec-account-links .cec-account-hello b { color: inherit; font-weight: 700; }
-.cec-account-links .cec-account-nav { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 10px; }
-.cec-account-links .cec-account-nav a.cec-btn { min-height: 44px; display: inline-flex !important; align-items: center; text-decoration: none !important; }
-.cec-account-links .cec-account-signout { display: inline-flex; align-items: center; min-height: 44px; padding: 0 6px; color: var(--cec-muted) !important; text-decoration: underline !important; font-size: 14px; }
+/* Signed in: only links the page doesn't already have (1.31.1). */
+.cec-account-links { max-width: 640px !important; margin: 0 auto 14px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 10px; }
+.cec-account-links a.cec-btn { min-height: 44px; display: inline-flex !important; align-items: center; text-decoration: none !important; }
 .cec-auth-note { margin: 0 0 12px !important; color: var(--cec-muted); text-align: center; }
