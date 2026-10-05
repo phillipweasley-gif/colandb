@@ -40,7 +40,7 @@ class CMP_Install {
 	}
 
 	public static function table_names() {
-		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ) );
+		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ) );
 	}
 
 	private static function create_tables() {
@@ -147,10 +147,61 @@ class CMP_Install {
 			ended_at datetime NULL,
 			ended_by bigint(20) unsigned NULL,
 			PRIMARY KEY  (id),
-			KEY proposer (proposer_id,status),
-			KEY partner (partner_id,status)
+			KEY idx_proposer (proposer_id,status),
+			KEY idx_partner (partner_id,status)
 		) $charset;";
 
-		return array( $audit, $notifications, $values, $images, $dynamics );
+		// Homework programs (0.7.0): a program per lead + member, its tasks,
+		// and one entry per task per day (proof photo kept here, private).
+		$programs = 'CREATE TABLE ' . self::table( 'programs' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			lead_id bigint(20) unsigned NOT NULL,
+			member_id bigint(20) unsigned NOT NULL,
+			title varchar(120) NOT NULL,
+			notes text NULL,
+			consequences longtext NULL,
+			status varchar(12) NOT NULL DEFAULT 'active',
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY idx_lead (lead_id,status),
+			KEY idx_member (member_id,status)
+		) $charset;";
+		$tasks = 'CREATE TABLE ' . self::table( 'tasks' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			program_id bigint(20) unsigned NOT NULL,
+			title varchar(120) NOT NULL,
+			category varchar(20) NOT NULL DEFAULT 'other',
+			weekly_min tinyint(3) unsigned NOT NULL DEFAULT 7,
+			what_counts text NULL,
+			proof varchar(12) NOT NULL DEFAULT 'none',
+			standard varchar(300) NOT NULL DEFAULT '',
+			position smallint(5) unsigned NOT NULL DEFAULT 0,
+			active tinyint(1) NOT NULL DEFAULT 1,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY idx_program (program_id,active)
+		) $charset;";
+		$entries = 'CREATE TABLE ' . self::table( 'task_entries' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			task_id bigint(20) unsigned NOT NULL,
+			program_id bigint(20) unsigned NOT NULL,
+			member_id bigint(20) unsigned NOT NULL,
+			day date NOT NULL,
+			status varchar(10) NOT NULL,
+			note text NULL,
+			photo mediumblob NULL,
+			photo_sha char(64) NOT NULL DEFAULT '',
+			review varchar(12) NOT NULL DEFAULT '',
+			review_note text NULL,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY idx_task_day (task_id,day),
+			KEY idx_program_day (program_id,day),
+			KEY idx_member (member_id)
+		) $charset;";
+
+		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries );
 	}
 }
