@@ -6,6 +6,16 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.28.1
+
+**Signing in with no destination no longer always lands on Submit an Event** (owner report: after signing in it "went to the submit an event page again and not the member profile").
+
+- The `[cec_login]` form no longer fills in Submit an Event as its destination when the page wasn't given a `redirect_to`; the destination is chosen after sign-in, per account, by the new `CEC_Auth::default_redirect( $user )`: event managers → the dashboard, everyone else → Submit an Event, as before.
+- New filter `cec_login_default_redirect( $url, $user )` so another plugin can change that default. `wp-login.php` sign-ins (`login_redirect`, `CEC_Roles`) use the same default. A destination that was asked for (`redirect_to`) is still respected.
+- Verification: `account-e2e.sh` 69/69 (new: wp-login and the site form with no destination, an explicit destination, event managers), `e2e.sh` 60/60, `dob-e2e.sh` 34/34.
+
+---
+
 ## 1.28.0
 
 **Hooks for "people you follow"** (with Community Member Planning 0.12.0, owner 2026-10-05).
