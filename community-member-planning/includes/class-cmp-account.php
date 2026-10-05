@@ -379,6 +379,7 @@ class CMP_Account {
 			'message'         => __( 'New message requests', 'cmp' ),
 			'nod'             => __( 'Nods', 'cmp' ),
 			'follow'          => __( 'People I follow (new posts, events they\'re going to)', 'cmp' ),
+			'event_reminder'  => __( 'Reminders for events on my calendar', 'cmp' ),
 		);
 	}
 
@@ -463,7 +464,7 @@ class CMP_Account {
 					$rows[] = array( 'name' => $name, 'value' => (string) $value );
 				}
 			}
-			$rows = array_merge( $rows, CMP_Birth_Date::export_rows( $user->ID ), CMP_Dynamics::export_rows( $user->ID ), CMP_Homework::export_rows( $user->ID ), CMP_Chastity::export_rows( $user->ID ), CMP_Feed::export_rows( $user->ID ), CMP_Messages::export_rows( $user->ID ), CMP_Follows::export_rows( $user->ID ), CMP_Directory::export_rows( $user->ID ), CMP_Nods::export_rows( $user->ID ), CMP_Calendar::export_rows( $user->ID ) );
+			$rows = array_merge( $rows, CMP_Birth_Date::export_rows( $user->ID ), CMP_Dynamics::export_rows( $user->ID ), CMP_Homework::export_rows( $user->ID ), CMP_Chastity::export_rows( $user->ID ), CMP_Feed::export_rows( $user->ID ), CMP_Messages::export_rows( $user->ID ), CMP_Follows::export_rows( $user->ID ), CMP_Directory::export_rows( $user->ID ), CMP_Nods::export_rows( $user->ID ), CMP_Calendar::export_rows( $user->ID ), CMP_Reminders::export_rows( $user->ID ) );
 			if ( $rows ) {
 				$data[] = array( 'group_id' => 'cmp-access', 'group_label' => __( 'Member area access', 'cmp' ), 'item_id' => 'cmp-access-' . $user->ID, 'data' => $rows );
 			}
@@ -499,6 +500,7 @@ class CMP_Account {
 			$removed = CMP_Birth_Date::erase( $user->ID ) || $removed;
 			$removed = CMP_Nods::erase( $user->ID ) > 0 || $removed;
 			$removed = CMP_Calendar::erase( $user->ID ) > 0 || $removed;
+			CMP_Reminders::erase( $user->ID );
 			$removed = CMP_Directory::erase( $user->ID ) > 0 || $removed;
 			$removed = CMP_Follows::erase( $user->ID ) > 0 || $removed;
 			$removed = CMP_Messages::erase( $user->ID ) > 0 || $removed;
@@ -716,6 +718,8 @@ class CMP_Account {
 				<a class="cmp-btn cmp-btn-outline" href="<?php echo esc_url( wp_logout_url( CMP_Settings::member_page_url() ) ); ?>"><?php esc_html_e( 'Sign out', 'cmp' ); ?></a>
 			</div>
 		</section>
+
+		<?php echo CMP_Access::is_member( $user->ID ) ? CMP_Reminders::settings_html( $user->ID ) : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 
 		<?php echo self::render_preferences( $user ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 

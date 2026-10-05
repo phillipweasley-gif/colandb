@@ -178,12 +178,15 @@ class CMP_Install {
 		) $charset;";
 
 		// My calendar (0.17.0): one row per member per event they added.
+		// rem_*_for (0.19.0): the start time a reminder was last sent for.
 		// response going|interested; audience members|partners|private.
 		$calendar = 'CREATE TABLE ' . self::table( 'calendar' ) . " (
 			user_id bigint(20) unsigned NOT NULL,
 			event_id bigint(20) unsigned NOT NULL,
 			response varchar(12) NOT NULL DEFAULT 'going',
 			audience varchar(12) NOT NULL DEFAULT 'private',
+			rem_evening_for varchar(20) NOT NULL DEFAULT '',
+			rem_2h_for varchar(20) NOT NULL DEFAULT '',
 			created_at datetime NOT NULL,
 			updated_at datetime NOT NULL,
 			PRIMARY KEY  (user_id,event_id),
