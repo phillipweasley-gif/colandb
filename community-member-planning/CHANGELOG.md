@@ -4,6 +4,47 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.19.0
+
+**Installable app and event reminders** (owner, 2026-10-05: "build the installable app with reminders"; release 1 of 2, with push notifications in release 2). Owner's choices: reminders the evening before (6 pm) and 2 hours before; in the member area, and by email only for members who turn it on; push will come from the site itself, not a third party.
+
+- **The site installs as an app.** Home-screen icon, full screen, and an offline page.
+  - The manifest, service worker and offline page are served from `wp-admin/admin-post.php`, which the host's CDN never caches. The worker is allowed the whole site (`Service-Worker-Allowed`).
+  - The service worker stores only the offline page and the app icon. Member pages, form posts and wp-admin are never touched or stored.
+  - Icons come from the site icon (Appearance → Customize → Site Identity), with bundled ones as a fallback.
+  - The short name is made from the site name's initials ("Central Ohio Leather & Beyond" → COL&B); the `cmp_app_short_name` filter can change it.
+  - Every page gets the manifest link, theme colour and home-screen tags.
+- **Install prompt in the member area:**
+  - an **Install** button where the browser offers one (Android, desktop Chrome/Edge);
+  - the three **Add to Home Screen** steps on iPhone/iPad;
+  - nothing once it's installed, and **Not now** hides it for 30 days on that device.
+  - **Account → App & notifications** always has the install help.
+- **Event reminders** for events on your calendar, checked every 15 minutes:
+  - **the evening before**, from 6 pm in your time zone; **2 hours before**, for events with a set start time;
+  - for Going events, and Interested ones too if you turn that on;
+  - in your member-area notifications straight away (not held for quiet hours), linking to the event;
+  - **by email** only if you turn it on. The subject says only "COL&B reminder: Tomorrow at 7:00 pm"; the event is in the body.
+  - Each is sent once per start time, so a moved event is reminded again. Cancelled or postponed events, unpublished events and accounts that aren't members get nothing.
+  - Settings are in Account → App & notifications, and there's a new "Reminders for events on my calendar" notification category.
+- **Database version 14** adds `calendar.rem_evening_for` and `rem_2h_for`.
+- **Privacy statement:** mentions reminders, email reminders and the app. Export lists reminder settings, and erase removes them.
+- **Verification:**
+  - New `app-e2e.sh` 26/26:
+    - manifest, service worker and offline page, with their headers, and that the icons load;
+    - the short name; tags on every page;
+    - the banner for members only; the Account panel; that reminders are checked every 15 minutes;
+    - reminders before and after 6 pm, timed and all-day, 2 hours before, Interested off and on, cancelled, non-members, sent once, a moved event, settings, a bad nonce, and email wording;
+    - export and erase.
+  - All other suites pass.
+  - In Chrome on the local test site:
+    - the service worker registered for the whole site and stored the offline page;
+    - Chrome offered the app as installable, so the banner showed, and Not now hid it for 30 days;
+    - with the server stopped, pages showed the offline page with its icon;
+    - the Account panel showed the reminder settings.
+    - The test service worker and its data were then removed from that browser.
+
+---
+
 ## 0.18.1
 
 **Private calendar feed moved out of the host's CDN cache.** Checked on the live site right after 0.18.0. Elementor Hosting's CDN may keep signed-out front-end responses for up to 7 days (`ec-cdn-cache-control: public, max-age=300, s-maxage=604800`, `ec-cdn-status: miss`), and calendar apps fetch the feed signed out. That could have shown members old events for a week and kept a reset link working.

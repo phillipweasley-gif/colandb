@@ -24,6 +24,7 @@ class CMP_Notifications {
 		'message',
 		'follow',
 		'nod',
+		'event_reminder',
 	);
 
 	const QUIET_START = 22;

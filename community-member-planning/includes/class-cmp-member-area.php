@@ -218,7 +218,7 @@ class CMP_Member_Area {
 			'expired'         => array( 'error', __( 'Your session expired. Please try again.', 'cmp' ) ),
 			'welcome'         => array( 'success', __( "You're in. Welcome to the member area.", 'cmp' ) ),
 		);
-		$map += CMP_Account::notices() + CMP_Profiles::notices() + CMP_Profile_Images::notices() + CMP_Dynamics::notices() + CMP_Homework::notices() + CMP_Chastity::notices() + CMP_Feed::notices() + CMP_Messages::notices() + CMP_Follows::notices() + CMP_Directory::notices() + CMP_Nods::notices() + CMP_Calendar::notices();
+		$map += CMP_Account::notices() + CMP_Profiles::notices() + CMP_Profile_Images::notices() + CMP_Dynamics::notices() + CMP_Homework::notices() + CMP_Chastity::notices() + CMP_Feed::notices() + CMP_Messages::notices() + CMP_Follows::notices() + CMP_Directory::notices() + CMP_Nods::notices() + CMP_Calendar::notices() + CMP_Reminders::notices();
 		if ( ! isset( $map[ $notice ] ) ) {
 			return '';
 		}
@@ -244,6 +244,9 @@ class CMP_Member_Area {
 			$out .= self::tabs_html( $tab, $state );
 		}
 		$out .= self::notice_html();
+		if ( CMP_Access::STATE_MEMBER === $state && CMP_Account::TAB !== $tab ) {
+			$out .= CMP_App::install_html( true ); // Shown by app.js only where it applies (0.19.0).
+		}
 		if ( CMP_Access::STATE_LOGGED_OUT !== $state && CMP_Account::TAB === $tab ) {
 			wp_enqueue_script( 'cmp-member' );
 			return $out . CMP_Account::render() . '</div>';

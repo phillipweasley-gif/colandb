@@ -139,7 +139,7 @@ ok "Remove takes it off the calendar and cancels the RSVP" $(echo "$r" | grep -q
 ok "Profile tab points to My calendar instead of the old followers switch" $(get calann pr "$PAGE&cmp_tab=profile"; [ "$(has $T/pr.html 'Followers and your events')$(hasnt $T/pr.html 'Show events I&#039;m going to')" = 11 ] && echo 1 || echo 0)
 
 HOME_ID=$($W post create --post_type=page --post_status=publish --post_title="ZZ Home" --post_content="[cec_upcoming]" --porcelain 2>/dev/null)
-CALP=$($W post create --post_type=page --post_status=publish --post_title="ZZ Events Page" --post_content="[cec_login] [cec_calendar] [cec_events]" --porcelain 2>/dev/null)
+CALP=$($W post create --post_type=page --post_status=publish --post_title="ZZ Events Page" --post_content="[cec_login] [cec_calendar] [cec_events]" --menu_order=-1 --porcelain 2>/dev/null)
 OLDFRONT=$(ev "echo (int) get_option('page_on_front');"); ev "update_option('page_on_front',$HOME_ID);" >/dev/null
 ok "Browse events goes to the calendar page, not the home page with upcoming events (0.17.1)" $([ "$(ev "echo CMP_Calendar::events_url();")" = "$(ev "echo get_permalink($CALP);")" ] && echo 1 || echo 0)
 ev "update_option('page_on_front',$OLDFRONT);" >/dev/null; $W post delete $HOME_ID $CALP --force >/dev/null 2>&1
