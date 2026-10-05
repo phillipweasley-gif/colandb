@@ -4,6 +4,23 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.15.0
+
+**Automatic data clean-up** (owner, 2026-10-05: "Yes"; it matches the retention table in `docs/privacy-statement.md`). New `CMP_Retention` runs once a day (WP-Cron `cmp_daily_retention`, cleared on deactivation):
+
+- **Audit log:** entries older than 2 years are deleted.
+- **Member reports:** deleted 3 years after they were made.
+- **Accounts never verified:** deleted 60 days after sign-up. On purpose, this only applies to accounts that:
+  - are plain subscribers;
+  - were created after this version was installed (the `cmp_retention_since` option), so older accounts are never swept up;
+  - have no posts or events of any kind and no RSVPs.
+  Each removal is audit-logged.
+- **Deletion requests:** administrators see a dashboard notice when a confirmed data deletion request has been waiting 20 days, since the statement promises 30.
+- Periods can be changed with the `cmp_retention_periods` filter (days). The last run's counts are stored in the `cmp_retention_last` option.
+- Verification: new `tests/retention-e2e.sh` 17/17; all other suites pass (setup 39, profile 84, dob 34, account 69, feed 41, messages 46, follows 27, directory 21, nods 20, dynamics 34, homework 44, chastity 55, e2e 60).
+
+---
+
 ## 0.14.0
 
 **Nods: a quiet way to show interest** (owner, 2026-10-05: "a way to indicate interest passively … somewhat neutral … related to kink but not aggressive", not another app's version). Named after the nod across the bar; our own word and our own mark (a small dot with a dip beneath), not another app's feature name or icon.

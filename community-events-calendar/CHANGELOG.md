@@ -6,6 +6,19 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.29.0
+
+**Automatic data clean-up** (owner, 2026-10-05: "Yes" to building it, so the site does what the privacy statement says). New `CEC_Retention` runs once a day (WP-Cron `cec_daily_retention`, scheduled on activation and on upgrade, cleared on deactivation):
+
+- **RSVPs and waitlist entries** are deleted 12 months after their event ends.
+- **The submitter's email and private edit link** are removed from events 12 months after they end. The events themselves stay published.
+- **Volunteer sign-ups** are deleted 2 years after they were sent.
+- **The event change log** keeps 2 years.
+- Periods can be changed with the `cec_retention_periods` filter (days). The last run's counts are stored in the `cec_retention_last` option.
+- Verification: new `tests/retention-e2e.sh` 17/17 (shared with Community Member Planning 0.15.0); `e2e.sh` 60/60.
+
+---
+
 ## 1.28.1
 
 **Signing in with no destination no longer always lands on Submit an Event** (owner report: after signing in it "went to the submit an event page again and not the member profile").

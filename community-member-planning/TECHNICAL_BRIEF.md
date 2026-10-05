@@ -29,6 +29,7 @@ community-member-planning/
 │   ├── class-cmp-follows.php       follow / unfollow, opt-in "Going to", Following feed filter, calendar label (cec_event_social_label)
 │   ├── class-cmp-directory.php     Members tab: search and filters (shown answers only), opt-out, profile item links
 │   ├── class-cmp-nods.php          nods: quiet interest, Messages → Nods, mutual nods count as connected
+│   ├── class-cmp-retention.php     daily clean-up: audit log, reports, never-verified accounts; overdue erase notice
 │   ├── class-cmp-onboarding.php    step-by-step profile setup (6 steps over the normal profile save; home opens it for new members)
 │   ├── class-cmp-birth-date.php    date of birth: sign-up fields via CEC hooks, one-time step, under-18 lock, age, wp-admin correction
 │   ├── class-cmp-email-verification.php
