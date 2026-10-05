@@ -110,7 +110,7 @@ ok "finished: home is the normal home, no nudge" $([ "$(has $T/h3.html 'Welcome,
 echo "== Profile display"
 login viewer viewer viewerpass12
 get viewer v1 "$PAGE&cmp_member=$NEW"
-ok "header: name, '36 M Keyholder'-style tag, stat line" $([ "$(has $T/v1.html 'New Member')$(has $T/v1.html 'class="cmp-prof-stat"')$(has $T/v1.html '5&#039;11&quot;')$(has $T/v1.html '185 lb')" = 1111 ] && echo 1 || echo 0)
+ok "header: name and '36 M Keyholder'-style tag; height and weight in Details" $([ "$(has $T/v1.html 'New Member')$(has $T/v1.html 'class="cmp-pv-name"')$(has $T/v1.html '<dd>5&#039;11&quot;</dd>')$(has $T/v1.html '<dd>185 lb</dd>')" = 1111 ] && echo 1 || echo 0)
 ok "kinks with level and direction, hard limits, bio" $([ "$(has $T/v1.html 'Chastity / keyholding')$(has $T/v1.html 'cmp-kink-lvl is-love">Love it</h5>')$(has $T/v1.html 'No public play')$(has $T/v1.html 'Hello from step one')" = 1111 ] && echo 1 || echo 0)
 ok "hidden health details not shown to others" $(hasnt $T/v1.html 'On PrEP')
 ev "CMP_Profiles::save_field($NEW,'practices',null,'members');" >/dev/null

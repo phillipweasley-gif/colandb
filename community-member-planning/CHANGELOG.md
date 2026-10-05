@@ -4,6 +4,20 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.13.0
+
+**Facebook / FetLife-style profiles and member search** (owner, 2026-10-05: "Even though I have a cover image it doesn't show in my profile … We want a Facebook or FetLife style profile view. I also need a way to search for members or filter members … click on one of the items in their profile to get a list of members who have that item"). From `docs/mockups/profile-directory.html`, with the owner's answers: everyone listed with an opt-out, location by city / state for now, sections as tabs.
+
+- **Cover image fixed.** 0.5.0's phone-first layout hid the cover (`.cmp-prof-cover { display: none }`). Profiles now show the cover across the top (3:1), with the profile photo overlapping it; no cover gives a plain band.
+- **New profile layout:** name with the "54 M Dominant" tag, location · pronouns · expression, follower counts, and **Follow · Message · Block** in the header. Below, **tabs: About · Kinks · Going to · Posts** (only tabs with something in them; arrow keys move between tabs; without JavaScript every section shows in turn). About has a Details list beside About me, Looking for, Not looking for, Interests, Hard limits and Health. Propose a dynamic and Report sit under the profile.
+- **Clickable items:** roles, orientation, gender, position, body type, how active, hosting, looking for, interests, kinks and the city link to Members filtered by that item, but only for answers shown to all members.
+- **`CMP_Directory`: a Members tab** (after Feed). Filters: name, role, looking for, orientation, gender, position, body type, kinks, interests, how active, hosting, age range, city or state, with a profile photo, people I follow; sort by newest or name; 24 per page. Active filters show as chips you can remove. Result cards show the cover strip, photo, name, "age gender role · city" and two "Looking for" items.
+- **Privacy:** only answers shown to all members are ever matched (an age filter only finds members who show their age). Full members only; never yourself, members who opted out, or anyone blocked either way. **"Hide me from member search"** on the Profile tab; export says whether you're hidden, erase removes the setting.
+- **Fix:** member profile pages now load the member-area script (profile tabs, the Propose form's labels, confirmations).
+- **Verification** (local WordPress 7.1.2): new `tests/directory-e2e.sh` 21/21; `setup-e2e.sh` 39/39 and `profile-e2e.sh` 84/84 (two checks updated for the new header), `dob-e2e.sh` 34/34, `dynamics-e2e.sh` 34/34, `homework-e2e.sh` 44/44, `chastity-e2e.sh` 55/55, `feed-e2e.sh` 41/41, `account-e2e.sh` 69/69, `messages-e2e.sh` 46/46, `follows-e2e.sh` 27/27, `e2e.sh` 60/60. In a browser at 1280 px and 375 px: the cover and photo, tabs, clicking "Keyholder" on a profile into a filtered Members list, and the Members grid.
+
+---
+
 ## 0.12.1
 
 **Signing in lands in the member area** (needs Community Events Calendar 1.28.1). Members who sign in with the site's Log In link (or `wp-login.php`) with no particular destination now go to their member area instead of Submit an Event. Administrators and event managers keep their usual destination; a requested destination (`redirect_to`) is still respected. Uses the new `cec_login_default_redirect` filter.
