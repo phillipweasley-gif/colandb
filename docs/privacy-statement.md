@@ -22,15 +22,15 @@ The rest of this statement explains the details.
 
 ## 1. Who we are
 
-Central Ohio Leather & Beyond ("COL&B", "we", "us") runs colandb.com, a community site for Central Ohio's queer leather, kink and BDSM communities. It includes a public events calendar and a private member area.
+Central Ohio Leather & Beyond ("COL&B", "we", "us") is a volunteer community project, not an incorporated company or registered nonprofit. It runs colandb.com, a community site for Central Ohio's queer leather, kink and BDSM communities, with a public events calendar and a private member area. The project's organizer is responsible for how your information is handled.
 
-**Contact:** [privacy contact email] · [mailing address]
+**Contact:** foxxyforce@gmail.com. Email is the quickest way to reach us. If you need a postal address for a legal request, email us and we'll provide one.
 
 ## 2. Who this applies to
 
 This statement covers colandb.com, including the public calendar and the member area. It covers anyone who visits the site, subscribes to event updates, RSVPs, submits an event, or creates an account.
 
-**You must be 18 or older to create an account.** We ask for your date of birth when you sign up and turn away anyone under 18. We don't ask for ID documents, so we keep no copies of them. If we learn that someone under 18 has an account, we close it and delete their information. Adults-only means adults-only; please tell us at [contact] if you see someone who shouldn't be here.
+**You must be 18 or older to create an account.** We ask for your date of birth when you sign up and turn away anyone under 18. We don't ask for ID documents, so we keep no copies of them. If we learn that someone under 18 has an account, we close it and delete their information. Adults-only means adults-only; please tell us at foxxyforce@gmail.com if you see someone who shouldn't be here.
 
 ## 3. What we collect
 
@@ -124,7 +124,7 @@ Much of what members share here is sensitive: sexual orientation, sex life and k
 - To keep an **audit log** of important account events (for example sign-up, changes to who can see your profile, reports, privacy requests). The log records *that* something changed, not your personal details, so it can't become a second copy of your profile.
 - To meet legal obligations.
 
-We don't use your information for advertising, profiling for marketing, or automated decisions about you. **We don't use AI or machine learning on your profile, photos, posts or messages**, and we don't give your content to anyone to train AI. Reports and moderation decisions are made by people. If you think a decision about your account was wrong, email [contact] and a different administrator will review it.
+We don't use your information for advertising, profiling for marketing, or automated decisions about you. **We don't use AI or machine learning on your profile, photos, posts or messages**, and we don't give your content to anyone to train AI. Reports and moderation decisions are made by people. If you think a decision about your account was wrong, email foxxyforce@gmail.com and someone other than the person who made it will review it where we can.
 
 ## 7. Who we share it with
 
@@ -161,16 +161,16 @@ We don't use your information for advertising, profiling for marketing, or autom
 | What | How long |
 |---|---|
 | Your account and member content | Until you delete it or ask us to (see below). |
-| Accounts started but never verified | [Suggested: deleted after 60 days.] |
+| Accounts started but never verified | Deleted after 60 days. |
 | Event subscriptions | Until you unsubscribe. |
-| RSVPs, waitlists and event submissions | [Suggested: 12 months after the event.] |
-| Volunteer sign-ups | [Suggested: 2 years, or until you ask us to remove them.] |
-| Reports about a member | [Suggested: 3 years], for community safety. |
-| Audit log | [Suggested: 2 years.] |
+| RSVPs, waitlists and event submissions | 12 months after the event. |
+| Volunteer sign-ups | 2 years, or until you ask us to remove them. |
+| Reports about a member | 3 years, for community safety. |
+| Audit log | 2 years. |
 | Hosting server logs | [Your host's period, ideally 30 days.] |
 | Backups | [Your host's period, ideally 30 days.] Deleted data stays in backups until they expire. |
 
-- **Deletion timeline:** after you confirm an erase request, we complete it within [30] days. Your profile disappears from the site as soon as the request is completed, and the remaining copies leave our backups when they expire.
+- **Deletion timeline:** after you confirm an erase request, we complete it within 30 days. Your profile disappears from the site as soon as the request is completed, and the remaining copies leave our backups when they expire.
 - **Content you delete:** posts, photos and conversations you delete are removed from the site. Deleting a conversation from your side leaves the other member's copy.
 - **When you erase your account:** your profile, photos, posts, likes, follows, nods, homework, chastity records, dynamics, messages (both sides of your conversations), blocks and the reports you made are deleted, and an administrator closes the account. **Reports other members made about you are kept** for community safety.
 
@@ -185,9 +185,9 @@ From your **Account** and **Profile** tabs you can:
 - **Turn off any kind of notification,** and unsubscribe from event emails.
 - **Block and report** other members.
 
-You can also email [privacy contact] about any of these, or to correct your date of birth. We'll answer within [30] days.
+You can also email foxxyforce@gmail.com about any of these, or to correct your date of birth. We'll answer within 30 days.
 
-**If you live in a US state with a privacy law** (for example California, Colorado, Connecticut, Virginia, Oregon or Texas), you have rights to know, access, correct, delete and get a copy of your personal information, to opt out of sale, targeted advertising and profiling, and to limit how sensitive information is used. We don't sell or share information for targeted advertising, and we use sensitive information only to provide the service you asked for. We won't treat you differently for using these rights. To make a request, use the Account tab or email us. If we decline, you can appeal by replying to our answer. [Lawyer: confirm which laws apply to COL&B's size and nonprofit status, and whether Washington's My Health My Data Act applies to the health fields.]
+**If you live in a US state with a privacy law** (for example California, Colorado, Connecticut, Virginia, Oregon or Texas), you have rights to know, access, correct, delete and get a copy of your personal information, to opt out of sale, targeted advertising and profiling, and to limit how sensitive information is used. We don't sell or share information for targeted advertising, and we use sensitive information only to provide the service you asked for. We won't treat you differently for using these rights. To make a request, use the Account tab or email us. If we decline, you can appeal by replying to our answer. [Lawyer: confirm which laws apply to a small, unincorporated volunteer project, and whether Washington's My Health My Data Act applies to the health fields.]
 
 **If you're in the UK or European Economic Area,** you have rights under the GDPR, including access, correction, deletion, portability, objection and withdrawing consent. You can also complain to your local data protection authority. Our legal bases are: providing the service you signed up for (contract); your explicit consent for sensitive profile details you choose to share; our legitimate interest in keeping the community safe; and legal obligations. You can withdraw consent at any time by switching an item off or deleting it.
 
@@ -201,17 +201,18 @@ Our site is hosted in [country/region of hosting]. If you use the site from outs
 
 ## 14. Changes to this statement
 
-If we make a significant change, we'll post it here with a new "Last updated" date and let members know in the member area [and by email] before it takes effect.
+If we make a significant change, we'll post it here with a new "Last updated" date and let members know in the member area and by email before it takes effect.
 
 ## 15. Contact
 
-Questions, requests or concerns: **[privacy contact email]** · [mailing address].
+Questions, requests or concerns: **foxxyforce@gmail.com**. If you need a postal address for a legal request, email us and we'll provide one.
 
 ---
 
 ### Notes for the owner (remove before publishing)
 
-1. **Fill in the brackets:** legal name, contact email, address, hosting region, email provider, analytics (the live site prefetches Google Tag Manager, so check whether Site Kit or Analytics is on), and retention periods. The suggested periods come from comparable sites (Recon publishes a detailed retention table; FetLife purges deleted accounts within 7–30 days).
+1. **Still to fill in:** hosting region (Elementor hosting dashboard), email provider (Settings → FluentSMTP), web push provider, and analytics (the live site prefetches Google Tag Manager, so check whether Site Kit or Analytics is on). The effective date goes in when you publish. Retention periods use the suggested values, taken from comparable sites (Recon publishes a detailed retention table; FetLife purges deleted accounts within 7–30 days).
+1a. **Who's responsible:** COL&B isn't incorporated, so the organizer is personally the one responsible for the data. A lawyer can tell you whether forming an LLC or nonprofit would change that. No postal address is published, for the organizer's safety; one is offered on request.
 2. **Behaviour this statement promises** that the software doesn't do automatically yet: deleting RSVPs, submissions and never-verified accounts after a set time, trimming the audit log, and notifying members of changes to the statement. Erase requests are also completed by an administrator rather than automatically. I can build these.
 3. **Elementor Cloud hosting terms:** still to check that adult content is allowed (open item).
 4. **Washington My Health My Data Act** and similar health-data laws cover health information such as the safer-sex fields. A lawyer should confirm whether COL&B needs a separate consumer health data policy.
