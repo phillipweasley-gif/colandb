@@ -48,10 +48,17 @@ ok "profile header has a Nod button" $(has $T/n0.html '>Nod</button>')
 r=$(nod nora $NN nod $OTTO)
 ok "nod sent" $(echo "$r" | grep -q 'nod_sent' && [ "$(q "SELECT COUNT(*) FROM $ND_T WHERE from_id=$NORA AND to_id=$OTTO")" = 1 ] && echo 1 || echo 0)
 ok "Otto notified by name: 'Nora Nodder nodded at you.'" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$OTTO AND category='nod' AND message='Nora Nodder nodded at you.'")" = 1 ] && echo 1 || echo 0)
-nod nora $NN nod $OTTO >/dev/null
-ok "nodding twice is still one nod, one notification" $([ "$(q "SELECT COUNT(*) FROM $ND_T")" = 1 ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$OTTO AND category='nod'")" = 1 ] && echo 1 || echo 0)
+r=$(nod nora $NN nod $OTTO)
+ok "again within 24 hours: refused, still one nod and one notification (0.15.1)" $(echo "$r" | grep -q 'nod_wait' && [ "$(q "SELECT COUNT(*) FROM $ND_T")" = 1 ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$OTTO AND category='nod'")" = 1 ] && echo 1 || echo 0)
+get nora n1b "$PAGE&cmp_tab=messages&box=nods"
+ok "Nora's Nods: 'You nodded at' lists Otto" $([ "$(has $T/n1b.html 'You nodded at')$(php -r '$h=file_get_contents($argv[1]); $i=strpos($h,"You nodded at"); exit($i!==false && false!==strpos(substr($h,$i),"Otto Other")?0:1);' $T/n1b.html && echo 1 || echo 0)" = 11 ] && echo 1 || echo 0)
 get nora n1 "$PAGE&cmp_member=$OTTO"
 ok "button now says Nodded" $(has $T/n1.html 'Nodded</button>')
+ev "global \$wpdb; \$wpdb->update('$ND_T',array('created_at'=>gmdate('Y-m-d H:i:s',time()-25*HOUR_IN_SECONDS)),array('from_id'=>$NORA,'to_id'=>$OTTO));" >/dev/null
+get nora n1c "$PAGE&cmp_member=$OTTO"
+ok "after 24 hours the button says Nod again" $(has $T/n1c.html 'Nod again</button>')
+r=$(nod nora $NN nod $OTTO)
+ok "nodding again after 24 hours works and tells them again" $(echo "$r" | grep -q 'nod_sent' && [ "$(q "SELECT COUNT(*) FROM $ND_T WHERE from_id=$NORA AND to_id=$OTTO")" = 1 ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$OTTO AND category='nod'")" = 2 ] && echo 1 || echo 0)
 r=$(nod nora $NN nod $NORA)
 ok "can't nod at yourself" $(echo "$r" | grep -q 'nod_gone' && echo 1 || echo 0)
 

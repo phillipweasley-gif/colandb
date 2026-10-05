@@ -4,6 +4,21 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.15.1
+
+**Messages and nods fixes** (owner, 2026-10-05: sending a message "just asks if I want to leave", the message wasn't received, "no way for me to see who I nodded to or the messages I sent", and "nods should be limited to once per receiver per 24 hours").
+
+- **Sending works even when other scripts ask "Leave site?"** On the live site, Elementor and the push service add that warning to pages with forms. If someone chose to stay, our double-submit guard had already locked the form, so pressing Send again silently did nothing and the message was never saved. Now:
+  - while one of our forms is submitting, a capturing `beforeunload` listener stops other scripts' warnings (only during our own submit);
+  - a form unlocks itself after 6 seconds if the page didn't leave;
+  - forms also unlock when you come back with the Back button.
+- **Messages → Sent:** your requests to members you're not connected with, "waiting for them to accept", in their own list instead of mixed into the Inbox. The conversation's back link returns there.
+- **Nods once per member every 24 hours.** Within 24 hours a second nod is refused ("You've already nodded at them today"). After 24 hours the profile button says **Nod again**, and nodding again tells them again.
+- **Messages → Nods** now has two lists: **Nodded at you** and **You nodded at** (when, whether they nodded back, Nod again once allowed, Message).
+- **Verification:** `nods-e2e.sh` 23/23 (new: the 24-hour rule, Nod again, You nodded at) and `messages-e2e.sh` 47/47 (new: Sent, not in Inbox). All other suites pass. In a browser, a message was sent with a "Leave site?" handler added to the page, the same situation as on the live site.
+
+---
+
 ## 0.15.0
 
 **Automatic data clean-up** (owner, 2026-10-05: "Yes"; it matches the retention table in `docs/privacy-statement.md`). New `CMP_Retention` runs once a day (WP-Cron `cmp_daily_retention`, cleared on deactivation):
