@@ -15,20 +15,43 @@ class CEC_Ical {
 		return $vars;
 	}
 
+	/**
+	 * The old front-end addresses (?cec_ical=all, an event's ?cec_ical=1)
+	 * now redirect to the admin-post.php ones (1.32.1). The host's CDN cached
+	 * the front-end ones for up to 7 days, so subscribers saw new and changed
+	 * events late. Calendar apps follow the redirect, so existing
+	 * subscriptions keep working.
+	 */
 	public static function maybe_output() {
 		$target = get_query_var( 'cec_ical' );
 		if ( '' === $target || false === $target ) {
 			return;
 		}
-
 		if ( 'all' === $target ) {
-			self::output_feed();
-			return;
+			wp_safe_redirect( self::feed_url(), 301 );
+			exit;
 		}
-
 		if ( is_singular( 'cec_event' ) ) {
-			self::output_single( get_queried_object_id() );
+			wp_safe_redirect( self::event_ics_url( get_queried_object_id() ), 301 );
+			exit;
 		}
+	}
+
+	/** admin-post.php?action=cec_ical&feed=all, or &event=<id> (1.32.1). */
+	public static function serve() {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- public, read-only downloads.
+		$event = isset( $_GET['event'] ) ? absint( $_GET['event'] ) : 0;
+		$feed  = isset( $_GET['feed'] ) ? sanitize_key( wp_unslash( $_GET['feed'] ) ) : '';
+		// phpcs:enable
+		if ( $event ) {
+			self::output_single( $event );
+		} elseif ( 'all' === $feed ) {
+			self::output_feed();
+		}
+		status_header( 404 );
+		header( 'Content-Type: text/plain; charset=utf-8' );
+		echo 'Not found';
+		exit;
 	}
 
 	private static function output_single( $post_id ) {
@@ -196,11 +219,15 @@ class CEC_Ical {
 	}
 
 	public static function single_ics_url( $data ) {
-		return add_query_arg( 'cec_ical', '1', $data['permalink'] );
+		return self::event_ics_url( (int) $data['id'] );
+	}
+
+	public static function event_ics_url( $event_id ) {
+		return add_query_arg( array( 'action' => 'cec_ical', 'event' => (int) $event_id ), admin_url( 'admin-post.php' ) );
 	}
 
 	public static function feed_url() {
-		return add_query_arg( 'cec_ical', 'all', home_url( '/' ) );
+		return add_query_arg( array( 'action' => 'cec_ical', 'feed' => 'all' ), admin_url( 'admin-post.php' ) );
 	}
 
 	public static function google_calendar_url( $data ) {

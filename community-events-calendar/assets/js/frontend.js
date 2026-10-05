@@ -293,9 +293,11 @@
 		$wrap.find( '.cec-cal-daynum' ).each( function () {
 			$( this ).toggleClass( 'cec-cal-selected-daynum', $( this ).data( 'date' ) === dateStr );
 		} );
+		// Boxes carry their own date (1.32.1). The old check looked for the
+		// number inside the box, but it's a separate layer, so it passed 0
+		// (not false) and jQuery toggled every box instead of setting one.
 		$wrap.find( '.cec-cal-cell' ).each( function () {
-			var $num = $( this ).find( '.cec-cal-daynum' );
-			$( this ).toggleClass( 'cec-cal-selected', $num.length && $num.data( 'date' ) === dateStr );
+			$( this ).toggleClass( 'cec-cal-selected', $( this ).data( 'date' ) === dateStr );
 		} );
 
 		var heading = new Date( dateStr + 'T00:00:00' ).toLocaleDateString( undefined, { weekday: 'long', month: 'long', day: 'numeric' } );
@@ -403,6 +405,23 @@
 
 	$( document ).on( 'click', '.cec-cal-daynum, .cec-cal-daymore', function () {
 		selectCalendarDate( $( this ).closest( '.cec-calendar-wrap' ), $( this ).data( 'date' ) );
+	} );
+
+	// 1.32.1: anywhere in a day's box opens that day, not just its number
+	// (owner: "it forces me to click the number instead of the box").
+	// Events (pills, bars) still open the event; the number stays the
+	// keyboard path.
+	$( document ).on( 'click', '.cec-cal-cell[data-date], .cec-cal-daycontent[data-date]', function ( e ) {
+		if ( $( e.target ).closest( 'a, button' ).length ) {
+			return;
+		}
+		selectCalendarDate( $( this ).closest( '.cec-calendar-wrap' ), $( this ).data( 'date' ) );
+	} );
+
+	// The number and the box are separate layers; hovering either lights the box.
+	$( document ).on( 'mouseenter mouseleave', '.cec-cal-cell[data-date], .cec-cal-daycontent[data-date]', function ( e ) {
+		var $week = $( this ).closest( '.cec-cal-week' );
+		$week.find( '.cec-cal-cell[data-date="' + $( this ).data( 'date' ) + '"]' ).toggleClass( 'cec-cal-hover', 'mouseenter' === e.type );
 	} );
 
 	$( document ).on( 'click', '.cec-cal-today-btn', function () {

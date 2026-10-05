@@ -306,7 +306,7 @@ class CEC_Month_Grid {
 					$date_str = $day_num ? $week_dates[ $col ] : null;
 					$is_today = $date_str && $is_current_month && $day_num === $today;
 					?>
-					<div class="cec-cal-cell<?php echo ! $day_num ? ' cec-cal-empty' : ''; ?><?php echo $is_today ? ' cec-cal-today' : ''; ?>" style="grid-column:<?php echo (int) ( $col + 1 ); ?>;grid-row:1 / <?php echo (int) $row_end; ?>;"></div>
+					<div class="cec-cal-cell<?php echo ! $day_num ? ' cec-cal-empty' : ''; ?><?php echo $is_today ? ' cec-cal-today' : ''; ?>"<?php echo $date_str ? ' data-date="' . esc_attr( $date_str ) . '"' : ''; ?> style="grid-column:<?php echo (int) ( $col + 1 ); ?>;grid-row:1 / <?php echo (int) $row_end; ?>;"></div>
 				<?php endforeach; ?>
 
 				<?php
@@ -318,7 +318,7 @@ class CEC_Month_Grid {
 					$events   = isset( $by_day[ $day_num ] ) ? $by_day[ $day_num ] : array();
 					$overflow = ( isset( $day_overflow[ $date_str ] ) ? $day_overflow[ $date_str ] : 0 ) + max( 0, count( $events ) - 2 );
 					?>
-					<div class="cec-cal-daycontent" style="grid-column:<?php echo (int) ( $col + 1 ); ?>;grid-row:1;">
+					<div class="cec-cal-daycontent" data-date="<?php echo esc_attr( $date_str ); ?>" style="grid-column:<?php echo (int) ( $col + 1 ); ?>;grid-row:1;">
 						<button type="button" class="cec-cal-daynum" data-date="<?php echo esc_attr( $date_str ); ?>"><?php echo esc_html( $day_num ); ?></button>
 						<div class="cec-cal-events">
 							<?php foreach ( array_slice( $events, 0, 2 ) as $ev ) : ?>

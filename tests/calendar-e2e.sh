@@ -92,6 +92,15 @@ ok "unknown audience refused" $(echo "$r" | grep -q 'cal_gone' && echo 1 || echo
 r=$(save calann $AN 999999 going members)
 ok "unknown event refused" $(echo "$r" | grep -q 'cal_gone' && echo 1 || echo 0)
 
+echo "== Public .ics outside the host's CDN cache; whole day box clickable (Events Calendar 1.32.1)"
+code(){ curl -s -o $T/ics.out -D $T/ics.h -w '%{http_code}' "$1"; }
+ok "site feed at admin-post.php: a calendar with upcoming events" $([ "$(code "$H/wp-admin/admin-post.php?action=cec_ical&feed=all")" = 200 ] && grep -q 'BEGIN:VCALENDAR' $T/ics.out && grep -q 'SUMMARY:ZZ Rope Jam' $T/ics.out && echo 1 || echo 0)
+ok "old ?cec_ical=all redirects there (301), so subscriptions keep working" $([ "$(code "$H/?cec_ical=all")" = 301 ] && grep -qi 'location:.*admin-post.php?action=cec_ical&feed=all' $T/ics.h && echo 1 || echo 0)
+ok "one event's .ics at admin-post.php, and its old link redirects there" $([ "$(code "$H/wp-admin/admin-post.php?action=cec_ical&event=$E3")" = 200 ] && grep -q 'SUMMARY:ZZ Rope Jam' $T/ics.out && [ "$(curl -s -L -o /dev/null -w '%{http_code} %{url_effective}' "$H/?p=$E3&cec_ical=1" | grep -c "200 .*admin-post.php?action=cec_ical&event=$E3")" = 1 ] && echo 1 || echo 0)
+ok "unknown or unpublished events: not found" $([ "$(code "$H/wp-admin/admin-post.php?action=cec_ical&event=999999")$(code "$H/wp-admin/admin-post.php?action=cec_ical")" = 404404 ] && echo 1 || echo 0)
+ok "event page links use the new address" $(has $T/e2.html "admin-post.php?action=cec_ical&#038;event=$E2")
+ok "calendar day boxes carry their date (whole box opens the day)" $(ev "echo preg_match('~class=\"cec-cal-cell[^\"]*\" data-date=\"\d{4}-\d{2}-\d{2}\"~', do_shortcode('[cec_calendar]')) && preg_match('~class=\"cec-cal-daycontent\" data-date=\"\d{4}-~', do_shortcode('[cec_calendar]')) ?1:0;")
+
 echo "== Who sees what"
 login calbo calbo calbopass1234; login calcy calcy calcypass1234
 get calbo pb "$PAGE&cmp_member=$ANN"

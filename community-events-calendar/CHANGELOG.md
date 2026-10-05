@@ -6,6 +6,23 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.32.1
+
+**Public calendar feeds no longer cached for a week; tapping anywhere in a day opens it** (owner, 2026-10-05: "fix the public feed caching too", and "it forces me to click the number instead of the box of the day … that is counter intuitive").
+
+- **.ics files moved out of the host's CDN cache.** On the live site the CDN served stored copies of `?cec_ical=all` (`ec-cdn-status: hit`, `s-maxage=604800`), so subscribers could see new or changed events up to a week late.
+  - The site feed and single-event downloads are now served from `wp-admin/admin-post.php?action=cec_ical&feed=all` and `&event=<id>`, which the CDN excludes.
+  - The Subscribe (iCal) and Download .ics buttons use the new addresses.
+  - The old addresses redirect permanently (301), so existing subscriptions follow automatically.
+- **Calendar: the whole day box opens the day**, not just the number. Events in a box still open the event, and the number is still the keyboard path. Hovering anywhere in a day lights its box.
+- **Fixed: selecting a day lit up every day.** The selected-day check looked for the number inside the box, but the number is a separate layer, so jQuery toggled every box instead of one. Boxes now carry their own date.
+- **Verification:**
+  - `calendar-e2e.sh` 63/63, with 6 new checks: the feed and an event's .ics at the new address, the old addresses redirecting (301), unknown events not found, event pages linking the new address, and day boxes carrying their date.
+  - `e2e.sh` 60/60.
+  - In a browser on the local test site: clicking empty space in a day opens its events with only that day highlighted, and clicking an event still opens it.
+
+---
+
 ## 1.32.0
 
 **Calendar files for subscribed calendars** (for Community Member Planning 0.18.0's private calendar feed).

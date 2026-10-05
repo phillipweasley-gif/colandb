@@ -311,6 +311,9 @@ body.cec-plugin-page {
    once (today also happens to be the selected date). */
 .cec-cal-selected { background: color-mix(in srgb, var(--cec-secondary) 22%, var(--cec-card)); }
 .cec-cal-daycontent { position: relative; z-index: 1; padding: 6px 8px; min-width: 0; }
+/* 1.32.1: the whole day box opens the day. */
+.cec-cal-cell[data-date], .cec-cal-daycontent[data-date] { cursor: pointer; }
+.cec-cal-cell.cec-cal-hover:not(.cec-cal-selected) { background: color-mix(in srgb, var(--cec-secondary) 10%, var(--cec-card)); }
 .cec-calendar-wrap .cec-cal-daynum {
 	all: unset;
 	box-sizing: border-box;
