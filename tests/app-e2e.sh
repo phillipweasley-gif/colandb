@@ -52,6 +52,20 @@ ok "service worker: JavaScript, allowed the whole site, not cached" $(grep -qi '
 ok "...it only handles page loads, keeps just the offline page, and leaves wp-admin alone" $([ "$(has $T/sw.js "'navigate' !== req.mode")$(has $T/sw.js 'action=cmp_app_offline')$(has $T/sw.js 'ADMIN')$(hasnt $T/sw.js 'cache.put')$(has $T/sw.js 'var ICON')" = 11111 ] && echo 1 || echo 0)
 ok "offline page" $([ "$(curl -s -o $T/off.html -w '%{http_code}' "$A?action=cmp_app_offline")" = 200 ] && grep -q "You&#039;re offline\|You're offline" $T/off.html && echo 1 || echo 0)
 
+echo "== Icons from a non-square site icon (0.19.1)"
+OLDICON=$(ev "echo (int) get_option('site_icon');")
+mkimg(){ ev "\$u=wp_upload_dir(); \$f=\$u['path'].'/zz-$1.png'; \$i=imagecreatetruecolor($2,$3); imagefill(\$i,0,0,imagecolorallocate(\$i,255,80,215)); imagepng(\$i,\$f); \$id=wp_insert_attachment(array('post_mime_type'=>'image/png','post_title'=>'zz-$1','post_status'=>'inherit'),\$f); require_once ABSPATH.'wp-admin/includes/image.php'; wp_update_attachment_metadata(\$id, wp_generate_attachment_metadata(\$id,\$f)); echo \$id;"; }
+WIDE=$(mkimg wide 873 327); SQ=$(mkimg square 512 512)
+ev "update_option('site_icon',$WIDE);" >/dev/null
+SRC=$(ev "echo CMP_App::icons()[1]['src'];")
+curl -s -o $T/icon.png "$SRC"
+ok "a wide site icon is centred on a true 512×512 square for the app" $(echo "$SRC" | grep -q '/cmp-app/icon-' && php -r '$s=getimagesize($argv[1]); echo (512===$s[0] && 512===$s[1])?1:0;' $T/icon.png)
+get anon h2 "$H/"
+ok "...and iPhones get the square one (after WordPress's own icon tags)" $(grep -o '<link rel="apple-touch-icon"[^>]*>' $T/h2.html | tail -1 | grep -q 'sizes="180x180".*cmp-app/icon-' && echo 1 || echo 0)
+ev "update_option('site_icon',$SQ);" >/dev/null
+ok "a square site icon is used as it is" $(ev "echo false===strpos(CMP_App::icons()[1]['src'],'/cmp-app/') && false!==strpos(CMP_App::icons()[1]['src'],'zz-square')?1:0;")
+ev "update_option('site_icon',$OLDICON); wp_delete_attachment($WIDE,true); wp_delete_attachment($SQ,true);" >/dev/null
+
 echo "== Pages"
 get anon h0 "$H/"
 ok "every page links the manifest, sets the theme colour and loads app.js with the worker's address" $([ "$(has $T/h0.html 'rel="manifest"')$(has $T/h0.html 'name="theme-color"')$(has $T/h0.html 'apple-mobile-web-app-capable')$(has $T/h0.html 'assets/js/app.js')$(has $T/h0.html 'action=cmp_app_sw')" = 11111 ] && echo 1 || echo 0)

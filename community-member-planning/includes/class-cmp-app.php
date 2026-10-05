@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   hides it for 30 days on that device. Account → App & notifications
  *   always has it.
  * - Icons come from the site icon (Appearance → Customize → Site Identity),
- *   or the bundled ones.
+ *   centred on a square when it isn't square (0.19.1), or the bundled ones.
  */
 class CMP_App {
 
@@ -35,6 +35,7 @@ class CMP_App {
 			add_action( 'admin_post_cmp_app_' . $what, array( __CLASS__, 'serve_' . $what ) );
 		}
 		add_action( 'wp_head', array( __CLASS__, 'head' ), 2 );
+		add_action( 'wp_head', array( __CLASS__, 'touch_icon' ), 100 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 	}
 
@@ -65,18 +66,74 @@ class CMP_App {
 		return array( sanitize_hex_color( $bg ) ? $bg : '#15121f', sanitize_hex_color( $theme ) ? $theme : '#15121f' );
 	}
 
+	/**
+	 * App icons (0.19.1): the site icon when it's square; when it isn't (a
+	 * wide logo set as the site icon), it's centred on a square in the app's
+	 * background colour, so phones don't squash or crop it. Those squares
+	 * are made once with GD and kept in uploads/cmp-app/. Without a site
+	 * icon, or without GD, the bundled icons.
+	 */
 	public static function icons() {
 		$out = array();
 		foreach ( array( 192, 512 ) as $size ) {
-			$url   = get_site_icon_url( $size );
 			$out[] = array(
-				'src'     => $url ? $url : CMP_URL . 'assets/img/app-icon-' . $size . '.png',
+				'src'     => self::icon_url( $size ),
 				'sizes'   => $size . 'x' . $size,
 				'type'    => 'image/png',
 				'purpose' => 'any',
 			);
 		}
 		return $out;
+	}
+
+	public static function icon_url( $size ) {
+		$id = (int) get_option( 'site_icon' );
+		if ( $id && get_site_icon_url( $size ) ) {
+			$meta = wp_get_attachment_metadata( $id );
+			if ( ! empty( $meta['width'] ) && (int) $meta['width'] === (int) $meta['height'] ) {
+				return get_site_icon_url( $size );
+			}
+			$made = self::padded_icon( $id, $size );
+			if ( $made ) {
+				return $made;
+			}
+		}
+		return CMP_URL . 'assets/img/app-icon-' . $size . '.png';
+	}
+
+	/** The site icon centred on a square (80% of it), as a URL; '' if it can't be made. */
+	private static function padded_icon( $id, $size ) {
+		$file = get_attached_file( $id );
+		$up   = wp_upload_dir();
+		if ( ! $file || ! is_readable( $file ) || ! empty( $up['error'] ) || ! function_exists( 'imagecreatetruecolor' ) ) {
+			return '';
+		}
+		$name = 'icon-' . $id . '-' . (int) filemtime( $file ) . '-' . $size . '.png';
+		$dir  = trailingslashit( $up['basedir'] ) . 'cmp-app';
+		$path = $dir . '/' . $name;
+		$url  = trailingslashit( $up['baseurl'] ) . 'cmp-app/' . $name;
+		if ( file_exists( $path ) ) {
+			return $url;
+		}
+		$src = @imagecreatefromstring( (string) file_get_contents( $file ) ); // phpcs:ignore WordPress.PHP.NoSilencedErrors,WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		if ( ! $src || ! wp_mkdir_p( $dir ) ) {
+			return '';
+		}
+		list( $bg ) = self::colors();
+		$rgb        = sscanf( $bg, '#%02x%02x%02x' );
+		$canvas     = imagecreatetruecolor( $size, $size );
+		imagefill( $canvas, 0, 0, imagecolorallocate( $canvas, (int) $rgb[0], (int) $rgb[1], (int) $rgb[2] ) );
+		imagealphablending( $canvas, true );
+		$w     = imagesx( $src );
+		$h     = imagesy( $src );
+		$scale = ( $size * 0.8 ) / max( $w, $h );
+		$nw    = max( 1, (int) round( $w * $scale ) );
+		$nh    = max( 1, (int) round( $h * $scale ) );
+		imagecopyresampled( $canvas, $src, (int) ( ( $size - $nw ) / 2 ), (int) ( ( $size - $nh ) / 2 ), 0, 0, $nw, $nh, $w, $h );
+		$ok = imagepng( $canvas, $path );
+		imagedestroy( $canvas );
+		imagedestroy( $src );
+		return $ok ? $url : '';
 	}
 
 	private static function scope() {
@@ -95,8 +152,12 @@ class CMP_App {
 		echo '<meta name="apple-mobile-web-app-capable" content="yes" />' . "\n";
 		echo '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />' . "\n";
 		echo '<meta name="apple-mobile-web-app-title" content="' . esc_attr( self::short_name() ) . '" />' . "\n";
-		if ( ! get_site_icon_url() ) {
-			echo '<link rel="apple-touch-icon" href="' . esc_url( CMP_URL . 'assets/img/app-icon-192.png' ) . '" />' . "\n";
+	}
+
+	/** After WordPress's own site-icon tags, so iPhones use the square one (0.19.1). */
+	public static function touch_icon() {
+		if ( ! is_admin() ) {
+			echo '<link rel="apple-touch-icon" sizes="180x180" href="' . esc_url( self::icon_url( 192 ) ) . '" />' . "\n";
 		}
 	}
 
