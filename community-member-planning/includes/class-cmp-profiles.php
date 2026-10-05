@@ -407,6 +407,11 @@ class CMP_Profiles {
 					$options[ $value ] = $all[ $value ]; // A retired option the member already has.
 				}
 				$html = '<select id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '"' . $bad . '>';
+				if ( ! isset( $options['not_listed'] ) ) {
+					// A blank first choice (0.10.0): without it, saving the
+					// Profile tab quietly set the field to its first option.
+					$html .= '<option value=""' . selected( $value, '', false ) . '>' . esc_html__( 'Not set', 'cmp' ) . '</option>';
+				}
 				foreach ( $options as $k => $label ) {
 					$html .= '<option value="' . esc_attr( 'not_listed' === $k ? '' : $k ) . '"' . selected( $value ? $value : '', 'not_listed' === $k ? '' : $k, false ) . '>' . esc_html( $label ) . '</option>';
 				}
@@ -469,23 +474,60 @@ class CMP_Profiles {
 				if ( ! $options ) {
 					return '<p class="cmp-muted">' . esc_html__( 'No choices yet: the site team is still preparing this list.', 'cmp' ) . '</p>';
 				}
-				$html = '<span class="cmp-rated">';
-				foreach ( $options as $k => $label ) {
-					$lvl   = isset( $chosen[ $k ]['lvl'] ) ? $chosen[ $k ]['lvl'] : '';
-					$dir   = isset( $chosen[ $k ]['dir'] ) ? $chosen[ $k ]['dir'] : '';
-					$rid   = $id . '_' . $k;
-					$html .= '<span class="cmp-rated-row"><span class="cmp-rated-name" id="' . esc_attr( $rid ) . '_l">' . esc_html( $label ) . '</span>';
-					$html .= '<select name="' . esc_attr( $name . '[' . $k . '][lvl]' ) . '" aria-label="' . esc_attr( sprintf( /* translators: %s: kink */ __( 'How much: %s', 'cmp' ), $label ) ) . '"><option value="">' . esc_html__( 'How much?', 'cmp' ) . '</option>';
-					foreach ( CMP_Profile_Fields::kink_level_labels() as $lk => $ll ) {
-						$html .= '<option value="' . esc_attr( $lk ) . '"' . selected( $lvl, $lk, false ) . '>' . esc_html( $ll ) . '</option>';
+				// Kink picker (0.10.0): only the member's picks are listed; the
+				// rest are found by search or category (member.js). Without
+				// JavaScript, "Browse all kinks" lists every kink by category.
+				$groups   = CMP_Profile_Fields::kink_groups();
+				$group_of = CMP_Profile_Fields::option_groups( $f['list'] );
+				$picked   = array();
+				foreach ( $chosen as $k => $row ) {
+					if ( isset( $options[ $k ] ) && isset( $row['lvl'] ) && in_array( $row['lvl'], CMP_Profile_Fields::KINK_LEVELS, true ) ) {
+						$picked[ $k ] = $row;
 					}
-					$html .= '</select><select name="' . esc_attr( $name . '[' . $k . '][dir]' ) . '" aria-label="' . esc_attr( sprintf( /* translators: %s: kink */ __( 'Giving or receiving: %s', 'cmp' ), $label ) ) . '"><option value="">' . esc_html__( 'Giving / receiving?', 'cmp' ) . '</option>';
-					foreach ( CMP_Profile_Fields::kink_dir_labels() as $dk => $dl ) {
-						$html .= '<option value="' . esc_attr( $dk ) . '"' . selected( $dir, $dk, false ) . '>' . esc_html( $dl ) . '</option>';
-					}
-					$html .= '</select></span>';
 				}
-				return $html . '</span>';
+				$row_html = function ( $k, $label, $row ) use ( $name, $id, $group_of ) {
+					$lvl  = $row && isset( $row['lvl'] ) ? (string) $row['lvl'] : '';
+					$dir  = $row && isset( $row['dir'] ) ? (string) $row['dir'] : '';
+					$base = $name . '[' . $k . ']';
+					$rid  = $id . '_' . $k;
+					$h    = '<li class="cmp-kp-row" data-k="' . esc_attr( $k ) . '" data-label="' . esc_attr( $label ) . '" data-group="' . esc_attr( isset( $group_of[ $k ] ) ? $group_of[ $k ] : 'other' ) . '">';
+					$h   .= '<div class="cmp-kp-top"><span class="cmp-kp-name" id="' . esc_attr( $rid ) . '_n">' . esc_html( $label ) . '</span>';
+					$h   .= '<label class="cmp-kp-rm"><input type="radio" class="cmp-kp-input" name="' . esc_attr( $base . '[lvl]' ) . '" value=""' . checked( $lvl, '', false ) . ' data-cmp-kp-rm /><span aria-hidden="true">×</span><span class="screen-reader-text">' . esc_html( sprintf( /* translators: %s: kink */ __( 'Remove %s', 'cmp' ), $label ) ) . '</span></label></div>';
+					$h   .= '<div class="cmp-kp-segs"><span class="cmp-kp-seg" role="radiogroup" aria-labelledby="' . esc_attr( $rid ) . '_n">';
+					foreach ( CMP_Profile_Fields::kink_level_labels() as $v => $l ) {
+						$h .= '<label><input type="radio" class="cmp-kp-input" name="' . esc_attr( $base . '[lvl]' ) . '" value="' . esc_attr( $v ) . '"' . checked( $lvl, $v, false ) . ' /><span>' . esc_html( $l ) . '</span></label>';
+					}
+					$h .= '</span><span class="cmp-kp-seg cmp-kp-dir" role="radiogroup" aria-label="' . esc_attr( sprintf( /* translators: %s: kink */ __( 'Giving or receiving: %s', 'cmp' ), $label ) ) . '">';
+					$h .= '<input type="radio" class="cmp-kp-input cmp-kp-none" name="' . esc_attr( $base . '[dir]' ) . '" value=""' . checked( $dir, '', false ) . ' tabindex="-1" aria-hidden="true" />';
+					foreach ( CMP_Profile_Fields::kink_dir_labels() as $v => $l ) {
+						$h .= '<label><input type="radio" class="cmp-kp-input" name="' . esc_attr( $base . '[dir]' ) . '" value="' . esc_attr( $v ) . '"' . checked( $dir, $v, false ) . ' data-cmp-kp-dir /><span>' . esc_html( $l ) . '</span></label>';
+					}
+					return $h . '</span></div></li>';
+				};
+				$html  = '<div class="cmp-kp" data-cmp-kp data-limit="' . (int) $f['limit'] . '" data-label-all="' . esc_attr__( 'All', 'cmp' ) . '" data-label-none="' . esc_attr__( 'No match. You can suggest it to the site team.', 'cmp' ) . '" data-label-more="' . esc_attr__( 'Showing %1$d of %2$d. Type or pick a category to narrow it down.', 'cmp' ) . '" data-label-full="' . esc_attr__( 'You\'ve picked the most allowed. Remove one to add another.', 'cmp' ) . '">';
+				$html .= '<p class="cmp-kp-count" data-cmp-kp-count aria-live="polite">' . esc_html( sprintf( /* translators: 1: picked, 2: maximum */ __( '%1$d of %2$d picked', 'cmp' ), count( $picked ), (int) $f['limit'] ) ) . '</p>';
+				$html .= '<ul class="cmp-kp-mine" data-cmp-kp-mine>';
+				foreach ( $picked as $k => $row ) {
+					$html .= $row_html( $k, $options[ $k ], $row );
+				}
+				$html .= '</ul><p class="cmp-muted cmp-kp-empty" data-cmp-kp-empty' . ( $picked ? ' hidden' : '' ) . '>' . esc_html__( 'Nothing picked yet.', 'cmp' ) . '</p>';
+				$html .= '<div class="cmp-kp-find" data-cmp-kp-find hidden><p class="cmp-field"><label for="' . esc_attr( $id ) . '_q">' . esc_html__( 'Add kinks', 'cmp' ) . '</label><input type="search" id="' . esc_attr( $id ) . '_q" placeholder="' . esc_attr__( 'Search, e.g. rope, pup, boots', 'cmp' ) . '" autocomplete="off" data-cmp-kp-q /></p>';
+				$html .= '<div class="cmp-kp-cats" role="group" aria-label="' . esc_attr__( 'Categories', 'cmp' ) . '" data-cmp-kp-cats>';
+				foreach ( array( '' => __( 'All', 'cmp' ) ) + $groups as $g => $gl ) {
+					$html .= '<button type="button" data-cmp-kp-cat="' . esc_attr( $g ) . '" aria-pressed="' . ( '' === $g ? 'true' : 'false' ) . '">' . esc_html( $gl ) . '</button>';
+				}
+				$html .= '</div><div class="cmp-kp-results" data-cmp-kp-results></div><p class="cmp-muted cmp-kp-more" data-cmp-kp-more aria-live="polite"></p></div>';
+				$html .= '<details class="cmp-kp-browse" data-cmp-kp-browse><summary>' . esc_html__( 'Browse all kinks', 'cmp' ) . '</summary>';
+				foreach ( $groups as $g => $gl ) {
+					$items = '';
+					foreach ( $options as $k => $label ) {
+						if ( ! isset( $picked[ $k ] ) && ( isset( $group_of[ $k ] ) ? $group_of[ $k ] : 'other' ) === $g ) {
+							$items .= $row_html( $k, $label, null );
+						}
+					}
+					$html .= '<div class="cmp-kp-group" data-cmp-kp-group="' . esc_attr( $g ) . '"><h4>' . esc_html( $gl ) . '</h4><ul>' . $items . '</ul></div>';
+				}
+				return $html . '</details></div>';
 		}
 		return '';
 	}
@@ -799,14 +841,25 @@ class CMP_Profiles {
 			$o    = CMP_Profile_Fields::options( 'kinks', true );
 			$lvls = CMP_Profile_Fields::kink_level_labels();
 			$dirs = CMP_Profile_Fields::kink_dir_labels();
-			$main .= '<section class="cmp-prof-card"><h4>' . esc_html__( 'Kinks', 'cmp' ) . '</h4><ul class="cmp-prof-kinks">';
+			// Grouped by how much (0.10.0), like FetLife's fetish lists.
+			$by = array();
 			foreach ( (array) $kinks as $row ) {
-				if ( ! isset( $row['k'], $o[ $row['k'] ] ) ) {
+				if ( isset( $row['k'], $o[ $row['k'] ], $lvls[ $row['lvl'] ] ) ) {
+					$by[ $row['lvl'] ][] = $row;
+				}
+			}
+			$main .= '<section class="cmp-prof-card cmp-prof-kinks"><h4>' . esc_html__( 'Kinks', 'cmp' ) . '</h4>';
+			foreach ( $lvls as $lv => $lv_label ) {
+				if ( empty( $by[ $lv ] ) ) {
 					continue;
 				}
-				$main .= '<li><span>' . esc_html( $o[ $row['k'] ] ) . '</span><span><b>' . esc_html( isset( $lvls[ $row['lvl'] ] ) ? $lvls[ $row['lvl'] ] : '' ) . '</b>' . ( ! empty( $row['dir'] ) && isset( $dirs[ $row['dir'] ] ) ? ' <small>' . esc_html( mb_strtolower( $dirs[ $row['dir'] ] ) ) . '</small>' : '' ) . '</span></li>';
+				$main .= '<h5 class="cmp-kink-lvl is-' . esc_attr( $lv ) . '">' . esc_html( $lv_label ) . '</h5><ul class="cmp-chips">';
+				foreach ( $by[ $lv ] as $row ) {
+					$main .= '<li>' . esc_html( $o[ $row['k'] ] ) . ( ! empty( $row['dir'] ) && isset( $dirs[ $row['dir'] ] ) ? ' <small>' . esc_html( mb_strtolower( $dirs[ $row['dir'] ] ) ) . '</small>' : '' ) . '</li>';
+				}
+				$main .= '</ul>';
 			}
-			$main .= '</ul></section>';
+			$main .= '</section>';
 		}
 		if ( $txt( 'hard_limits' ) ) {
 			$main .= '<section class="cmp-prof-card"><h4>' . esc_html__( 'Hard limits', 'cmp' ) . '</h4><p>' . nl2br( esc_html( $txt( 'hard_limits' ) ) ) . '</p></section>';

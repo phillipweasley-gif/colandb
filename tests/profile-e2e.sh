@@ -70,6 +70,7 @@ ok "every field rendered with a Show switch" $([ "$(has $T/p1.html 'id="cmp-row-
 ok "empty fields: switch hidden (and on, ready for when filled)" $(grep -o '<span class="cmp-show" data-cmp-show hidden><input type="hidden" name="sp\[bio\]" value="1" /><input type="checkbox" class="cmp-switch-input" id="cmp_s_bio" name="s\[bio\]" value="1" checked' $T/p1.html | wc -l | awk '{print ($1==1)}')
 ok "display name: no switch, always shown (0.9.1)" $([ "$(hasnt $T/p1.html 'id="cmp_s_display_name"')$(has $T/p1.html 'Always shown')" = 11 ] && echo 1 || echo 0)
 ok "orientation is a fixed list: no free-text Other (0.9.1)" $(hasnt $T/p1.html 'name="f[identity][other]"')
+ok "single choices start blank ('Not set'), so saving doesn't pick the first option (0.10.0)" $([ "$(has $T/p1.html 'name="f\[body_type\]"><option value="" selected')$(has $T/p1.html 'name="f\[position\]"><option value="" selected')" = 11 ] && echo 1 || echo 0)
 ok "link to view my profile as members see it" $(has $T/p1.html "cmp_member=$(uid pat)\"")
 ok "age calculated from date of birth, not typed" $([ "$(has $T/p1.html "cmp-age-value\">$AGE<")$(hasnt $T/p1.html 'name="f[age]')" = 11 ] && echo 1 || echo 0)
 ok "options list shows renamed choice" $(has $T/p1.html 'Leathercraft')

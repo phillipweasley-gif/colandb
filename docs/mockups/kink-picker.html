@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kink Picker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root { --primary: #e1f577; --secondary: #ff50d7; --text: #f5f4f7; --muted: #a9a6bb; --card: #1b1826; --field: #110f18; --border: rgba(255,255,255,.12); --line: rgba(255,255,255,.08); --page: #0b0a10; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font-family: Inter, system-ui, sans-serif; }
+.intro { max-width: 1100px; margin: 0 auto; padding: 28px 16px 6px; }
+.intro h1 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 22px; margin: 0 0 8px; }
+.intro p { color: var(--muted); max-width: 860px; line-height: 1.55; margin: 0 0 6px; }
+.intro strong { color: var(--text); }
+.row { display: flex; flex-wrap: wrap; gap: 26px; justify-content: center; padding: 18px 16px; align-items: flex-start; }
+.col { width: 400px; max-width: calc(100vw - 32px); }
+.col h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+.phone { border: 10px solid #26232f; border-radius: 40px; background: #000; height: 760px; overflow: hidden; }
+.screen { height: 100%; overflow-y: auto; padding: 16px 14px 30px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+.title { font-family: 'Archivo Black', sans-serif; color: var(--secondary); text-transform: uppercase; font-size: 14px; margin: 0 0 8px; }
+.muted { color: var(--muted); font-size: 13px; }
+/* Chosen */
+.mine { list-style: none; margin: 0; padding: 0; }
+.mine li { border-top: 1px solid var(--line); padding: 10px 0; }
+.mine li:first-child { border-top: none; }
+.mine .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.mine b { font-size: 15px; }
+.x { background: none; border: none; color: var(--muted); font-size: 22px; width: 44px; height: 44px; cursor: pointer; }
+.seg { display: inline-flex; border: 1.5px solid var(--border); border-radius: 100px; overflow: hidden; margin: 6px 6px 0 0; }
+.seg button { background: transparent; border: none; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 700; min-height: 36px; padding: 0 11px; cursor: pointer; }
+.seg button.on { background: var(--primary); color: #0b0a12; }
+.seg.dir button.on { background: var(--secondary); color: #fff; }
+/* Finder */
+.search { width: 100%; min-height: 46px; background: var(--field); border: 1.5px solid var(--border); border-radius: 10px; color: var(--text); font: inherit; font-size: 15px; padding: 0 12px; }
+.cats { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 4px; scrollbar-width: none; }
+.cats button { flex: 0 0 auto; background: transparent; border: 1.5px solid var(--border); color: var(--text); border-radius: 100px; min-height: 36px; padding: 0 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.cats button.on { border-color: var(--primary); color: var(--primary); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip { background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--text); border-radius: 100px; min-height: 40px; padding: 0 12px; font: inherit; font-size: 13.5px; cursor: pointer; }
+.chip:hover { border-color: var(--primary); }
+.chip.added { opacity: .4; pointer-events: none; }
+.more { color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+/* Profile view */
+.prof h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; margin: 12px 0 6px; }
+.prof h3.love { color: var(--secondary); } .prof h3.like { color: var(--primary); } .prof h3.curious { color: var(--muted); }
+.prof .tag { display: inline-block; margin: 0 6px 6px 0; padding: 6px 10px; border-radius: 100px; background: rgba(255,255,255,.06); font-size: 13px; }
+.prof .tag small { color: var(--muted); }
+.decisions { max-width: 1000px; margin: 10px auto 60px; padding: 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.decisions b { color: var(--text); }
+.decisions h2 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 16px; }
+</style>
+</head>
+<body>
+<div class="intro">
+	<h1>Kink picker</h1>
+	<p>Mockup for a <strong>Profile tab kinks section</strong> that stays short. Today every kink in the list is shown with two dropdowns, so the section is a long wall. Here you only see <strong>the kinks you've picked</strong>; everything else is found by <strong>typing</strong> or <strong>tapping a category</strong>, the way FetLife's fetish search and Chaster's grouped lists work. It keeps working as the list grows to hundreds. <strong>It works: try it.</strong></p>
+</div>
+<div class="row">
+	<div class="col">
+		<h2>Editing (phone)</h2>
+		<div class="phone"><div class="screen">
+			<div class="card">
+				<div class="title">Your kinks</div>
+				<ul class="mine" id="mine"></ul>
+				<p class="muted" id="empty">Nothing picked yet. Find kinks below.</p>
+			</div>
+			<div class="card">
+				<div class="title">Add kinks</div>
+				<input class="search" id="q" type="search" placeholder="Search, e.g. rope, pup, boots" aria-label="Search kinks">
+				<div class="cats" id="cats" role="group" aria-label="Categories"></div>
+				<div class="chips" id="results"></div>
+				<p class="more" id="more"></p>
+			</div>
+		</div></div>
+	</div>
+	<div class="col">
+		<h2>On your profile</h2>
+		<div class="card prof" id="prof"></div>
+		<p class="muted">Grouped by how much you like them, with giving / receiving where you set it.</p>
+	</div>
+</div>
+<div class="decisions">
+	<h2>Decisions for you</h2>
+	<ol>
+		<li><b>Only your picks are shown</b> while editing; nothing else takes up space.</li>
+		<li><b>Find by typing or category.</b> Results are tap targets; tapping one adds it as "Like it" and you can change it right there.</li>
+		<li><b>Three levels</b> (Love it / Like it / Curious) and an optional <b>Giving / Receiving / Both</b>, as now.</li>
+		<li><b>Categories</b> (proposed): Bondage &amp; restraint · Impact · Chastity &amp; control · Service &amp; protocol · Pup &amp; pet · Role &amp; age play · Fetish &amp; gear · Sensation · Body worship · Exhibition &amp; voyeur · Other. The site team can add kinks and categories in the admin, as they can with options today.</li>
+		<li><b>Optional later:</b> a "Limits" level (hard no) so limits and kinks live in one place, and suggesting new kinks to the site team.</li>
+	</ol>
+</div>
+<script>
+const CATS = {
+	'Bondage & restraint': ['Rope bondage','Restraints','Cuffs','Hoods','Mummification','Suspension','Cages'],
+	'Impact': ['Impact play','Spanking','Flogging','Paddling','Caning','Belts'],
+	'Chastity & control': ['Chastity / keyholding','Edging & denial','Orgasm control','Tease & denial','Ruined orgasms'],
+	'Service & protocol': ['Service & protocol','Domestic service','Training & homework','Rules & rituals','Kneeling','Speech protocol'],
+	'Pup & pet': ['Pup play','Pony play','Kitten play','Handler / pet','Primal play'],
+	'Role & age play': ['Daddy / boy dynamics','Role play','Teacher / student','Interrogation','Uniforms & authority'],
+	'Fetish & gear': ['Leather','Leather worship','Rubber / latex','Uniforms & gear','Jockstraps','Socks','Sneakers','Gas masks'],
+	'Sensation': ['Sensory play','Wax play','Electro','Ice play','Tickling','Sensory deprivation'],
+	'Body worship': ['Boot worship','Muscle worship','Foot worship','Body hair','Armpits'],
+	'Exhibition & voyeur': ['Exhibitionism','Voyeurism','Public play','Photography'],
+	'Other': ['Praise','Humiliation','Watersports','Toys','Group play','Breath play']
+};
+const ALL = Object.entries(CATS).flatMap(([c, ks]) => ks.map(k => ({ k, c })));
+const LEVELS = [['love','Love it'],['like','Like it'],['curious','Curious']];
+const DIRS = [['giving','Giving'],['receiving','Receiving'],['both','Both']];
+let picked = [{k:'Chastity / keyholding',lvl:'love',dir:'receiving'},{k:'Leather',lvl:'love',dir:'both'},{k:'Pup play',lvl:'curious',dir:''}];
+let cat = '';
+const $ = id => document.getElementById(id);
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+function renderMine(){
+	$('mine').innerHTML = picked.map((p,i)=>`<li><div class="top"><b>${esc(p.k)}</b><button class="x" aria-label="Remove ${esc(p.k)}" data-rm="${i}">×</button></div>
+	<div class="seg" role="group" aria-label="How much">${LEVELS.map(([v,l])=>`<button class="${p.lvl===v?'on':''}" data-i="${i}" data-lvl="${v}" aria-pressed="${p.lvl===v}">${l}</button>`).join('')}</div><div class="seg dir" role="group" aria-label="Giving or receiving">${DIRS.map(([v,l])=>`<button class="${p.dir===v?'on':''}" data-i="${i}" data-dir="${v}" aria-pressed="${p.dir===v}">${l}</button>`).join('')}</div></li>`).join('');
+	$('empty').hidden = picked.length>0;
+}
+function renderFind(){
+	const q = $('q').value.trim().toLowerCase();
+	$('cats').innerHTML = ['All',...Object.keys(CATS)].map(c=>`<button class="${(c==='All'?'':c)===cat?'on':''}" data-cat="${c==='All'?'':c}">${esc(c)}</button>`).join('');
+	let list = ALL.filter(x => (!cat || x.c===cat) && (!q || x.k.toLowerCase().includes(q)));
+	const total = list.length; list = list.slice(0, q||cat ? 60 : 18);
+	const has = new Set(picked.map(p=>p.k));
+	$('results').innerHTML = list.map(x=>`<button class="chip ${has.has(x.k)?'added':''}" data-add="${esc(x.k)}">${has.has(x.k)?'✓ ':'+ '}${esc(x.k)}</button>`).join('') || '<p class="muted">No match. You can suggest it to the site team.</p>';
+	$('more').textContent = total>list.length ? `Showing ${list.length} of ${total}. Type or pick a category to narrow it down.` : '';
+}
+function renderProf(){
+	const by = l => picked.filter(p=>p.lvl===l);
+	$('prof').innerHTML = '<div class="title">Kinks</div>' + LEVELS.map(([v,l])=> by(v).length ? `<h3 class="${v}">${l}</h3>`+by(v).map(p=>`<span class="tag">${esc(p.k)}${p.dir?` <small>${p.dir}</small>`:''}</span>`).join('') : '').join('');
+}
+function all(){renderMine();renderFind();renderProf();}
+document.addEventListener('click', e=>{
+	const t = e.target.closest('button'); if(!t) return;
+	if (t.dataset.rm!==undefined){ picked.splice(+t.dataset.rm,1); }
+	else if (t.dataset.lvl){ picked[+t.dataset.i].lvl=t.dataset.lvl; }
+	else if (t.dataset.dir){ const p=picked[+t.dataset.i]; p.dir = p.dir===t.dataset.dir?'':t.dataset.dir; }
+	else if (t.dataset.cat!==undefined){ cat=t.dataset.cat; }
+	else if (t.dataset.add){ picked.push({k:t.dataset.add,lvl:'like',dir:''}); }
+	else return;
+	all();
+});
+$('q').addEventListener('input', renderFind);
+all();
+</script>
+</body>
+</html>
