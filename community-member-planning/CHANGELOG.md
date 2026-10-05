@@ -4,6 +4,25 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.10.0
+
+**Kink picker** (owner, 2026-10-05: the kinks list "becomes cumbersome"; approved from `docs/mockups/kink-picker.html`).
+
+- **Only your picks are listed** on the Profile tab and setup step, each with Love it / Like it / Curious and Giving / Receiving / Both as tap-sized buttons (tap the chosen Giving / Receiving / Both again to clear it) and a × to remove it. A "N of 40 picked" count.
+- **Add kinks** by typing (Enter adds the first match) or tapping a category; results are tap targets. Without JavaScript, "Browse all kinks" lists every kink by category with the same buttons, and saves the same way.
+- **Categories** (11): Bondage & restraint · Impact · Chastity & control · Service & protocol · Pup & pet · Role & age play · Fetish & gear · Sensation · Body worship · Exhibition & voyeur · Other. The site team sets each kink's category on Users → Member Profile Options → Kinks (new Category column).
+- **62 starter kinks** (the 30 from 0.5.0 plus 32 more). A one-time upgrade (`CMP_DB_VERSION` 8) gives existing kinks a category and adds the new ones; kinks the site team renamed or retired, and ones they added, are left as they are.
+- **On profiles** kinks are grouped under Love it / Like it / Curious, with giving / receiving beside each.
+
+**Fixes**
+
+- **Show switches came back.** 0.9.1 accidentally removed the script that reveals a field's "Show to members" switch once it's filled in, so a newly filled field couldn't be switched off until after saving. Restored. A picker's empty radios don't count as "filled".
+- **Single-choice fields start blank.** Body type, position, hosting and "how active" had no blank choice, so any Profile tab save quietly set them to their first option ("Slim", "Top", …). They now start on "Not set". Members who saved their profile since 0.5.0 may show a body type or position they never chose; they can set it back to "Not set".
+
+**Verification** (local WordPress 7.1.2): `setup-e2e.sh` 39/39 (new: categories, upgrade, admin categories, picker markup, removing), `profile-e2e.sh` 84/84, `dob-e2e.sh` 34/34, `dynamics-e2e.sh` 34/34, `homework-e2e.sh` 44/44, `chastity-e2e.sh` 55/55, `feed-e2e.sh` 41/41, `account-e2e.sh` 64/64, `e2e.sh` 60/60. In a browser at 375 px: search, Enter to add, categories, levels, clearing a direction, removing, saving, the Show switch appearing and hiding, and the grouped profile view.
+
+---
+
 ## 0.9.1
 
 **Profile fixes from the owner's review of the live site (2026-10-05).**

@@ -516,6 +516,40 @@
 	sync();
 }() );
 
+/* Profile tab (0.4.0): a field's "Show to members" switch only appears once
+   the field has something in it, already switched on. Without JavaScript the
+   hidden switch still posts "on", so the server reaches the same result. */
+( function () {
+	'use strict';
+	Array.prototype.forEach.call( document.querySelectorAll( '.cmp-profile-row' ), function ( row ) {
+		var sw = row.querySelector( '[data-cmp-show]' );
+		if ( ! sw || ! sw.hasAttribute( 'hidden' ) ) {
+			return; // Already filled when the page loaded: always shown.
+		}
+		var box = sw.querySelector( 'input[type="checkbox"]' );
+		var filled = function () {
+			return Array.prototype.some.call( row.querySelectorAll( '.cmp-profile-input input, .cmp-profile-input textarea, .cmp-profile-input select' ), function ( el ) {
+				if ( 'checkbox' === el.type || 'radio' === el.type ) {
+					return el.checked && '' !== el.value; // An empty radio means "none" (kink picker).
+				}
+				return '' !== String( el.value ).trim();
+			} );
+		};
+		var sync = function () {
+			var was = ! sw.hasAttribute( 'hidden' );
+			var now = filled();
+			if ( now && ! was && box ) {
+				// A newly filled field starts shown, except health details,
+				// which start hidden (data-cmp-sensitive).
+				box.checked = ! sw.hasAttribute( 'data-cmp-sensitive' );
+			}
+			sw.toggleAttribute( 'hidden', ! now );
+		};
+		row.addEventListener( 'input', sync );
+		row.addEventListener( 'change', sync );
+	} );
+}() );
+
 /* Chastity (0.8.0): keep the "Locked for" timer current without a reload. */
 ( function () {
 	'use strict';
@@ -532,4 +566,136 @@
 		} );
 	}
 	window.setInterval( tick, 30000 );
+}() );
+
+/* Kink picker (0.10.0): only the member's picks are listed; others are found
+   by search or category. Without this script, "Browse all kinks" lists every
+   kink by category and the same radios save the same way. */
+( function () {
+	'use strict';
+	Array.prototype.forEach.call( document.querySelectorAll( '.cmp-member-area [data-cmp-kp]' ), function ( kp ) {
+		var mine = kp.querySelector( '[data-cmp-kp-mine]' );
+		var browse = kp.querySelector( '[data-cmp-kp-browse]' );
+		var find = kp.querySelector( '[data-cmp-kp-find]' );
+		var q = kp.querySelector( '[data-cmp-kp-q]' );
+		var results = kp.querySelector( '[data-cmp-kp-results]' );
+		var more = kp.querySelector( '[data-cmp-kp-more]' );
+		var count = kp.querySelector( '[data-cmp-kp-count]' );
+		var empty = kp.querySelector( '[data-cmp-kp-empty]' );
+		var limit = parseInt( kp.getAttribute( 'data-limit' ), 10 ) || 40;
+		var cat = '';
+		var countTpl = count.textContent.replace( /^\d+/, '%1' ).replace( /\d+(?=\D*$)/, '%2' );
+
+		browse.hidden = true;
+		find.hidden = false;
+
+		var rows = function () {
+			return Array.prototype.slice.call( kp.querySelectorAll( '.cmp-kp-row' ) );
+		};
+		var picked = function () {
+			return mine.querySelectorAll( '.cmp-kp-row' ).length;
+		};
+		var sync = function () {
+			var n = picked();
+			count.textContent = countTpl.replace( '%1', n ).replace( '%2', limit );
+			empty.hidden = n > 0;
+		};
+		var render = function () {
+			var term = q.value.trim().toLowerCase();
+			var list = rows().filter( function ( r ) {
+				return r.parentNode !== mine && ( ! cat || r.getAttribute( 'data-group' ) === cat ) && ( ! term || r.getAttribute( 'data-label' ).toLowerCase().indexOf( term ) > -1 );
+			} );
+			var total = list.length;
+			var shown = list.slice( 0, term || cat ? 80 : 18 );
+			var full = picked() >= limit;
+			results.innerHTML = '';
+			shown.forEach( function ( r ) {
+				var b = document.createElement( 'button' );
+				b.type = 'button';
+				b.className = 'cmp-kp-chip';
+				b.textContent = '+ ' + r.getAttribute( 'data-label' );
+				b.disabled = full;
+				b.addEventListener( 'click', function () {
+					add( r );
+				} );
+				results.appendChild( b );
+			} );
+			if ( ! total ) {
+				more.textContent = kp.getAttribute( 'data-label-none' );
+			} else if ( full ) {
+				more.textContent = kp.getAttribute( 'data-label-full' );
+			} else {
+				more.textContent = total > shown.length ? kp.getAttribute( 'data-label-more' ).replace( '%1$d', shown.length ).replace( '%2$d', total ) : '';
+			}
+		};
+		var add = function ( r ) {
+			if ( picked() >= limit ) {
+				return;
+			}
+			mine.appendChild( r );
+			r.querySelector( 'input[value="like"]' ).checked = true;
+			// Lets the field's Show switch appear (Profile tab, 0.4.0).
+			r.querySelector( 'input[value="like"]' ).dispatchEvent( new Event( 'change', { bubbles: true } ) );
+			sync();
+			render();
+			r.querySelector( 'input[value="like"]' ).focus();
+		};
+		var remove = function ( r ) {
+			var group = browse.querySelector( '[data-cmp-kp-group="' + r.getAttribute( 'data-group' ) + '"] ul' ) || browse.querySelector( 'ul' );
+			r.querySelector( '[data-cmp-kp-rm]' ).checked = true;
+			r.querySelector( '.cmp-kp-none' ).checked = true;
+			group.appendChild( r );
+			mine.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+			sync();
+			render();
+			q.focus();
+		};
+
+		kp.addEventListener( 'change', function ( e ) {
+			if ( e.target.hasAttribute( 'data-cmp-kp-rm' ) && e.target.checked ) {
+				remove( e.target.closest( '.cmp-kp-row' ) );
+			}
+		} );
+		// Tapping the chosen Giving / Receiving / Both again clears it.
+		kp.addEventListener( 'pointerdown', function ( e ) {
+			var label = e.target.closest( '.cmp-kp-dir label' );
+			if ( label ) {
+				var input = label.querySelector( 'input' );
+				input.setAttribute( 'data-was', input.checked ? '1' : '' );
+			}
+		} );
+		kp.addEventListener( 'click', function ( e ) {
+			var input = e.target.matches && e.target.matches( '[data-cmp-kp-dir]' ) ? e.target : null;
+			if ( input && '1' === input.getAttribute( 'data-was' ) ) {
+				input.closest( '.cmp-kp-dir' ).querySelector( '.cmp-kp-none' ).checked = true;
+				input.setAttribute( 'data-was', '' );
+			}
+		} );
+		kp.querySelector( '[data-cmp-kp-cats]' ).addEventListener( 'click', function ( e ) {
+			var b = e.target.closest( '[data-cmp-kp-cat]' );
+			if ( ! b ) {
+				return;
+			}
+			cat = b.getAttribute( 'data-cmp-kp-cat' );
+			Array.prototype.forEach.call( this.querySelectorAll( '[data-cmp-kp-cat]' ), function ( x ) {
+				x.setAttribute( 'aria-pressed', x === b ? 'true' : 'false' );
+			} );
+			render();
+		} );
+		q.addEventListener( 'input', render );
+		// Enter in the search box adds the first match instead of saving the form.
+		q.addEventListener( 'keydown', function ( e ) {
+			if ( 'Enter' === e.key ) {
+				e.preventDefault();
+				var first = results.querySelector( '.cmp-kp-chip:not([disabled])' );
+				if ( first ) {
+					first.click();
+					q.value = '';
+					render();
+				}
+			}
+		} );
+		sync();
+		render();
+	} );
 }() );

@@ -67,7 +67,7 @@ class CMP_Profile_Fields {
 			'active_level'    => array( 'I live it 24/7', 'I live the lifestyle when I can', 'Just in the bedroom', 'Once in a while to spice things up', 'Curious and want to try', 'Just curious right now' ),
 			'not_looking_for' => array( 'Casual hookups', 'One night stands', 'Online only', 'Cybersex', 'Small talk', 'A relationship', 'A dynamic', 'Play partners', 'Meeting in person' ),
 			'hosting'         => array( 'Can host', 'Can travel', 'Host or travel', 'Ask me' ),
-			'kinks'           => array( 'Chastity / keyholding', 'Service & protocol', 'Domestic service', 'Training & homework', 'Rope bondage', 'Restraints', 'Impact play', 'Spanking', 'Pup play', 'Primal play', 'Daddy / boy dynamics', 'Praise', 'Humiliation', 'Edging & denial', 'Orgasm control', 'Sensory play', 'Wax play', 'Electro', 'Leather worship', 'Boot worship', 'Muscle worship', 'Uniforms & gear', 'Rubber / latex', 'Jockstraps', 'Watersports', 'Voyeurism', 'Exhibitionism', 'Role play', 'Toys', 'Group play' ),
+			'kinks'           => array_merge( ...array_values( self::default_kinks_by_group() ) ),
 			'practices'       => array( 'On PrEP', 'DoxyPEP', 'Condoms always', 'Condoms sometimes', 'Undetectable (U=U)', 'Mpox vaccinated', 'COVID vaccinated', 'Tested regularly' ),
 			'substances'      => array( 'No drugs', 'No PnP', 'Sober', 'Drinks socially', '420 friendly', 'No tobacco' ),
 		);
@@ -89,6 +89,9 @@ class CMP_Profile_Fields {
 			foreach ( $labels as $i => $label ) {
 				$key = substr( sanitize_title( $label ), 0, 60 );
 				$rows[] = array( 'key' => $key ? $key : 'option-' . $i, 'label' => $label, 'active' => true, 'order' => $i );
+				if ( 'kinks' === $list ) {
+					$rows[ count( $rows ) - 1 ]['group'] = self::default_group_of( $label );
+				}
 			}
 			$all[ $list ] = $rows;
 			$changed      = true;
@@ -164,6 +167,94 @@ class CMP_Profile_Fields {
 	public static function is_sensitive( $key ) {
 		$f = self::field( $key );
 		return $f && ! empty( $f['sensitive'] );
+	}
+
+	/** Kink categories for the picker (0.10.0). The site team assigns each kink one. */
+	public static function kink_groups() {
+		return array(
+			'bondage'   => __( 'Bondage & restraint', 'cmp' ),
+			'impact'    => __( 'Impact', 'cmp' ),
+			'control'   => __( 'Chastity & control', 'cmp' ),
+			'service'   => __( 'Service & protocol', 'cmp' ),
+			'pet'       => __( 'Pup & pet', 'cmp' ),
+			'roleplay'  => __( 'Role & age play', 'cmp' ),
+			'gear'      => __( 'Fetish & gear', 'cmp' ),
+			'sensation' => __( 'Sensation', 'cmp' ),
+			'worship'   => __( 'Body worship', 'cmp' ),
+			'exhibit'   => __( 'Exhibition & voyeur', 'cmp' ),
+			'other'     => __( 'Other', 'cmp' ),
+		);
+	}
+
+	/** Starter kinks by category (the 0.5.0 thirty plus more, 0.10.0). */
+	public static function default_kinks_by_group() {
+		return array(
+			'bondage'   => array( 'Rope bondage', 'Restraints', 'Cuffs', 'Hoods', 'Mummification', 'Suspension', 'Cages' ),
+			'impact'    => array( 'Impact play', 'Spanking', 'Flogging', 'Paddling', 'Caning', 'Belts' ),
+			'control'   => array( 'Chastity / keyholding', 'Edging & denial', 'Orgasm control', 'Tease & denial', 'Ruined orgasms' ),
+			'service'   => array( 'Service & protocol', 'Domestic service', 'Training & homework', 'Rules & rituals', 'Kneeling', 'Speech protocol' ),
+			'pet'       => array( 'Pup play', 'Pony play', 'Kitten play', 'Handler / pet', 'Primal play' ),
+			'roleplay'  => array( 'Daddy / boy dynamics', 'Role play', 'Teacher / student', 'Interrogation', 'Uniforms & authority' ),
+			'gear'      => array( 'Leather', 'Leather worship', 'Rubber / latex', 'Uniforms & gear', 'Jockstraps', 'Socks', 'Sneakers', 'Gas masks' ),
+			'sensation' => array( 'Sensory play', 'Wax play', 'Electro', 'Ice play', 'Tickling', 'Sensory deprivation' ),
+			'worship'   => array( 'Boot worship', 'Muscle worship', 'Foot worship', 'Body hair', 'Armpits' ),
+			'exhibit'   => array( 'Exhibitionism', 'Voyeurism', 'Public play', 'Photography' ),
+			'other'     => array( 'Praise', 'Humiliation', 'Watersports', 'Toys', 'Group play' ),
+		);
+	}
+
+	private static function default_group_of( $label ) {
+		foreach ( self::default_kinks_by_group() as $group => $labels ) {
+			if ( in_array( $label, $labels, true ) ) {
+				return $group;
+			}
+		}
+		return 'other';
+	}
+
+	/** option key => category, for lists that have them (kinks). */
+	public static function option_groups( $list ) {
+		$out = array();
+		foreach ( self::raw_options( $list ) as $o ) {
+			$out[ $o['key'] ] = isset( $o['group'] ) && isset( self::kink_groups()[ $o['group'] ] ) ? $o['group'] : 'other';
+		}
+		return $out;
+	}
+
+	/**
+	 * Once (0.10.0): gives every existing kink a category, and adds the new
+	 * starter kinks the list doesn't have yet. Kinks the site team renamed
+	 * or retired are left as they are; nothing is removed.
+	 */
+	public static function upgrade_kinks() {
+		if ( get_option( 'cmp_kinks_grouped' ) ) {
+			return;
+		}
+		$all  = get_option( self::OPTION, array() );
+		$rows = isset( $all['kinks'] ) ? (array) $all['kinks'] : array();
+		$map  = array();
+		foreach ( self::default_kinks_by_group() as $group => $labels ) {
+			foreach ( $labels as $label ) {
+				$map[ substr( sanitize_title( $label ), 0, 60 ) ] = array( $group, $label );
+			}
+		}
+		$have  = array();
+		$order = 0;
+		foreach ( $rows as $i => $o ) {
+			$have[ $o['key'] ] = true;
+			$order             = max( $order, (int) $o['order'] );
+			if ( empty( $o['group'] ) ) {
+				$rows[ $i ]['group'] = isset( $map[ $o['key'] ] ) ? $map[ $o['key'] ][0] : 'other';
+			}
+		}
+		foreach ( $map as $key => $info ) {
+			if ( ! isset( $have[ $key ] ) ) {
+				$rows[] = array( 'key' => $key, 'label' => $info[1], 'active' => true, 'order' => ++$order, 'group' => $info[0] );
+			}
+		}
+		$all['kinks'] = array_values( $rows );
+		update_option( self::OPTION, $all, false );
+		update_option( 'cmp_kinks_grouped', CMP_VERSION, false );
 	}
 
 	const KINK_LEVELS = array( 'love', 'like', 'curious' );
@@ -269,6 +360,10 @@ class CMP_Profile_Fields {
 				}
 			}
 			$out[ $key ] = array( 'key' => $key, 'label' => $label, 'active' => $active, 'order' => (int) ( isset( $row['order'] ) ? $row['order'] : 0 ) );
+			if ( 'kinks' === $list ) {
+				$group               = isset( $row['group'] ) ? sanitize_key( $row['group'] ) : '';
+				$out[ $key ]['group'] = isset( self::kink_groups()[ $group ] ) ? $group : ( isset( $existing[ $key ]['group'] ) ? $existing[ $key ]['group'] : 'other' );
+			}
 		}
 		// Options not submitted at all are kept unchanged (never deleted),
 		// and still count when checking for duplicate names.
