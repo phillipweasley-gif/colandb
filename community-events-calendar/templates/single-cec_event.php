@@ -58,6 +58,15 @@ while ( have_posts() ) :
 							<a class="cec-btn cec-btn-outline cec-btn-small" href="<?php echo esc_url( CEC_Ical::single_ics_url( $data ) ); ?>"><?php esc_html_e( 'Download .ics', 'cec' ); ?></a>
 						</p>
 					<?php endif; ?>
+					<?php
+					/**
+					 * Below the calendar links (1.30.0). Community Member Planning adds
+					 * "Add to my calendar" here.
+					 *
+					 * @param array $data The event (CEC_Event_Helper::data()).
+					 */
+					do_action( 'cec_single_event_calendar_actions', $data );
+					?>
 
 					<?php $share_links = CEC_Event_Helper::share_links( $data ); ?>
 					<div class="cec-share" data-share-title="<?php echo esc_attr( $data['title'] ); ?>" data-share-text="<?php echo esc_attr( $data['title'] . ( $data['start_display'] ? ' — ' . $data['start_display'] : '' ) ); ?>" data-share-url="<?php echo esc_url( $data['permalink'] ); ?>">
@@ -149,6 +158,8 @@ while ( have_posts() ) :
 						<p class="cec-rsvp-disabled-note"><?php esc_html_e( 'RSVP/registration is paused while this event is postponed or cancelled.', 'cec' ); ?></p>
 					<?php elseif ( 'external' === $data['rsvp_mode'] && $data['rsvp_url'] ) : ?>
 						<a class="cec-btn cec-btn-block" href="<?php echo esc_url( $data['rsvp_url'] ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Register', 'cec' ); ?></a>
+					<?php elseif ( 'internal' === $data['rsvp_mode'] && CEC_RSVP::has_member_rsvp( $data['id'], get_current_user_id() ) ) : ?>
+						<p class="cec-rsvp-disabled-note"><?php esc_html_e( 'You\'re on the list for this event.', 'cec' ); ?></p>
 					<?php elseif ( 'internal' === $data['rsvp_mode'] ) : ?>
 						<?php include CEC_DIR . 'templates/parts/rsvp-form.php'; ?>
 					<?php endif; ?>

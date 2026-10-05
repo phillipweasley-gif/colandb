@@ -218,7 +218,7 @@ class CMP_Member_Area {
 			'expired'         => array( 'error', __( 'Your session expired. Please try again.', 'cmp' ) ),
 			'welcome'         => array( 'success', __( "You're in. Welcome to the member area.", 'cmp' ) ),
 		);
-		$map += CMP_Account::notices() + CMP_Profiles::notices() + CMP_Profile_Images::notices() + CMP_Dynamics::notices() + CMP_Homework::notices() + CMP_Chastity::notices() + CMP_Feed::notices() + CMP_Messages::notices() + CMP_Follows::notices() + CMP_Directory::notices() + CMP_Nods::notices();
+		$map += CMP_Account::notices() + CMP_Profiles::notices() + CMP_Profile_Images::notices() + CMP_Dynamics::notices() + CMP_Homework::notices() + CMP_Chastity::notices() + CMP_Feed::notices() + CMP_Messages::notices() + CMP_Follows::notices() + CMP_Directory::notices() + CMP_Nods::notices() + CMP_Calendar::notices();
 		if ( ! isset( $map[ $notice ] ) ) {
 			return '';
 		}
@@ -271,6 +271,9 @@ class CMP_Member_Area {
 		if ( CMP_Access::STATE_MEMBER === $state && CMP_Homework::TAB === $tab ) {
 			return $out . CMP_Homework::render( get_current_user_id() ) . '</div>';
 		}
+		if ( CMP_Access::STATE_MEMBER === $state && CMP_Calendar::TAB === $tab ) {
+			return $out . CMP_Calendar::render( get_current_user_id() ) . '</div>';
+		}
 		if ( CMP_Access::STATE_MEMBER === $state && CMP_Dynamics::TAB === $tab ) {
 			return $out . CMP_Dynamics::render( get_current_user_id() ) . '</div>';
 		}
@@ -303,7 +306,7 @@ class CMP_Member_Area {
 
 	private static function current_tab() {
 		$tab = isset( $_GET['cmp_tab'] ) ? sanitize_key( wp_unslash( $_GET['cmp_tab'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		return in_array( $tab, array( CMP_Account::TAB, CMP_Profiles::TAB, CMP_Onboarding::TAB, CMP_Dynamics::TAB, CMP_Homework::TAB, CMP_Chastity::TAB, CMP_Feed::TAB, CMP_Messages::TAB, CMP_Directory::TAB ), true ) ? $tab : 'home';
+		return in_array( $tab, array( CMP_Account::TAB, CMP_Profiles::TAB, CMP_Onboarding::TAB, CMP_Dynamics::TAB, CMP_Homework::TAB, CMP_Chastity::TAB, CMP_Feed::TAB, CMP_Messages::TAB, CMP_Directory::TAB, CMP_Calendar::TAB ), true ) ? $tab : 'home';
 	}
 
 	/**
@@ -319,7 +322,7 @@ class CMP_Member_Area {
 			$waiting = CMP_Dynamics::pending_for( get_current_user_id() );
 			/* translators: %d: invitations waiting */
 			$dyn_label = $waiting ? sprintf( __( 'Dynamics (%d)', 'cmp' ), $waiting ) : __( 'Dynamics', 'cmp' );
-			$tabs      = array_slice( $tabs, 0, 1, true ) + array( CMP_Feed::TAB => array( __( 'Feed', 'cmp' ), CMP_Feed::url() ), CMP_Directory::TAB => array( __( 'Members', 'cmp' ), CMP_Directory::url() ), CMP_Messages::TAB => array( CMP_Messages::tab_label( get_current_user_id() ), CMP_Messages::url() ), CMP_Profiles::TAB => array( __( 'Profile', 'cmp' ), CMP_Profiles::url() ), CMP_Dynamics::TAB => array( $dyn_label, CMP_Dynamics::url() ), CMP_Homework::TAB => array( __( 'Homework', 'cmp' ), CMP_Homework::url() ), CMP_Chastity::TAB => array( __( 'Chastity', 'cmp' ), CMP_Chastity::url() ) ) + array_slice( $tabs, 1, null, true );
+			$tabs      = array_slice( $tabs, 0, 1, true ) + array( CMP_Feed::TAB => array( __( 'Feed', 'cmp' ), CMP_Feed::url() ), CMP_Directory::TAB => array( __( 'Members', 'cmp' ), CMP_Directory::url() ), CMP_Messages::TAB => array( CMP_Messages::tab_label( get_current_user_id() ), CMP_Messages::url() ), CMP_Calendar::TAB => array( __( 'Calendar', 'cmp' ), CMP_Calendar::url() ), CMP_Profiles::TAB => array( __( 'Profile', 'cmp' ), CMP_Profiles::url() ), CMP_Dynamics::TAB => array( $dyn_label, CMP_Dynamics::url() ), CMP_Homework::TAB => array( __( 'Homework', 'cmp' ), CMP_Homework::url() ), CMP_Chastity::TAB => array( __( 'Chastity', 'cmp' ), CMP_Chastity::url() ) ) + array_slice( $tabs, 1, null, true );
 		}
 		$html = '<nav class="cmp-tabs" aria-label="' . esc_attr__( 'Member area', 'cmp' ) . '"><ul>';
 		foreach ( $tabs as $key => $tab ) {

@@ -1,0 +1,35 @@
+/* "Add to my calendar" on event pages (Community Member Planning 0.17.0).
+   Sits inside the events plugin's info box; every control is scoped and
+   hardened against theme styles, with touch-sized targets. */
+.cmp-cal-box { margin: 16px 0 4px; padding-top: 16px; border-top: 1px solid var(--cec-border-soft, rgba(255, 255, 255, 0.08)); }
+.cmp-cal-box .cmp-cal-title { margin: 0 0 10px !important; }
+.cmp-cal-box .cmp-cal-form { margin: 0 !important; }
+.cmp-cal-box .cmp-cal-choice { border: 0 !important; margin: 0 0 12px !important; padding: 0 !important; min-width: 0; }
+.cmp-cal-box .cmp-cal-choice legend { padding: 0 !important; margin: 0 0 6px !important; font-size: 13px; font-weight: 600; color: var(--cec-text, #f5f4f7); }
+.cmp-cal-box .cmp-cal-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.cmp-cal-box .cmp-cal-pill { position: relative; display: inline-flex; }
+.cmp-cal-box .cmp-cal-pill input { position: absolute !important; opacity: 0 !important; width: 1px !important; height: 1px !important; margin: 0 !important; padding: 0 !important; pointer-events: none; }
+.cmp-cal-box .cmp-cal-pill label { display: inline-flex !important; align-items: center; min-height: 44px; padding: 0 14px !important; margin: 0 !important; border: 1px solid rgba(255, 255, 255, 0.25) !important; border-radius: 999px !important; background: #0f0d16 !important; color: var(--cec-text, #f5f4f7) !important; font-size: 14px !important; font-weight: 500 !important; line-height: 1.2; cursor: pointer; user-select: none; }
+.cmp-cal-box .cmp-cal-pill input:checked + label { border-color: var(--cec-primary, #e1f577) !important; background: rgba(225, 245, 119, 0.14) !important; color: var(--cec-primary, #e1f577) !important; }
+.cmp-cal-box .cmp-cal-pill input:checked + label::before { content: "✓"; margin-right: 6px; }
+.cmp-cal-box .cmp-cal-pill input:focus-visible + label { outline: 2px solid var(--cec-primary, #e1f577); outline-offset: 2px; }
+.cmp-cal-box .cmp-cal-note { font-size: 12.5px; margin: 0 0 12px !important; color: var(--cec-muted, #a9a6bb) !important; }
+.cmp-cal-box .cmp-cal-btn,
+.cmp-cal-box button.cmp-cal-btn,
+.cmp-cal-box a.cmp-cal-btn { display: inline-flex !important; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px !important; margin: 0 !important; border: 1px solid var(--cec-primary, #e1f577) !important; border-radius: 999px !important; background: var(--cec-primary, #e1f577) !important; color: #1b1826 !important; font: inherit !important; font-size: 13px !important; font-weight: 700 !important; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none !important; cursor: pointer; box-shadow: none !important; }
+.cmp-cal-box .cmp-cal-btn-outline,
+.cmp-cal-box button.cmp-cal-btn-outline { background: transparent !important; color: var(--cec-primary, #e1f577) !important; }
+.cmp-cal-box .cmp-cal-btn-danger,
+.cmp-cal-box button.cmp-cal-btn-danger { border-color: #ff8a8a !important; color: #ff8a8a !important; }
+.cmp-cal-box .cmp-cal-on { display: flex; flex-direction: column; margin: 0 0 10px !important; color: var(--cec-primary, #e1f577) !important; font-weight: 700; }
+.cmp-cal-box .cmp-cal-on small { color: var(--cec-muted, #a9a6bb); font-weight: 400; font-size: 13px; }
+.cmp-cal-box .cmp-cal-change { display: inline-block; margin: 0 8px 8px 0; }
+.cmp-cal-box .cmp-cal-change[open] { display: block; }
+.cmp-cal-box .cmp-cal-change > summary { list-style: none; }
+.cmp-cal-box .cmp-cal-change > summary::-webkit-details-marker { display: none; }
+.cmp-cal-box .cmp-cal-change[open] > summary { margin-bottom: 12px !important; }
+.cmp-cal-box .cmp-cal-remove { display: inline-block; }
+.cmp-cal-box .cmp-cal-link { display: flex; align-items: center; min-height: 44px; margin-top: 4px; color: var(--cec-primary, #e1f577) !important; text-decoration: underline !important; }
+.cmp-cal-box .cmp-cal-msg { margin: 0 0 10px !important; padding: 8px 12px; border-radius: 8px; font-size: 13px; }
+.cmp-cal-box .cmp-cal-msg.is-success { background: rgba(123, 228, 149, 0.12); color: #7be495 !important; }
+.cmp-cal-box .cmp-cal-msg.is-error { background: rgba(255, 138, 138, 0.12); color: #ff8a8a !important; }

@@ -6,6 +6,22 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.30.0
+
+**Room for "Add to my calendar" on event pages** (owner, 2026-10-05: no way to "Add to my calendar" while signed in). Small additions for Community Member Planning 0.17.0; nothing changes for visitors without it.
+
+- **New hook `cec_single_event_calendar_actions`** on the single event page, under "Add to Google Calendar / Download .ics". It receives the event data. The member plugin puts its "Add to my calendar" box there.
+- **New `CEC_RSVP` functions for a signed-in member's RSVP:**
+  - `accepts_member_rsvp()`: the event takes RSVPs here, is published and is scheduled;
+  - `has_member_rsvp()`;
+  - `add_member_rsvp()`: same capacity lock and limit as the form, no guests, name and email from the account; returns `ok` / `exists` / `full` / `closed`;
+  - `remove_member_rsvp()`.
+  - When a member marks Going, the RSVP count stays right. Interested or Remove takes the RSVP away.
+- **Already on the list:** a signed-in member who has RSVP'd sees "You're on the list for this event." instead of the RSVP form again, so they can't be counted twice.
+- **Verification:** `calendar-e2e.sh` 39/39 (with Community Member Planning 0.17.0); `e2e.sh` passes.
+
+---
+
 ## 1.29.0
 
 **Automatic data clean-up** (owner, 2026-10-05: "Yes" to building it, so the site does what the privacy statement says). New `CEC_Retention` runs once a day (WP-Cron `cec_daily_retention`, scheduled on activation and on upgrade, cleared on deactivation):

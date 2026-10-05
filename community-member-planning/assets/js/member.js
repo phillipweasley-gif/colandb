@@ -602,6 +602,25 @@
 	sync();
 }() );
 
+/* My calendar (0.17.0): changing who can see an event saves straight away;
+   the Save button stays for when JavaScript is off. */
+( function () {
+	'use strict';
+	Array.prototype.forEach.call( document.querySelectorAll( '[data-cmp-autosave]' ), function ( select ) {
+		var btn = select.form && select.form.querySelector( '[data-cmp-autosave-btn]' );
+		if ( btn ) {
+			btn.hidden = true;
+		}
+		select.addEventListener( 'change', function () {
+			if ( select.form.requestSubmit ) {
+				select.form.requestSubmit();
+			} else {
+				select.form.submit();
+			}
+		} );
+	} );
+}() );
+
 /* Profile tab (0.4.0): a field's "Show to members" switch only appears once
    the field has something in it, already switched on. Without JavaScript the
    hidden switch still posts "on", so the server reaches the same result. */

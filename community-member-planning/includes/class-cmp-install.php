@@ -40,7 +40,7 @@ class CMP_Install {
 	}
 
 	public static function table_names() {
-		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ), self::table( 'follows' ), self::table( 'nods' ), self::table( 'dynamic_addons' ) );
+		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ), self::table( 'follows' ), self::table( 'nods' ), self::table( 'dynamic_addons' ), self::table( 'calendar' ) );
 	}
 
 	private static function create_tables() {
@@ -53,6 +53,7 @@ class CMP_Install {
 		CMP_Profile_Fields::seed_defaults();
 		CMP_Profile_Fields::upgrade_kinks();
 		CMP_Dynamics::migrate_addons(); // 0.16.0, once.
+		CMP_Calendar::migrate(); // 0.17.0, once.
 		update_option( self::DB_VERSION_OPTION, CMP_DB_VERSION, false );
 	}
 
@@ -174,6 +175,19 @@ class CMP_Install {
 			PRIMARY KEY  (id),
 			KEY idx_pair (user_a,user_b,status),
 			KEY idx_group (group_id)
+		) $charset;";
+
+		// My calendar (0.17.0): one row per member per event they added.
+		// response going|interested; audience members|partners|private.
+		$calendar = 'CREATE TABLE ' . self::table( 'calendar' ) . " (
+			user_id bigint(20) unsigned NOT NULL,
+			event_id bigint(20) unsigned NOT NULL,
+			response varchar(12) NOT NULL DEFAULT 'going',
+			audience varchar(12) NOT NULL DEFAULT 'private',
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (user_id,event_id),
+			KEY idx_event (event_id,response)
 		) $charset;";
 
 		// Homework programs (0.7.0): a program per lead + member, its tasks,
@@ -381,6 +395,6 @@ class CMP_Install {
 			KEY idx_to (to_id,created_at)
 		) $charset;";
 
-		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports, $follows, $nods, $addons );
+		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports, $follows, $nods, $addons, $calendar );
 	}
 }
