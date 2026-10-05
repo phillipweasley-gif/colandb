@@ -107,6 +107,15 @@ class CEC_RSVP {
 			$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
 		}
 
+		/**
+		 * Someone RSVP'd (1.28.0). Community Member Planning uses it to tell
+		 * a member's followers, if that member chose to share their events.
+		 *
+		 * @param int $event_id
+		 * @param int $user_id  0 for a guest.
+		 */
+		do_action( 'cec_rsvp_created', $event_id, get_current_user_id() );
+
 		wp_send_json_success( array( 'message' => __( "You're on the list! See you there.", 'cec' ) ) );
 	}
 

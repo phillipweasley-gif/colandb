@@ -644,6 +644,8 @@ class CMP_Profiles {
 
 		<?php echo CMP_Profile_Images::render_panels( $user_id, $rows ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 
+		<?php echo CMP_Follows::settings_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
+
 		<section class="cmp-panel" id="cmp-about">
 			<h3 class="cmp-panel-title" id="cmp-about-title"><?php esc_html_e( 'About you', 'cmp' ); ?></h3>
 			<?php if ( $errors ) : ?>
@@ -892,6 +894,8 @@ class CMP_Profiles {
 			<h2 id="cmp-member-title" class="cmp-title"><?php esc_html_e( 'Member profile', 'cmp' ); ?></h2>
 			<div class="cmp-notice cmp-notice-info cmp-self-view"><p><?php esc_html_e( 'This is your profile as other members see it. Items you switched off aren\'t here.', 'cmp' ); ?> <a href="<?php echo esc_url( self::url() ); ?>"><?php esc_html_e( 'Edit my profile', 'cmp' ); ?></a></p></div>
 			<?php echo self::card_html( $user_id, $user_id, true ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+			<?php echo CMP_Follows::counts_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
+			<?php echo CMP_Follows::going_html( $user_id, $user_id, true ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 			<?php echo CMP_Feed::profile_html( $user_id, $user_id, true ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 		</section>
 		<?php
@@ -915,7 +919,9 @@ class CMP_Profiles {
 			<h2 id="cmp-member-title" class="cmp-title"><?php esc_html_e( 'Member profile', 'cmp' ); ?></h2>
 			<?php if ( $ok ) : ?>
 				<?php echo self::card_html( $owner_id, $viewer ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<?php echo CMP_Follows::counts_html( $owner_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 				<?php echo CMP_Messages::profile_actions_html( $viewer, $owner_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
+				<?php echo CMP_Follows::going_html( $owner_id, $viewer ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 				<?php echo CMP_Dynamics::propose_html( $viewer, $owner_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 				<?php echo CMP_Feed::profile_html( $owner_id, $viewer ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 			<?php else : ?>

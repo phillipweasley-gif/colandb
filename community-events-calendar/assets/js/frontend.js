@@ -361,6 +361,9 @@
 		if ( where.length ) {
 			$( '<span class="cec-cal-pcard-where"></span>' ).text( where.join( ' · ' ) ).appendTo( $body );
 		}
+		if ( item.social ) {
+			$( '<span class="cec-cal-pcard-social"></span>' ).text( item.social ).appendTo( $body );
+		}
 		$( '<span class="cec-cal-pcard-chev" aria-hidden="true">›</span>' ).appendTo( $a );
 		return $a;
 	}

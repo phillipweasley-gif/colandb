@@ -4,6 +4,22 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.12.0
+
+**Follow / unfollow** (owner, 2026-10-05: "in case you don't want to be friends but want to engage and see where someone is attending"). Owner's choices: anyone can follow, no approval; event plans only if the member opts in; shown as a Following feed filter, a "Going to" profile card, a calendar marker and notifications. Needs Community Events Calendar 1.28.0 for the calendar marker and RSVP notifications.
+
+- **`CMP_Follows`**, new table `cmp_follows` (`CMP_DB_VERSION` 10).
+- **Follow / Following** button on member profiles, with "N followers · N following" (also on your own profile view and the Profile tab).
+- **"Events I'm going to"** (Profile tab), **off by default**: when on, your followers see a **Going to** card on your profile (your next 5 upcoming, published events you RSVP'd to while signed in, with each event's own time setting), get a notification when you RSVP, and see the calendar marker. Non-followers see "Follow <name> to see the events they're going to". Your own profile view marks the card "Only your followers see this".
+- **Feed → Everyone / Following**: just the posts of members you follow (and can see).
+- **Calendar:** "1 person you follow is going" / "N people you follow are going" via `cec_event_social_label`: a dot on desktop, a line on the phone list.
+- **Notifications** (new category "People I follow", can be turned off): a followed member's new post (only to followers who can see it) and, if they share their events, their RSVPs.
+- **Blocks** remove follows both ways and stop new ones; nothing crosses a block.
+- **Privacy:** export lists who you follow and your sharing choice; erase removes follows both ways and the setting.
+- **Verification** (local WordPress 7.1.2): new `tests/follows-e2e.sh` 27/27; `setup-e2e.sh` 39/39, `profile-e2e.sh` 84/84, `dob-e2e.sh` 34/34, `dynamics-e2e.sh` 34/34, `homework-e2e.sh` 44/44, `chastity-e2e.sh` 55/55, `feed-e2e.sh` 41/41, `account-e2e.sh` 64/64, `messages-e2e.sh` 46/46, `e2e.sh` 60/60. In a browser: profile button and Going to card (375 px), the Following filter (moved into the Feed header card after it rendered on the page background), and the calendar marker at 1280 px and 375 px.
+
+---
+
 ## 0.11.0
 
 **Member messages, with block and report** (owner, 2026-10-05: "a way for members to send messages to one another … as well as block or report"). From `docs/mockups/messages.html`, with the owner's answers: anyone can write, as requests; text only for now; reports show the whole conversation.

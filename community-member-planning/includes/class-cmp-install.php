@@ -40,7 +40,7 @@ class CMP_Install {
 	}
 
 	public static function table_names() {
-		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ) );
+		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ), self::table( 'follows' ) );
 	}
 
 	private static function create_tables() {
@@ -338,6 +338,15 @@ class CMP_Install {
 			KEY idx_reported (reported_id)
 		) $charset;";
 
-		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports );
+		// Follows (0.12.0).
+		$follows = 'CREATE TABLE ' . self::table( 'follows' ) . " (
+			follower_id bigint(20) unsigned NOT NULL,
+			followed_id bigint(20) unsigned NOT NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (follower_id,followed_id),
+			KEY idx_followed (followed_id)
+		) $charset;";
+
+		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports, $follows );
 	}
 }

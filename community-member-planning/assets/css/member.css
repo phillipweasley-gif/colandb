@@ -616,3 +616,14 @@
 .cmp-member-area .cmp-msg-blocked { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--cmp-border); }
 .cmp-member-area .cmp-msg-blocked:first-of-type { border-top: none; }
 .cmp-member-area .cmp-msg-profile { margin: 12px 0; }
+
+/* Follow (0.12.0) */
+.cmp-member-area .cmp-fl-counts { color: var(--cmp-muted); font-size: 14px; margin: 10px 0 0; }
+.cmp-member-area .cmp-fd-filter { margin: 4px 0 0; }
+.cmp-member-area .cmp-fl-events { list-style: none !important; margin: 0 !important; padding: 0 !important; }
+.cmp-member-area .cmp-fl-events li { border-top: 1px solid var(--cmp-border); margin: 0 !important; }
+.cmp-member-area .cmp-fl-events li:first-child { border-top: none; }
+.cmp-member-area .cmp-fl-events a { display: flex !important; gap: 12px; align-items: center; min-height: 56px; padding: 8px 0; color: var(--cmp-text) !important; text-decoration: none !important; background: transparent !important; }
+.cmp-member-area .cmp-fl-events small { display: block; color: var(--cmp-muted); font-size: 12.5px; }
+.cmp-member-area .cmp-fl-date { flex: 0 0 48px; text-align: center; border: 1.5px solid var(--cmp-border); border-radius: 10px; padding: 4px 0; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--cmp-secondary); }
+.cmp-member-area .cmp-fl-date b { display: block; font-size: 18px; color: var(--cmp-text); letter-spacing: 0; }

@@ -97,7 +97,7 @@ class CMP_Feed {
 	 */
 	public static function visible_posts( $viewer_id, $args = array() ) {
 		global $wpdb;
-		$args      = wp_parse_args( $args, array( 'author' => 0, 'event' => 0, 'page' => 1 ) );
+		$args      = wp_parse_args( $args, array( 'author' => 0, 'event' => 0, 'page' => 1, 'following' => false ) );
 		$connected = self::connected_ids( $viewer_id );
 		$where     = $wpdb->prepare( "( p.author_id = %d OR ( p.status = 'published' AND ( p.visibility = 'members'", $viewer_id );
 		if ( $connected ) {
@@ -107,6 +107,10 @@ class CMP_Feed {
 		$blocked = CMP_Messages::blocked_ids( $viewer_id );
 		if ( $blocked ) {
 			$where .= ' AND p.author_id NOT IN (' . implode( ',', array_map( 'intval', $blocked ) ) . ')';
+		}
+		if ( $args['following'] ) {
+			$ids    = CMP_Follows::following_ids( $viewer_id );
+			$where .= ' AND p.author_id IN (' . ( $ids ? implode( ',', array_map( 'intval', $ids ) ) : '0' ) . ')';
 		}
 		if ( $args['author'] ) {
 			$where .= $wpdb->prepare( ' AND p.author_id = %d', $args['author'] );
@@ -323,6 +327,7 @@ class CMP_Feed {
 			$wpdb->insert( self::t( 'post_photos' ), array( 'post_id' => $post_id, 'position' => $i, 'photo' => $jpeg, 'photo_sha' => hash( 'sha256', $jpeg ), 'width' => (int) $size[0], 'height' => (int) $size[1] ) );
 		}
 		CMP_Audit::log( 'post_created', 'post', $post_id, null, array( 'photos' => count( $photos ), 'event' => $event, 'visibility' => $visibility ) );
+		CMP_Follows::on_post( self::post( $post_id ) );
 		self::back( 'fd_posted' );
 	}
 
@@ -398,7 +403,7 @@ class CMP_Feed {
 
 	private static function current_url() {
 		$args = array();
-		foreach ( array( 'cmp_tab', 'cmp_member', 'cmp_event', 'cmp_post', 'cmp_page' ) as $k ) {
+		foreach ( array( 'cmp_tab', 'cmp_member', 'cmp_event', 'cmp_post', 'cmp_page', 'cmp_following' ) as $k ) {
 			if ( isset( $_GET[ $k ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 				$args[ $k ] = sanitize_text_field( wp_unslash( $_GET[ $k ] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			}
@@ -412,6 +417,7 @@ class CMP_Feed {
 		$event = isset( $_GET['cmp_event'] ) ? absint( $_GET['cmp_event'] ) : 0;
 		$one   = isset( $_GET['cmp_post'] ) ? absint( $_GET['cmp_post'] ) : 0;
 		$page  = isset( $_GET['cmp_page'] ) ? max( 1, absint( $_GET['cmp_page'] ) ) : 1;
+		$fol   = isset( $_GET['cmp_following'] ) && '1' === $_GET['cmp_following'];
 		// phpcs:enable
 		ob_start();
 		?>
@@ -421,6 +427,9 @@ class CMP_Feed {
 				<p><?php echo esc_html( sprintf( /* translators: %s: event */ __( 'Posts tagged with %s', 'cmp' ), self::event_label( $event ) ) ); ?> · <a href="<?php echo esc_url( get_permalink( $event ) ); ?>"><?php esc_html_e( 'Event page', 'cmp' ); ?></a> · <a href="<?php echo esc_url( self::url() ); ?>"><?php esc_html_e( 'Whole feed', 'cmp' ); ?></a></p>
 			<?php else : ?>
 				<p class="cmp-muted"><?php esc_html_e( 'Posts from members, visible only to signed-in members.', 'cmp' ); ?></p>
+				<?php if ( ! $one ) : ?>
+					<?php echo '<nav class="cmp-msg-boxes cmp-fd-filter" aria-label="' . esc_attr__( 'Whose posts', 'cmp' ) . '"><a href="' . esc_url( self::url() ) . '"' . ( $fol ? '' : ' aria-current="page" class="is-current"' ) . '>' . esc_html__( 'Everyone', 'cmp' ) . '</a><a href="' . esc_url( self::url( array( 'cmp_following' => 1 ) ) ) . '"' . ( $fol ? ' aria-current="page" class="is-current"' : '' ) . '>' . esc_html__( 'Following', 'cmp' ) . '</a></nav>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<?php endif; ?>
 			<?php endif; ?>
 		</section>
 		<?php
@@ -432,13 +441,13 @@ class CMP_Feed {
 			$posts = self::can_see( $post, $user_id ) || ( $post && user_can( $user_id, 'manage_options' ) ) ? array( $post ) : array();
 			$more  = false;
 		} else {
-			$posts = self::visible_posts( $user_id, array( 'event' => $event, 'page' => $page ) );
+			$posts = self::visible_posts( $user_id, array( 'event' => $event, 'page' => $page, 'following' => $fol ) );
 			$more  = count( $posts ) > self::PER_PAGE;
 			$posts = array_slice( $posts, 0, self::PER_PAGE );
 		}
-		echo self::list_html( $posts, $user_id, $one ? __( 'That post isn\'t available.', 'cmp' ) : __( 'No posts yet. Be the first to share something.', 'cmp' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
+		echo self::list_html( $posts, $user_id, $one ? __( 'That post isn\'t available.', 'cmp' ) : ( $fol ? __( 'No posts from people you follow yet. Follow members from their profile.', 'cmp' ) : __( 'No posts yet. Be the first to share something.', 'cmp' ) ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		if ( $more || $page > 1 ) {
-			echo '<nav class="cmp-fd-pages">' . ( $page > 1 ? '<a class="cmp-btn cmp-btn-small cmp-btn-outline" href="' . esc_url( self::url( array_filter( array( 'cmp_event' => $event, 'cmp_page' => $page - 1 ) ) ) ) . '">' . esc_html__( 'Newer', 'cmp' ) . '</a>' : '' ) . ( $more ? '<a class="cmp-btn cmp-btn-small cmp-btn-outline" href="' . esc_url( self::url( array_filter( array( 'cmp_event' => $event, 'cmp_page' => $page + 1 ) ) ) ) . '">' . esc_html__( 'Older', 'cmp' ) . '</a>' : '' ) . '</nav>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			echo '<nav class="cmp-fd-pages">' . ( $page > 1 ? '<a class="cmp-btn cmp-btn-small cmp-btn-outline" href="' . esc_url( self::url( array_filter( array( 'cmp_event' => $event, 'cmp_following' => $fol ? 1 : 0, 'cmp_page' => $page - 1 ) ) ) ) . '">' . esc_html__( 'Newer', 'cmp' ) . '</a>' : '' ) . ( $more ? '<a class="cmp-btn cmp-btn-small cmp-btn-outline" href="' . esc_url( self::url( array_filter( array( 'cmp_event' => $event, 'cmp_following' => $fol ? 1 : 0, 'cmp_page' => $page + 1 ) ) ) ) . '">' . esc_html__( 'Older', 'cmp' ) . '</a>' : '' ) . '</nav>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		}
 		return ob_get_clean();
 	}

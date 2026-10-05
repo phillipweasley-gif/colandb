@@ -315,6 +315,7 @@ class CMP_Messages {
 		}
 		if ( ! self::i_blocked( $user_id, $them ) ) {
 			$wpdb->insert( self::t( 'blocks' ), array( 'blocker_id' => $user_id, 'blocked_id' => $them, 'created_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+			CMP_Follows::remove_pair( $user_id, $them );
 			CMP_Audit::log( 'member_blocked', 'user', $them );
 			$d = CMP_Install::table( 'dynamics' );
 			foreach ( $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $d WHERE status IN ('pending','active') AND ( ( proposer_id = %d AND partner_id = %d ) OR ( proposer_id = %d AND partner_id = %d ) )", $user_id, $them, $them, $user_id ) ) as $dyn ) { // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -555,7 +556,7 @@ class CMP_Messages {
 	public static function profile_actions_html( $viewer_id, $owner_id ) {
 		$ok   = self::can_start( $viewer_id, $owner_id );
 		$conv = self::between( $viewer_id, $owner_id );
-		$html = '<div class="cmp-actions cmp-msg-profile">';
+		$html = '<div class="cmp-actions cmp-msg-profile">' . CMP_Follows::button_html( $viewer_id, $owner_id );
 		if ( ( $conv && self::can_use( $conv, $viewer_id ) ) || true === $ok ) {
 			$html .= '<a class="cmp-btn" href="' . esc_url( self::url( array( 'to' => (int) $owner_id ) ) ) . '">' . esc_html__( 'Message', 'cmp' ) . '</a>';
 		} elseif ( 'msg_closed' === $ok ) {
