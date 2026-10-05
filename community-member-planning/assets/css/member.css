@@ -544,3 +544,9 @@
 .cmp-member-area .cmp-fd-post.is-hidden { opacity: .6; }
 .cmp-member-area .cmp-fd-pages { display: flex; gap: 8px; justify-content: center; margin: 8px 0 16px; }
 .cmp-member-area .cmp-fd-profile { margin-top: 16px; }
+
+/* Profile fixes (0.9.1) */
+.cmp-member-area .cmp-show-fixed { color: var(--cmp-muted); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; align-self: center; }
+.cmp-member-area .cmp-photo-alt { margin: 4px 0 12px; }
+.cmp-member-area .cmp-photo-alt summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--cmp-primary); font-weight: 700; }
+.cmp-member-area .cmp-self-view a { color: var(--cmp-primary) !important; font-weight: 700; }

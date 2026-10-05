@@ -219,6 +219,9 @@
 		}
 	} );
 
+	// Every photo panel on the page, so one Save uploads all chosen photos
+	// (otherwise the reload after the first would drop the others).
+	var photoPanels = [];
 	each( '.cmp-member-area [data-cmp-photo]', function ( panel ) {
 		var form = panel.querySelector( 'form' );
 		var input = form.querySelector( 'input[type="file"]' );
@@ -228,8 +231,6 @@
 		var img = form.querySelector( '[data-cmp-crop-img]' );
 		var zoom = form.querySelector( '[data-cmp-zoom]' );
 		var progress = form.querySelector( '[data-cmp-progress]' );
-		var decorative = form.querySelector( '[data-cmp-decorative]' );
-		var altRow = form.querySelector( '[data-cmp-alt-row]' );
 		var outW = parseInt( panel.getAttribute( 'data-width' ), 10 );
 		var outH = parseInt( panel.getAttribute( 'data-height' ), 10 );
 		var minW = parseInt( panel.getAttribute( 'data-min' ), 10 );
@@ -239,11 +240,6 @@
 			error.textContent = message || '';
 			error.hidden = ! message;
 		};
-		var syncAlt = function () {
-			altRow.hidden = decorative.checked;
-		};
-		decorative.addEventListener( 'change', syncAlt );
-		syncAlt();
 
 		var clamp = function () {
 			var fw = frame.clientWidth, fh = frame.clientHeight;
@@ -388,25 +384,8 @@
 			canvas.toBlob( done, 'image/jpeg', 0.9 );
 		};
 
-		form.addEventListener( 'submit', function ( e ) {
-			var submitter = e.submitter;
-			if ( submitter && 'remove' === submitter.name ) {
-				return; // A normal post; the shared handler asks to confirm.
-			}
-			var alt = form.querySelector( 'input[name="alt"]' );
-			var hasPhoto = !! panel.querySelector( '.cmp-photo-current img' ) || ( input.files && input.files.length );
-			if ( hasPhoto && ! decorative.checked && ! alt.value.trim() ) {
-				e.preventDefault();
-				e.stopImmediatePropagation();
-				say( text( 'photoAlt', 'Describe the photo for people who can\'t see it, or tick "Decorative image".' ) );
-				alt.focus();
-				return;
-			}
-			if ( ! ( input.files && input.files.length ) || ! window.FormData || ! window.XMLHttpRequest ) {
-				return; // Nothing to upload, or an old browser: post normally.
-			}
-			e.preventDefault();
-			e.stopImmediatePropagation();
+		// Uploads this panel's chosen photo; done( ok, redirect ).
+		var upload = function ( done ) {
 			var send = function ( blob ) {
 				var data = new FormData( form );
 				if ( blob ) {
@@ -428,6 +407,8 @@
 					progress.hidden = true;
 					form.querySelector( '[data-cmp-photo-save]' ).disabled = false;
 					say( message );
+					panel.scrollIntoView( { block: 'center' } );
+					done( false );
 				};
 				xhr.onload = function () {
 					var res = null;
@@ -438,7 +419,8 @@
 					}
 					if ( res && res.ok && res.redirect ) {
 						label.textContent = text( 'photoDone', 'Saved. Reloading…' );
-						window.location.assign( res.redirect );
+						input.value = ''; // Saved: don't send it again if another photo fails.
+						done( true, res.redirect );
 					} else if ( 413 === xhr.status ) {
 						fail( text( 'photoBig', 'That photo is larger than 5 MB. Please choose a smaller one.' ) );
 					} else {
@@ -456,41 +438,54 @@
 			} else {
 				send( null ); // e.g. HEIC the browser couldn't open: the server converts it.
 			}
-		} );
-	} );
-}() );
+		};
+		var me = {
+			form: form,
+			pending: function () {
+				return !! ( input.files && input.files.length );
+			},
+			upload: upload
+		};
+		photoPanels.push( me );
 
-/* Profile tab (0.4.0): a field's "Show to members" switch only appears once
-   the field has something in it, already switched on. Without JavaScript the
-   hidden switch still posts "on", so the server reaches the same result. */
-( function () {
-	'use strict';
-	Array.prototype.forEach.call( document.querySelectorAll( '.cmp-profile-row' ), function ( row ) {
-		var sw = row.querySelector( '[data-cmp-show]' );
-		if ( ! sw || ! sw.hasAttribute( 'hidden' ) ) {
-			return; // Already filled when the page loaded: always shown.
-		}
-		var box = sw.querySelector( 'input[type="checkbox"]' );
-		var filled = function () {
-			return Array.prototype.some.call( row.querySelectorAll( '.cmp-profile-input input, .cmp-profile-input textarea, .cmp-profile-input select' ), function ( el ) {
-				if ( 'checkbox' === el.type || 'radio' === el.type ) {
-					return el.checked;
-				}
-				return '' !== String( el.value ).trim();
-			} );
-		};
-		var sync = function () {
-			var was = ! sw.hasAttribute( 'hidden' );
-			var now = filled();
-			if ( now && ! was && box ) {
-				// A newly filled field starts shown, except health details,
-				// which start hidden (data-cmp-sensitive).
-				box.checked = ! sw.hasAttribute( 'data-cmp-sensitive' );
+		form.addEventListener( 'submit', function ( e ) {
+			var submitter = e.submitter;
+			if ( submitter && 'remove' === submitter.name ) {
+				return; // A normal post; the shared handler asks to confirm.
 			}
-			sw.toggleAttribute( 'hidden', ! now );
-		};
-		row.addEventListener( 'input', sync );
-		row.addEventListener( 'change', sync );
+			var queue = photoPanels.filter( function ( p ) {
+				return p.pending();
+			} );
+			if ( ! queue.length || ! window.FormData || ! window.XMLHttpRequest ) {
+				return; // Nothing to upload, or an old browser: post normally.
+			}
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			// This panel first, then any other photo that's waiting.
+			var mine = me.pending();
+			queue.sort( function ( a, b ) {
+				return ( a === me ? -1 : 0 ) - ( b === me ? -1 : 0 );
+			} );
+			var last = '';
+			var next = function () {
+				var p = queue.shift();
+				if ( p ) {
+					p.upload( function ( ok, redirect ) {
+						if ( ok ) {
+							last = redirect;
+							next();
+						}
+						// On a failure, stay: that panel shows why; photos already saved stay saved.
+					} );
+				} else if ( mine ) {
+					window.location.assign( last );
+				} else {
+					// This panel had no new photo: still post its own changes (e.g. the Show switch).
+					HTMLFormElement.prototype.submit.call( form );
+				}
+			};
+			next();
+		} );
 	} );
 }() );
 

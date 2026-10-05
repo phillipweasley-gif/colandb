@@ -208,8 +208,10 @@ class CMP_Profile_Images {
 			self::respond( true, 'photo_removed', '', $kind );
 		}
 
-		$decorative = ! empty( $_POST['decorative'] );
-		$alt        = $decorative ? '' : trim( sanitize_text_field( wp_unslash( isset( $_POST['alt'] ) ? $_POST['alt'] : '' ) ) );
+		// A description is optional (owner, 0.9.1); without one the photo
+		// is described by its kind and owner's name (img_html()).
+		$alt        = trim( sanitize_text_field( wp_unslash( isset( $_POST['alt'] ) ? $_POST['alt'] : '' ) ) );
+		$decorative = '' === $alt;
 		// Show switch (0.4.0): on = Members. Off = Only me, except that a
 		// Connections choice made before 0.4.0 stays Connections. Older
 		// forms that still post "visibility" are read as before.
@@ -225,9 +227,6 @@ class CMP_Profile_Images {
 
 		if ( mb_strlen( $alt ) > 150 ) {
 			self::respond( false, 'photo_error', __( 'The description can be at most 150 characters.', 'cmp' ), $kind );
-		}
-		if ( ( $uploaded || $current ) && ! $decorative && '' === $alt ) {
-			self::respond( false, 'photo_error', __( 'Describe the photo for people who can\'t see it, or tick "Decorative image".', 'cmp' ), $kind );
 		}
 		if ( ! $uploaded && ! $current ) {
 			// Nothing to describe yet; just remember the visibility choice.
@@ -278,7 +277,13 @@ class CMP_Profile_Images {
 
 	public static function img_html( $user_id, $kind, $img ) {
 		list( $w, $h ) = self::SIZES[ $kind ];
-		return '<img src="' . esc_url( self::url( $user_id, $kind, $img ) ) . '" width="' . (int) $w . '" height="' . (int) $h . '" alt="' . esc_attr( $img->decorative ? '' : $img->alt ) . '" loading="lazy" decoding="async" />';
+		$alt = $img->decorative ? '' : (string) $img->alt;
+		if ( '' === $alt && 'avatar' === $kind ) {
+			$user = get_userdata( $user_id );
+			/* translators: %s: member's display name */
+			$alt = $user ? sprintf( __( 'Profile photo of %s', 'cmp' ), $user->display_name ) : __( 'Profile photo', 'cmp' );
+		}
+		return '<img src="' . esc_url( self::url( $user_id, $kind, $img ) ) . '" width="' . (int) $w . '" height="' . (int) $h . '" alt="' . esc_attr( $alt ) . '" loading="lazy" decoding="async" />';
 	}
 
 	/**
@@ -407,15 +412,14 @@ class CMP_Profile_Images {
 					<p class="cmp-field cmp-zoom"><label for="<?php echo esc_attr( $id ); ?>-zoom"><?php esc_html_e( 'Zoom', 'cmp' ); ?></label><input type="range" id="<?php echo esc_attr( $id ); ?>-zoom" min="1" max="4" step="0.01" value="1" data-cmp-zoom /></p>
 				</div>
 				<div class="cmp-progress" data-cmp-progress hidden><progress max="100" value="0"></progress> <span data-cmp-progress-text aria-live="polite"></span></div>
-				<p class="cmp-check cmp-check-small">
-					<input type="checkbox" id="<?php echo esc_attr( $id ); ?>-decorative" name="decorative" value="1" data-cmp-decorative <?php checked( $img && $img->decorative ); ?> />
-					<label for="<?php echo esc_attr( $id ); ?>-decorative"><?php esc_html_e( 'Decorative image (nothing to describe)', 'cmp' ); ?></label>
-				</p>
-				<p class="cmp-field" data-cmp-alt-row>
-					<label for="<?php echo esc_attr( $id ); ?>-alt"><?php esc_html_e( 'Describe the photo', 'cmp' ); ?></label>
-					<input type="text" id="<?php echo esc_attr( $id ); ?>-alt" name="alt" maxlength="150" value="<?php echo esc_attr( $img ? $img->alt : '' ); ?>" aria-describedby="<?php echo esc_attr( $id ); ?>-alt-help" />
-					<span class="cmp-muted" id="<?php echo esc_attr( $id ); ?>-alt-help"><?php esc_html_e( 'Read out by screen readers. Up to 150 characters, for example "Me at the spring market".', 'cmp' ); ?></span>
-				</p>
+				<details class="cmp-photo-alt"<?php echo $img && ! $img->decorative && '' !== $img->alt ? ' open' : ''; ?>>
+					<summary><?php esc_html_e( 'Add a description (optional)', 'cmp' ); ?></summary>
+					<p class="cmp-field">
+						<label for="<?php echo esc_attr( $id ); ?>-alt"><?php esc_html_e( 'Describe the photo', 'cmp' ); ?></label>
+						<input type="text" id="<?php echo esc_attr( $id ); ?>-alt" name="alt" maxlength="150" value="<?php echo esc_attr( $img && ! $img->decorative ? $img->alt : '' ); ?>" aria-describedby="<?php echo esc_attr( $id ); ?>-alt-help" />
+						<span class="cmp-muted" id="<?php echo esc_attr( $id ); ?>-alt-help"><?php esc_html_e( 'Read out by screen readers, up to 150 characters. Leave it empty and your profile photo is read as "Profile photo of" your name.', 'cmp' ); ?></span>
+					</p>
+				</details>
 				<p class="cmp-field cmp-show-photo">
 					<input type="hidden" name="show_present" value="1" />
 					<?php // A new photo starts shown, like any filled-in field. ?>
