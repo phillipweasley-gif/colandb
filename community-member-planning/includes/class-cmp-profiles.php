@@ -763,7 +763,7 @@ class CMP_Profiles {
 		}
 		$html .= '</div></header>';
 
-		$side = '';
+		$side = CMP_Dynamics::profile_card_html( $owner_id );
 		if ( $stats ) {
 			$side .= '<section class="cmp-prof-card cmp-prof-stats"><h4>' . esc_html__( 'Stats', 'cmp' ) . '</h4><dl class="cmp-prof-table">';
 			foreach ( $stats as $label => $text ) {
@@ -824,6 +824,7 @@ class CMP_Profiles {
 			<h2 id="cmp-member-title" class="cmp-title"><?php esc_html_e( 'Member profile', 'cmp' ); ?></h2>
 			<?php if ( $ok ) : ?>
 				<?php echo self::card_html( $owner_id, $viewer ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<?php echo CMP_Dynamics::propose_html( $viewer, $owner_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 			<?php else : ?>
 				<p class="cmp-empty"><?php esc_html_e( 'This profile isn\'t available.', 'cmp' ); ?></p>
 			<?php endif; ?>
