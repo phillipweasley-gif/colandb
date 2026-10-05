@@ -196,14 +196,15 @@
 .cmp-member-area .cmp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
 .cmp-member-area .cmp-field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 16px; }
 .cmp-member-area .cmp-field label { font-weight: 600; }
-.cmp-member-area .cmp-field input {
+/* Text-like inputs only: radios and checkboxes inside a field keep their own size (0.15.2). */
+.cmp-member-area .cmp-field input:not([type="radio"]):not([type="checkbox"]) {
 	width: 100% !important; min-height: 44px; padding: 10px 14px !important;
 	background: #0f0d16 !important; color: var(--cmp-text) !important;
 	border: 1px solid rgba(255, 255, 255, 0.35) !important; border-radius: 8px !important;
 	font-family: inherit !important; font-size: 16px !important; /* 16px stops iOS zooming in */
 	box-shadow: none !important;
 }
-.cmp-member-area .cmp-field input:focus-visible { border-color: var(--cmp-primary) !important; }
+.cmp-member-area .cmp-field input:not([type="radio"]):not([type="checkbox"]):focus-visible { border-color: var(--cmp-primary) !important; }
 .cmp-member-area .cmp-check-small { align-items: center; margin: 0 0 16px; }
 .cmp-member-area .cmp-check-small input { width: 20px; height: 20px; margin: 0; }
 .cmp-member-area .cmp-check-small label { font-weight: 400; }
@@ -285,6 +286,7 @@
 .cmp-member-area .cmp-profile-input input[type="text"],
 .cmp-member-area .cmp-profile-input input[type="number"],
 .cmp-member-area .cmp-profile-input textarea,
+.cmp-member-area .cmp-field textarea,
 .cmp-member-area select,
 .cmp-member-area .cmp-photo input[type="text"] {
 	width: 100%; min-height: 44px; padding: 10px 14px !important;
@@ -446,6 +448,14 @@
 .cmp-member-area .cmp-dyn-propose > summary::-webkit-details-marker { display: none; }
 .cmp-member-area .cmp-dyn-propose[open] > summary { margin-bottom: 14px; }
 .cmp-member-area .cmp-dyn-side[hidden] { display: none !important; }
+/* "Your side": two tappable rows, the whole row selects (0.15.2). */
+.cmp-member-area .cmp-dyn-side { border: 0 !important; margin: 0 0 12px; padding: 0 !important; min-width: 0; }
+.cmp-member-area .cmp-dyn-side > legend { font-weight: 600; padding: 0 !important; margin: 0 0 6px; color: var(--cmp-text); }
+.cmp-member-area .cmp-dyn-side .cmp-check { position: relative; align-items: center; gap: 12px; margin: 0 0 8px; padding: 0 14px; min-height: 48px; border: 1px solid var(--cmp-border); border-radius: 10px; background: #0f0d16; }
+.cmp-member-area .cmp-dyn-side .cmp-check:has(input:checked) { border-color: var(--cmp-primary); }
+.cmp-member-area .cmp-dyn-side .cmp-check input[type="radio"] { width: 20px !important; height: 20px !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; flex: 0 0 auto; accent-color: var(--cmp-primary); }
+.cmp-member-area .cmp-dyn-side .cmp-check label { flex: 1 1 auto; padding: 13px 0; font-weight: 600; cursor: pointer; }
+.cmp-member-area .cmp-dyn-side .cmp-check label::after { content: ""; position: absolute; inset: 0; }
 .cmp-member-area .cmp-prof-dyn ul { list-style: none; margin: 0; padding: 0; }
 .cmp-member-area .cmp-prof-dyn li { padding: 6px 0; border-bottom: 1px solid var(--cmp-border); }
 .cmp-member-area .cmp-prof-dyn li:last-child { border-bottom: 0; }

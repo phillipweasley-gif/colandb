@@ -18,6 +18,9 @@ class CMP_Member_Area {
 		add_shortcode( 'cmp_member_area', array( __CLASS__, 'render' ) );
 		add_action( 'init', array( __CLASS__, 'register_assets' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue_on_member_page' ) );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'leave_out_ai_tools' ), 9999 );
+		add_action( 'wp_print_scripts', array( __CLASS__, 'leave_out_ai_tools' ), 1 );
+		add_action( 'wp_print_footer_scripts', array( __CLASS__, 'leave_out_ai_tools' ), 1 );
 		// Elementor's editor preview renders the shortcode without running the
 		// page's normal head, so the stylesheet is loaded there explicitly.
 		add_action( 'elementor/preview/enqueue_styles', array( __CLASS__, 'enqueue_style' ) );
@@ -49,6 +52,33 @@ class CMP_Member_Area {
 	public static function enqueue_on_member_page() {
 		if ( self::is_member_page() ) {
 			self::enqueue_style();
+		}
+	}
+
+	/**
+	 * Elementor's AI assistant ("Angie") loads for administrators on every
+	 * front-end page, inside a frame from Elementor's own site. That frame
+	 * makes the browser ask "Leave site?" on every link and form, which our
+	 * page can't switch off (it's another site's frame), so sending a
+	 * message looked like it failed (owner, 2026-10-05). It also has no
+	 * business on private member pages: the privacy statement promises
+	 * member content isn't shown to AI tools. So on the member page its
+	 * scripts and styles are left out; it still works everywhere else,
+	 * including the Elementor editor. (0.15.2)
+	 *
+	 * Filter cmp_leave_out_handle( $leave_out, $handle ) to change the list.
+	 */
+	public static function leave_out_ai_tools() {
+		if ( is_admin() || ! self::is_member_page() ) {
+			return;
+		}
+		foreach ( array( wp_scripts(), wp_styles() ) as $deps ) {
+			foreach ( array_merge( $deps->queue, array_keys( $deps->registered ) ) as $handle ) {
+				$match = 0 === strpos( $handle, 'angie' ) || false !== strpos( $handle, 'to-angie' );
+				if ( apply_filters( 'cmp_leave_out_handle', $match, $handle ) ) {
+					$deps->dequeue( $handle );
+				}
+			}
 		}
 	}
 
