@@ -40,7 +40,7 @@ class CMP_Install {
 	}
 
 	public static function table_names() {
-		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ) );
+		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ) );
 	}
 
 	private static function create_tables() {
@@ -202,6 +202,87 @@ class CMP_Install {
 			KEY idx_member (member_id)
 		) $charset;";
 
-		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries );
+		// Chastity locks (0.8.0): one row per lock, and its history
+		// (verification photos kept here, private to wearer and keyholder).
+		$locks  = 'CREATE TABLE ' . self::table( 'locks' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			wearer_id bigint(20) unsigned NOT NULL,
+			keyholder_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			option_key varchar(12) NOT NULL DEFAULT 'custom',
+			option_name varchar(60) NOT NULL DEFAULT '',
+			rule varchar(300) NOT NULL DEFAULT '',
+			release_policy varchar(12) NOT NULL DEFAULT 'none',
+			started_at datetime NOT NULL,
+			planned_end datetime NULL,
+			hide_timer tinyint(1) NOT NULL DEFAULT 0,
+			verify_daily tinyint(1) NOT NULL DEFAULT 0,
+			hygiene_minutes smallint(5) unsigned NOT NULL DEFAULT 0,
+			opened_at datetime NULL,
+			release_allowed tinyint(1) NOT NULL DEFAULT 0,
+			show_profile tinyint(1) NOT NULL DEFAULT 0,
+			status varchar(10) NOT NULL DEFAULT 'locked',
+			ended_at datetime NULL,
+			ended_by bigint(20) unsigned NULL,
+			end_reason varchar(20) NOT NULL DEFAULT '',
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY idx_wearer (wearer_id,status),
+			KEY idx_keyholder (keyholder_id,status)
+		) $charset;";
+		$events = 'CREATE TABLE ' . self::table( 'lock_events' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			lock_id bigint(20) unsigned NOT NULL,
+			actor_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			type varchar(20) NOT NULL,
+			minutes int(11) NOT NULL DEFAULT 0,
+			note varchar(500) NOT NULL DEFAULT '',
+			photo mediumblob NULL,
+			photo_sha char(64) NOT NULL DEFAULT '',
+			code varchar(8) NOT NULL DEFAULT '',
+			review varchar(12) NOT NULL DEFAULT '',
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY idx_lock (lock_id,id),
+			KEY idx_lock_type (lock_id,type,created_at)
+		) $charset;";
+
+		// Member feed (0.9.0): posts, their photos (kept here, members only)
+		// and likes.
+		$posts  = 'CREATE TABLE ' . self::table( 'posts' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			author_id bigint(20) unsigned NOT NULL,
+			body text NOT NULL,
+			event_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			visibility varchar(12) NOT NULL DEFAULT 'members',
+			status varchar(10) NOT NULL DEFAULT 'published',
+			reports smallint(5) unsigned NOT NULL DEFAULT 0,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY idx_author (author_id,id),
+			KEY idx_event (event_id,id),
+			KEY idx_status (status,id)
+		) $charset;";
+		$photos = 'CREATE TABLE ' . self::table( 'post_photos' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			post_id bigint(20) unsigned NOT NULL,
+			position tinyint(3) unsigned NOT NULL DEFAULT 0,
+			photo mediumblob NOT NULL,
+			photo_sha char(64) NOT NULL DEFAULT '',
+			width smallint(5) unsigned NOT NULL DEFAULT 0,
+			height smallint(5) unsigned NOT NULL DEFAULT 0,
+			PRIMARY KEY  (id),
+			KEY idx_post (post_id,position)
+		) $charset;";
+		$likes  = 'CREATE TABLE ' . self::table( 'post_likes' ) . " (
+			post_id bigint(20) unsigned NOT NULL,
+			user_id bigint(20) unsigned NOT NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (post_id,user_id),
+			KEY idx_user (user_id)
+		) $charset;";
+
+		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes );
 	}
 }

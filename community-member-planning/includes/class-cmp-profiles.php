@@ -754,6 +754,7 @@ class CMP_Profiles {
 		if ( $stat ) {
 			$html .= '<p class="cmp-prof-stat">' . esc_html( implode( ' · ', $stat ) ) . '</p>';
 		}
+		$html .= CMP_Chastity::profile_badge_html( $owner_id );
 		if ( $details ) {
 			$html .= '<dl class="cmp-prof-table">';
 			foreach ( $details as $label => $text ) {
@@ -825,6 +826,7 @@ class CMP_Profiles {
 			<?php if ( $ok ) : ?>
 				<?php echo self::card_html( $owner_id, $viewer ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				<?php echo CMP_Dynamics::propose_html( $viewer, $owner_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
+				<?php echo CMP_Feed::profile_html( $owner_id, $viewer ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 			<?php else : ?>
 				<p class="cmp-empty"><?php esc_html_e( 'This profile isn\'t available.', 'cmp' ); ?></p>
 			<?php endif; ?>
