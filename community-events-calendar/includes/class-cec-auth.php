@@ -13,9 +13,50 @@ class CEC_Auth {
 	const LOGIN_NONCE    = 'cec_login_action';
 	const REGISTER_NONCE = 'cec_register_action';
 
+	/**
+	 * Signed in (1.31.0): instead of "You're already logged in", quick links
+	 * for this account. Other plugins add theirs through cec_account_links
+	 * (Community Member Planning puts My calendar and Member area first).
+	 */
+	public static function account_links_html() {
+		global $wpdb;
+		$user  = wp_get_current_user();
+		$links = array();
+		if ( CEC_Roles::can_manage() && CEC_Admin_Settings::get( 'dashboard_page_url' ) ) {
+			$links['dashboard'] = array( __( 'Calendar dashboard', 'cec' ), CEC_Admin_Settings::get( 'dashboard_page_url' ) );
+		}
+		$mine = (int) $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'page' AND post_status = 'publish' AND post_content LIKE %s ORDER BY ID LIMIT 1", '%' . $wpdb->esc_like( '[cec_my_events' ) . '%' ) );
+		if ( $mine ) {
+			$links['my_events'] = array( __( 'My submitted events', 'cec' ), get_permalink( $mine ) );
+		}
+		if ( CEC_Admin_Settings::get( 'submit_page_url' ) ) {
+			$links['submit'] = array( __( 'Submit an event', 'cec' ), CEC_Admin_Settings::get( 'submit_page_url' ) );
+		}
+		/**
+		 * Quick links for a signed-in account (1.31.0): key => array( label, url ).
+		 * The first one is shown as the main button.
+		 *
+		 * @param array   $links
+		 * @param WP_User $user
+		 */
+		$links = (array) apply_filters( 'cec_account_links', $links, $user );
+		$here  = ( is_ssl() ? 'https://' : 'http://' ) . ( isset( $_SERVER['HTTP_HOST'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) : '' ) . ( isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '/' );
+		$html  = '<div class="cec-auth-form cec-account-links"><p class="cec-account-hello">' . sprintf( /* translators: %s: display name */ esc_html__( 'Signed in as %s', 'cec' ), '<b>' . esc_html( $user->display_name ) . '</b>' ) . '</p><nav class="cec-account-nav" aria-label="' . esc_attr__( 'Your account', 'cec' ) . '">';
+		$first = true;
+		foreach ( $links as $link ) {
+			if ( empty( $link[0] ) || empty( $link[1] ) ) {
+				continue;
+			}
+			$html .= '<a class="cec-btn cec-btn-small' . ( $first ? '' : ' cec-btn-outline' ) . '" href="' . esc_url( $link[1] ) . '">' . esc_html( $link[0] ) . '</a>';
+			$first = false;
+		}
+		return $html . '<a class="cec-account-signout" href="' . esc_url( wp_logout_url( wp_validate_redirect( $here, home_url( '/' ) ) ) ) . '">' . esc_html__( 'Sign out', 'cec' ) . '</a></nav></div>';
+	}
+
 	public static function render_login_shortcode( $atts ) {
+		$atts = shortcode_atts( array( 'note' => '' ), $atts, 'cec_login' );
 		if ( is_user_logged_in() ) {
-			return '<div class="cec-auth-form"><div class="cec-notice">' . esc_html__( "You're already logged in.", 'cec' ) . '</div></div>';
+			return self::account_links_html();
 		}
 
 		// No destination asked for: decided after sign-in, per account (default_redirect()).
@@ -25,6 +66,9 @@ class CEC_Auth {
 		ob_start();
 		?>
 		<div class="cec-auth-form">
+			<?php if ( '' !== $atts['note'] ) : ?>
+				<p class="cec-auth-note"><?php echo esc_html( $atts['note'] ); ?></p>
+			<?php endif; ?>
 			<?php if ( $error ) : ?>
 				<div class="cec-notice cec-notice-error"><?php esc_html_e( 'Incorrect username/email or password.', 'cec' ); ?></div>
 			<?php endif; ?>
@@ -93,7 +137,7 @@ class CEC_Auth {
 
 	public static function render_register_shortcode( $atts ) {
 		if ( is_user_logged_in() ) {
-			return '<div class="cec-auth-form"><div class="cec-notice">' . esc_html__( "You're already logged in.", 'cec' ) . '</div></div>';
+			return self::account_links_html();
 		}
 		if ( ! get_option( 'users_can_register' ) ) {
 			return '<div class="cec-auth-form"><div class="cec-notice">' . esc_html__( 'New account registration is currently closed. Please contact the site admin.', 'cec' ) . '</div></div>';

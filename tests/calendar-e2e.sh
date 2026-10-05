@@ -135,6 +135,19 @@ OLDFRONT=$(ev "echo (int) get_option('page_on_front');"); ev "update_option('pag
 ok "Browse events goes to the calendar page, not the home page with upcoming events (0.17.1)" $([ "$(ev "echo CMP_Calendar::events_url();")" = "$(ev "echo get_permalink($CALP);")" ] && echo 1 || echo 0)
 ev "update_option('page_on_front',$OLDFRONT);" >/dev/null; $W post delete $HOME_ID $CALP --force >/dev/null 2>&1
 
+echo "== Signed-in quick links (Events Calendar 1.31.0, Member Planning 0.17.2)"
+LP=$($W post create --post_type=page --post_status=publish --post_title="ZZ Log In" --post_content='[cec_login note="Log in or register to keep track of your events and RSVPs."]' --porcelain 2>/dev/null)
+RP=$($W post create --post_type=page --post_status=publish --post_title="ZZ Register" --post_content='[cec_register]' --porcelain 2>/dev/null)
+get anon q0 "$H/?page_id=$LP"
+ok "signed out: the note and the login form" $([ "$(has $T/q0.html 'Log in or register to keep track of your events and RSVPs.')$(has $T/q0.html 'name="cec_identifier"')$(hasnt $T/q0.html 'Signed in as')" = 111 ] && echo 1 || echo 0)
+get calann q1 "$H/?page_id=$LP"
+ok "member signed in: no 'already logged in', but Signed in as + My calendar first, Member area, Sign out" $([ "$(hasnt $T/q1.html 'already logged in')$(has $T/q1.html 'Signed in as <b>Cal Ann</b>')$(grep -o 'cec-account-nav.*</nav>' $T/q1.html | grep -q 'class="cec-btn cec-btn-small" href="[^"]*cmp_tab=calendar[^"]*">My calendar</a>' && echo 1 || echo 0)$(has $T/q1.html '>Member area</a>')$(has $T/q1.html '>Sign out</a>')$(hasnt $T/q1.html 'Log in or register to keep track')" = 111111 ] && echo 1 || echo 0)
+get calann q2 "$H/?page_id=$RP"
+ok "the register box shows the same links when signed in" $([ "$(hasnt $T/q2.html 'already logged in')$(has $T/q2.html '>My calendar</a>')" = 11 ] && echo 1 || echo 0)
+get caldee q3 "$H/?page_id=$LP"
+ok "not yet a member: pointed to finish setting up (no My calendar)" $([ "$(has $T/q3.html 'Finish setting up your account')$(hasnt $T/q3.html '>My calendar</a>')" = 11 ] && echo 1 || echo 0)
+$W post delete $LP $RP --force >/dev/null 2>&1
+
 echo "== RSVP with the event's form, upgrade, retention, privacy"
 ev "do_action('cec_rsvp_created',$E1,$BO);" >/dev/null
 ok "an RSVP made with the event form while signed in lands on the calendar as Going (their default)" $([ "$(q "SELECT CONCAT(response,'/',audience) FROM $CAL WHERE user_id=$BO AND event_id=$E1")" = going/partners ] && echo 1 || echo 0)

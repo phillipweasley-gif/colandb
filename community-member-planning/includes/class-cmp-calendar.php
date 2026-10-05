@@ -41,6 +41,22 @@ class CMP_Calendar {
 		add_action( 'cec_rsvp_created', array( __CLASS__, 'on_form_rsvp' ), 10, 2 );
 		add_filter( 'cec_event_social_label', array( __CLASS__, 'calendar_label' ), 10, 2 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
+		add_filter( 'cec_account_links', array( __CLASS__, 'account_links' ), 10, 2 );
+	}
+
+	/**
+	 * The events plugin's signed-in quick links (0.17.2): My calendar and
+	 * the member area first (or the next sign-up step if not a member yet).
+	 */
+	public static function account_links( $links, $user ) {
+		$id = $user instanceof WP_User ? (int) $user->ID : 0;
+		if ( ! $id ) {
+			return $links;
+		}
+		$ours = CMP_Access::is_member( $id )
+			? array( 'my_calendar' => array( __( 'My calendar', 'cmp' ), self::url() ), 'member_area' => array( __( 'Member area', 'cmp' ), CMP_Settings::member_page_url() ) )
+			: array( 'member_area' => array( __( 'Finish setting up your account', 'cmp' ), CMP_Settings::member_page_url() ) );
+		return $ours + (array) $links;
 	}
 
 	public static function assets() {
