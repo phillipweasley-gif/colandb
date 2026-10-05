@@ -57,6 +57,8 @@ ok "impossible date refused" $(echo "$r" | grep -q 'cec_register_error=dob_inval
 r=$(reg newbie "&cmp_dob[m]=$M&cmp_dob[d]=$D&cmp_dob[y]=$((Y-18))")
 NEW=$(uid newbie)
 ok "turning 18 today -> account created" $([ -n "$NEW" ] && echo 1 || echo 0)
+MEMBER_URL=$(ev 'echo CMP_Settings::member_page_url();')
+ok "new account lands in the member area, not Submit an Event" $([ "$r" = "$MEMBER_URL" ] && echo 1 || echo 0)
 ok "date stored; 18+ step recorded" $(ev "echo sprintf('%04d-%02d-%02d',$((Y-18)),$M,$D)===get_user_meta($NEW,'cmp_birth_date',true) && get_user_meta($NEW,'cmp_age_attested_at',true) ?1:0;")
 ok "age is 18" $(ev "echo 18===CMP_Birth_Date::age($NEW)?1:0;")
 ok "new member: name, age, member-since start shown" $(ev "\$r=CMP_Profiles::rows($NEW); echo 'members'===\$r['display_name']['visibility'] && 'members'===\$r['age']['visibility'] && 'members'===\$r['member_since']['visibility'] && 'private'===\$r['bio']['visibility'] ?1:0;")
