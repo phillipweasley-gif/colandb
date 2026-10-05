@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homework Programs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root { --primary: #e1f577; --secondary: #ff50d7; --text: #f5f4f7; --muted: #a9a6bb; --card: #1b1826; --card-alt: #211d2e; --field: #110f18; --border: rgba(255,255,255,.10); --line: rgba(255,255,255,.08); --page: #0b0a10; --ok: #7be495; --bad: #ff6b6b; --moved: #ffc857; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font-family: Inter, system-ui, sans-serif; }
+.intro { max-width: 1150px; margin: 0 auto; padding: 28px 16px 6px; }
+.intro h1 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 22px; margin: 0 0 8px; }
+.intro p { color: var(--muted); max-width: 900px; line-height: 1.55; margin: 0 0 6px; }
+.intro strong { color: var(--text); }
+.row { display: flex; flex-wrap: wrap; gap: 26px; justify-content: center; padding: 18px 16px; align-items: flex-start; }
+.phone { width: 380px; max-width: calc(100vw - 32px); height: 800px; border: 10px solid #26232f; border-radius: 44px; background: #000; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.screen { height: 100%; overflow-y: auto; padding: 18px 14px 30px; }
+.cap { font-size: 12.5px; color: var(--muted); text-align: center; max-width: 380px; margin: 8px auto 0; }
+h2 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 19px; margin: 0 0 4px; }
+.sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.sum { display: flex; gap: 8px; margin-bottom: 12px; }
+.sum div { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+.sum b { display: block; font-size: 18px; }
+.sum small { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+.task { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+.task-h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.task-h b { font-size: 15px; }
+.cat { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: #ff8fe4; }
+.prog { font-size: 12.5px; font-weight: 800; }
+.prog.met { color: var(--ok); }
+.what { font-size: 12.5px; color: var(--muted); margin: 6px 0; line-height: 1.45; }
+.std { font-size: 12.5px; background: rgba(225,245,119,.08); border-left: 3px solid var(--primary); padding: 6px 8px; border-radius: 0 6px 6px 0; margin: 6px 0; }
+.days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 8px 0; }
+.d { text-align: center; font-size: 10.5px; color: var(--muted); }
+.d i { display: block; height: 26px; border-radius: 6px; margin-top: 3px; background: #2a2636; font-style: normal; line-height: 26px; font-size: 13px; font-weight: 800; }
+.d i.done { background: rgba(123,228,149,.22); color: var(--ok); }
+.d i.missed { background: rgba(255,107,107,.2); color: var(--bad); }
+.d i.moved { background: rgba(255,200,87,.2); color: var(--moved); }
+.d i.today { outline: 2px solid var(--secondary); }
+.acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn { border: none; border-radius: 100px; min-height: 44px; padding: 0 14px; font-weight: 800; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
+.btn.y { background: var(--primary); color: #0b0a12; }
+.btn.o { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
+.proof { margin-top: 8px; padding: 10px; border: 1.5px dashed var(--border); border-radius: 10px; }
+.proof textarea { width: 100%; min-height: 60px; background: var(--field); border: 1.5px solid var(--border); border-radius: 8px; color: var(--text); font: inherit; font-size: 14px; padding: 8px; }
+.proof .file { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 13px; color: var(--muted); }
+.ladder { font-size: 12.5px; }
+.ladder div { padding: 8px 0; border-top: 1px solid var(--line); }
+.ladder b { color: var(--bad); }
+.desk { width: 1080px; max-width: calc(100vw - 32px); border: 1px solid var(--border); border-radius: 14px; background: #0e0c14; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.dh { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.wk { display: flex; align-items: center; gap: 8px; }
+.wk button { width: 44px; height: 44px; border-radius: 50%; border: none; background: var(--primary); font-weight: 800; }
+table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13.5px; }
+th, td { padding: 8px; border-bottom: 1px solid var(--line); text-align: center; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; }
+td.c span { display: inline-block; min-width: 54px; padding: 4px 6px; border-radius: 6px; font-size: 11.5px; font-weight: 800; }
+td.c .done { background: rgba(123,228,149,.22); color: var(--ok); }
+td.c .missed { background: rgba(255,107,107,.2); color: var(--bad); }
+td.c .moved { background: rgba(255,200,87,.2); color: var(--moved); }
+td.c .rev { outline: 2px solid var(--secondary); }
+td.c .empty { color: var(--muted); font-weight: 500; }
+.met { color: var(--ok); font-weight: 800; }
+.need { color: var(--bad); font-weight: 800; }
+.cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 16px; }
+.box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 13px; }
+.box h4 { margin: 0 0 8px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.ph { height: 110px; border-radius: 8px; background: linear-gradient(135deg,#2c2238,#14101c); display: grid; place-items: center; color: rgba(255,255,255,.3); font-size: 12px; margin: 6px 0; }
+.decisions { max-width: 1000px; margin: 10px auto 60px; padding: 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.decisions h2 { font-size: 16px; }
+.decisions b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="intro">
+	<h1>Homework programs</h1>
+	<p>Mockup for <strong>Community Member Planning 0.7.0</strong>, built from the owner's example weekly homework tracker (structure only). The leading side of an active dynamic (release 0.6.0) builds a weekly program; the other member logs each task day by day with the proof it asks for; quotas and "Met / Needs work" are worked out automatically. Sample data.</p>
+</div>
+<div class="row">
+	<div>
+		<div class="phone"><div class="screen">
+			<h2>This week</h2>
+			<p class="sub">Homework from <b style="color:var(--text)">SampleSir</b> · week of Oct 5</p>
+			<div class="sum"><div><b>3/8</b><small>Quotas met</small></div><div><b>14</b><small>Logged</small></div><div><b style="color:var(--moved)">1</b><small>Moved</small></div></div>
+			<div class="task">
+				<div class="task-h"><b>Morning check-in</b><span class="prog">5/7</span></div>
+				<div class="cat">Daily ritual</div>
+				<div class="what">Morning photo plus check-in text.</div>
+				<div class="std">Say: "Good morning, Sir."</div>
+				<div class="days"><div class="d">M<i class="done">✓</i></div><div class="d">T<i class="done">✓</i></div><div class="d">W<i class="done">✓</i></div><div class="d">T<i class="moved">↻</i></div><div class="d">F<i class="done">✓</i></div><div class="d">S<i class="today"></i></div><div class="d">S<i></i></div></div>
+				<div class="proof">
+					<div class="file">📷 <span>Photo (required)</span> <button class="btn o" style="min-height:36px">Choose</button></div>
+					<textarea>Good morning, Sir. Slept well, ready for the day.</textarea>
+					<div class="acts" style="margin-top:8px"><button class="btn y">Log today as done</button><button class="btn o">Moved</button><button class="btn o">N/A</button></div>
+				</div>
+			</div>
+			<div class="task">
+				<div class="task-h"><b>Cleaning / service block</b><span class="prog met">4/4 ✓</span></div>
+				<div class="cat">Domestic service</div>
+				<div class="what">30 minutes cleaning one space. Before/after photos.</div>
+				<div class="days"><div class="d">M<i class="done">✓</i></div><div class="d">T<i></i></div><div class="d">W<i class="done">✓</i></div><div class="d">T<i class="done">✓</i></div><div class="d">F<i class="done">✓</i></div><div class="d">S<i class="today"></i></div><div class="d">S<i></i></div></div>
+			</div>
+			<div class="task">
+				<div class="task-h"><b>Weekly report</b><span class="prog">0/1</span></div>
+				<div class="cat">Reflection</div>
+				<div class="what">Sunday report answering the reflection questions.</div>
+			</div>
+			<div class="task ladder"><b style="color:var(--text)">If a task is missed</b>
+				<div><b>Minor miss</b> · late photo, forgot proof → written apology</div>
+				<div><b>Missed task</b> → 30 minutes extra cleaning, before/after photos</div>
+				<div><b>Pattern miss</b> → 45 minutes service + written reflection</div>
+			</div>
+		</div></div>
+		<div class="cap">Member's phone: log each day with the proof the task asks for.</div>
+	</div>
+	<div class="desk">
+		<div class="dh">
+			<div><h2>Homework · boyJay</h2><div class="sub">Keyholder / chastity wearer · program "Fall routine"</div></div>
+			<div class="wk"><button>←</button><b>Week of Oct 5, 2026</b><button>→</button></div>
+		</div>
+		<div class="sum" style="max-width:520px"><div><b>3/8</b><small>Quotas met</small></div><div><b class="need">Needs work</b><small>Overall</small></div><div><b>2</b><small>To review</small></div></div>
+		<table>
+			<tr><th>Task</th><th>Category</th><th>Min</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th><th>Done</th><th>Met?</th></tr>
+			<tr><td><b>Morning check-in</b></td><td>Daily ritual</td><td>7</td><td class="c"><span class="done">Done</span></td><td class="c"><span class="done">Done</span></td><td class="c"><span class="done">Done</span></td><td class="c"><span class="moved">Moved</span></td><td class="c"><span class="done rev">Review</span></td><td class="c"><span class="empty">—</span></td><td class="c"><span class="empty">—</span></td><td>4</td><td class="need">Needs work</td></tr>
+			<tr><td><b>Cleaning / service block</b></td><td>Domestic service</td><td>4</td><td class="c"><span class="done">Done</span></td><td class="c"><span class="empty">—</span></td><td class="c"><span class="done">Done</span></td><td class="c"><span class="done">Done</span></td><td class="c"><span class="done">Done</span></td><td class="c"><span class="empty">—</span></td><td class="c"><span class="empty">—</span></td><td>4</td><td class="met">Met</td></tr>
+			<tr><td><b>Reading</b></td><td>Education</td><td>3</td><td class="c"><span class="done">Done</span></td><td class="c"><span class="missed">Missed</span></td><td class="c"><span class="empty">—</span></td><td class="c"><span class="done rev">Review</span></td><td class="c"><span class="empty">—</span></td><td class="c"><span class="empty">—</span></td><td class="c"><span class="empty">—</span></td><td>2</td><td class="need">Needs work</td></tr>
+		</table>
+		<div class="cols">
+			<div class="box"><h4>To review · Fri morning check-in</h4><div class="ph">proof photo</div><p style="margin:0 0 8px">"Good morning, Sir. Slept well."</p><div class="acts"><button class="btn y">Accept</button><button class="btn o">Not good enough</button></div></div>
+			<div class="box"><h4>Notes to boyJay</h4><p style="margin:0">Good week so far. Reading needs attention: pick it up Thursday and Saturday.</p></div>
+			<div class="box"><h4>Tasks &amp; rules</h4><p style="margin:0 0 8px">Add or change tasks, the proof each needs, your standard phrase, and the consequence ladder.</p><button class="btn o">Edit program</button></div>
+		</div>
+	</div>
+</div>
+<div class="decisions">
+	<h2 style="font-family:'Archivo Black',sans-serif;color:var(--primary);text-transform:uppercase">Decisions made overnight, for the owner to confirm</h2>
+	<ol>
+		<li><b>Who:</b> only the leading side of an <b>active</b> directed dynamic can create a program for the other member. If the dynamic ends, the program is archived at once: the lead loses access to it (including proof photos); the member keeps their own history.</li>
+		<li><b>Weeks run Monday to Sunday</b>, like the tracker. Each task has a weekly minimum; "Met / Needs work" and "Quotas met X/N" are calculated.</li>
+		<li><b>Day statuses:</b> Done, Missed, Moved (rescheduled and communicated), N/A. The member logs Done / Moved / N/A; only the lead marks Missed.</li>
+		<li><b>Proof:</b> none, text, photo, photo + text, or written report. Photos are re-encoded (no camera or location data), stored privately, and visible only to the member and their lead.</li>
+		<li><b>Review:</b> the lead can accept a logged day or mark it "not good enough" with a note; the member is notified either way.</li>
+		<li><b>Consequence ladder:</b> free-text levels written by the lead (level, examples, correction), shown to the member. Logging a consequence as its own task comes later.</li>
+		<li><b>Not yet:</b> due-time reminders, chastity choice (release 0.8.0), and a month calendar of completions (included as a simple month view).</li>
+	</ol>
+</div>
+</body>
+</html>

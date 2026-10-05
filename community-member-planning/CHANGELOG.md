@@ -4,6 +4,29 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.7.0
+
+**Homework programs** (owner, 2026-10-04: the Weekly Homework Tracker spreadsheet is "a great example of how a Dom might manage their submissive"; the core features should "enhance the tasks and calendar" and let members "manage their dynamics"). Built overnight from `docs/mockups/homework.html`; **not yet approved by the owner.**
+
+- **`CMP_Homework`**, three new tables `cmp_programs`, `cmp_tasks`, `cmp_task_entries` (`CMP_DB_VERSION` 5).
+- **Who can set homework:** only the leading side of an active directed dynamic (`CMP_Dynamics::lead_can_direct()`). When the dynamic ends, its programs are archived at once: no more entries, the leading side loses access to proof photos immediately, and the member keeps their history read-only.
+- **A program** = title, notes to the member, and a consequence ladder (up to 8 rows: level, examples, correction), modelled on the tracker's "Consequences" sheet.
+- **Tasks** (up to 30 per program), modelled on the tracker's task list:
+  - category: daily ritual, body / grooming, domestic service, education, attention / check-in, reflection, chastity, fitness, other;
+  - weekly minimum (1–7), "what counts", an optional standard phrase (e.g. "Good morning, Sir.");
+  - proof: none, text, photo, photo + text, written report.
+- **Logging (member):** done / moved / not applicable for today or the last 7 days, never future days; note and proof photo as the task asks. Photos are resized to ≤1600 px and re-encoded as JPEG, which strips EXIF/GPS; stored privately in the database and served only to the two members of the program (`?cmp_proof=<id>`, 404 for anyone else).
+- **Review (lead):** accept, "not good enough" (doesn't count toward the quota), or mark a day missed; optional note back. Notifications for new assignments, submissions, and review decisions.
+- **Week view:** Monday-start week with Mon–Sun cells per task, "quotas met", an overall status (On track / Needs work), entries waiting for review, and a month heat map.
+- **Homework tab** in the member area: "Your homework" and "Homework you set". Export lists a member's programs, tasks and entries (without photo bytes); erase deletes them (before dynamics).
+- **Index names:** MySQL 8 reserves `LEAD` and `MEMBER`, so every index added in 0.6.0 / 0.7.0 is now named `idx_*` (`idx_proposer`, `idx_partner` on `cmp_dynamics`). 0.6.0 has not shipped, so no live table has the old names.
+- **Verification** (local WordPress 7.1.2):
+  - new `tests/homework-e2e.sh` 44/44 (incl. EXIF marker stripped from proof photos, proof photo 404 for a third member, archive on dynamic end);
+  - `dynamics-e2e.sh` 34/34, `setup-e2e.sh` 32/32, `dob-e2e.sh` 34/34, `e2e.sh` 60/60, `account-e2e.sh` 64/64, `profile-e2e.sh` 68 (+12 photo checks needing ImageMagick); no PHP warnings;
+  - rendered at 375 px and 1280 px under Hello Elementor.
+
+---
+
 ## 0.6.0
 
 **Dynamics between members** (owner, 2026-10-04: FetLife's relationships and power dynamics "will be very important for the homework and chastity tasks"). Built overnight from `docs/mockups/dynamics.html`; **not yet approved by the owner.**
