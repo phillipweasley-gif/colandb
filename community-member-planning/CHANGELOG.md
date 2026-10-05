@@ -4,6 +4,14 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.17.2
+
+**My calendar in the events plugin's quick links** (needs Community Events Calendar 1.31.0). When you're signed in, the login box on event pages such as Community Events shows **My calendar** and **Member area** first. An account that hasn't finished signing up gets "Finish setting up your account" instead.
+
+- **Verification:** `calendar-e2e.sh` 44/44.
+
+---
+
 ## 0.17.1
 
 **"Browse events" on My calendar went to the home page** (owner, 2026-10-05). It picked the first page showing any calendar shortcode, and the home page shows a few upcoming events. It now prefers a page with the full calendar, then the event list, then an upcoming list, and never the home page. On colandb.com that's Community Events. The `cmp_events_url` filter can still set it.

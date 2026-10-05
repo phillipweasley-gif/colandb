@@ -6,6 +6,21 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.31.0
+
+**Quick links when you're signed in** (owner, 2026-10-05: should there be a "my events" quick link for personal calendar management on the Community Events page?). The login box used to say only "You're already logged in."
+
+- **Signed in, `[cec_login]` and `[cec_register]` now show "Signed in as <name>"** with links as buttons:
+  - Calendar dashboard (event managers);
+  - My submitted events (when a page has `[cec_my_events]`);
+  - Submit an event;
+  - Sign out, which returns to the same page.
+- **Other plugins add theirs through the new `cec_account_links` filter** (key => label, URL). Community Member Planning 0.17.2 puts My calendar and Member area first. The first link is the main button.
+- **New `note` option on `[cec_login]`**, e.g. `[cec_login note="Log in or register to keep track of your events and RSVPs."]`. The note shows above the form only to signed-out visitors, so a page no longer needs a separate text block that signed-in members see too.
+- **Verification:** `calendar-e2e.sh` 44/44, with 4 new checks for the signed-out note, the signed-in links in both boxes, and accounts that haven't finished setting up. `e2e.sh` 60/60. Checked in a browser on the local test site, signed in and out.
+
+---
+
 ## 1.30.0
 
 **Room for "Add to my calendar" on event pages** (owner, 2026-10-05: no way to "Add to my calendar" while signed in). Small additions for Community Member Planning 0.17.0; nothing changes for visitors without it.
