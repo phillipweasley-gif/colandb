@@ -58,6 +58,15 @@ class CEC_Month_Grid {
 				'host'       => $data['host_org_name'],
 				'badge'      => $badge['label'],
 				'badgeClass' => $badge['class'],
+				/**
+				 * A short social label for this event for the current
+				 * viewer (1.28.0), e.g. "2 people you follow are going"
+				 * from Community Member Planning. Empty by default.
+				 *
+				 * @param string $label
+				 * @param int    $event_id
+				 */
+				'social'     => (string) apply_filters( 'cec_event_social_label', '', (int) $data['id'] ),
 			),
 		);
 	}
@@ -116,6 +125,7 @@ class CEC_Month_Grid {
 				'host'       => $item['detail']['host'],
 				'badge'      => $item['detail']['badge'],
 				'badgeClass' => $item['detail']['badgeClass'],
+				'social'     => isset( $item['detail']['social'] ) ? $item['detail']['social'] : '',
 				'startDate'  => $true_start_date,
 				'endDate'    => $item['end_ts'] ? date_i18n( 'Y-m-d', max( $item['end_ts'], $item['start_ts'] ) ) : $true_start_date,
 				'time'       => isset( $item['detail']['time'] ) ? $item['detail']['time'] : '',
@@ -312,7 +322,7 @@ class CEC_Month_Grid {
 						<button type="button" class="cec-cal-daynum" data-date="<?php echo esc_attr( $date_str ); ?>"><?php echo esc_html( $day_num ); ?></button>
 						<div class="cec-cal-events">
 							<?php foreach ( array_slice( $events, 0, 2 ) as $ev ) : ?>
-								<a class="cec-cal-pill<?php echo 'scheduled' !== $ev['status'] ? ' cec-cal-chip-' . esc_attr( $ev['status'] ) : ''; ?><?php echo $ev['highlight'] ? ' cec-cal-preview-highlight' : ''; ?>" href="<?php echo esc_url( $ev['url'] ); ?>" title="<?php echo esc_attr( $ev['title'] ); ?>"><?php echo esc_html( $ev['title'] ); ?></a>
+								<a class="cec-cal-pill<?php echo 'scheduled' !== $ev['status'] ? ' cec-cal-chip-' . esc_attr( $ev['status'] ) : ''; ?><?php echo $ev['highlight'] ? ' cec-cal-preview-highlight' : ''; ?>" href="<?php echo esc_url( $ev['url'] ); ?>" title="<?php echo esc_attr( $ev['title'] . ( ! empty( $ev['detail']['social'] ) ? ' · ' . $ev['detail']['social'] : '' ) ); ?>"><?php echo ! empty( $ev['detail']['social'] ) ? '<span class="cec-cal-social-dot" aria-hidden="true"></span>' : ''; ?><?php echo esc_html( $ev['title'] ); ?><?php echo ! empty( $ev['detail']['social'] ) ? '<span class="screen-reader-text"> · ' . esc_html( $ev['detail']['social'] ) . '</span>' : ''; ?></a>
 							<?php endforeach; ?>
 							<?php if ( $overflow > 0 ) : ?>
 								<button type="button" class="cec-cal-more cec-cal-daymore" data-date="<?php echo esc_attr( $date_str ); ?>">
@@ -354,7 +364,7 @@ class CEC_Month_Grid {
 							href="<?php echo esc_url( $ev['url'] ); ?>"
 							title="<?php echo esc_attr( $ev['title'] ); ?>"
 							style="grid-column:<?php echo (int) ( $bar['col_start'] + 1 ); ?> / <?php echo (int) ( $bar['col_end'] + 2 ); ?>;grid-row:<?php echo (int) ( $lane + 2 ); ?>;">
-							<span class="cec-cal-event-title"><?php echo esc_html( $ev['title'] ); ?></span>
+							<span class="cec-cal-event-title"><?php echo ! empty( $ev['detail']['social'] ) ? '<span class="cec-cal-social-dot" aria-hidden="true"></span>' : ''; ?><?php echo esc_html( $ev['title'] ); ?><?php echo ! empty( $ev['detail']['social'] ) ? '<span class="screen-reader-text"> · ' . esc_html( $ev['detail']['social'] ) . '</span>' : ''; ?></span>
 						</a>
 						<?php
 					endforeach;
@@ -391,7 +401,7 @@ class CEC_Month_Grid {
 	private static function plain_payload( $events_by_date ) {
 		foreach ( $events_by_date as $date => $day_events ) {
 			foreach ( $day_events as $i => $ev ) {
-				foreach ( array( 'title', 'date_range', 'location', 'host', 'badge' ) as $key ) {
+				foreach ( array( 'title', 'date_range', 'location', 'host', 'badge', 'social' ) as $key ) {
 					if ( isset( $ev[ $key ] ) && is_string( $ev[ $key ] ) ) {
 						$events_by_date[ $date ][ $i ][ $key ] = CEC_Event_Helper::plain_text( $ev[ $key ] );
 					}
@@ -589,6 +599,7 @@ class CEC_Month_Grid {
 				<span class="cec-cal-pcard-title"><?php echo esc_html( $ev['title'] ); ?></span>
 				<span class="cec-cal-pcard-when"><span class="cec-cal-pcard-chip"><?php echo esc_html( $chip ); ?></span><?php echo $of ? '<span class="cec-cal-pcard-of">' . esc_html( $of ) . '</span>' : ''; ?></span>
 				<?php if ( $where ) : ?><span class="cec-cal-pcard-where"><?php echo esc_html( implode( ' · ', $where ) ); ?></span><?php endif; ?>
+				<?php if ( ! empty( $ev['social'] ) ) : ?><span class="cec-cal-pcard-social"><?php echo esc_html( $ev['social'] ); ?></span><?php endif; ?>
 			</span>
 			<span class="cec-cal-pcard-chev" aria-hidden="true">&rsaquo;</span>
 		</a>

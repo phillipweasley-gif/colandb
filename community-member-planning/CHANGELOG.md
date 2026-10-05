@@ -4,6 +4,57 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.12.0
+
+**Follow / unfollow** (owner, 2026-10-05: "in case you don't want to be friends but want to engage and see where someone is attending"). Owner's choices: anyone can follow, no approval; event plans only if the member opts in; shown as a Following feed filter, a "Going to" profile card, a calendar marker and notifications. Needs Community Events Calendar 1.28.0 for the calendar marker and RSVP notifications.
+
+- **`CMP_Follows`**, new table `cmp_follows` (`CMP_DB_VERSION` 10).
+- **Follow / Following** button on member profiles, with "N followers · N following" (also on your own profile view and the Profile tab).
+- **"Events I'm going to"** (Profile tab), **off by default**: when on, your followers see a **Going to** card on your profile (your next 5 upcoming, published events you RSVP'd to while signed in, with each event's own time setting), get a notification when you RSVP, and see the calendar marker. Non-followers see "Follow <name> to see the events they're going to". Your own profile view marks the card "Only your followers see this".
+- **Feed → Everyone / Following**: just the posts of members you follow (and can see).
+- **Calendar:** "1 person you follow is going" / "N people you follow are going" via `cec_event_social_label`: a dot on desktop, a line on the phone list.
+- **Notifications** (new category "People I follow", can be turned off): a followed member's new post (only to followers who can see it) and, if they share their events, their RSVPs.
+- **Blocks** remove follows both ways and stop new ones; nothing crosses a block.
+- **Privacy:** export lists who you follow and your sharing choice; erase removes follows both ways and the setting.
+- **Verification** (local WordPress 7.1.2): new `tests/follows-e2e.sh` 27/27; `setup-e2e.sh` 39/39, `profile-e2e.sh` 84/84, `dob-e2e.sh` 34/34, `dynamics-e2e.sh` 34/34, `homework-e2e.sh` 44/44, `chastity-e2e.sh` 55/55, `feed-e2e.sh` 41/41, `account-e2e.sh` 64/64, `messages-e2e.sh` 46/46, `e2e.sh` 60/60. In a browser: profile button and Going to card (375 px), the Following filter (moved into the Feed header card after it rendered on the page background), and the calendar marker at 1280 px and 375 px.
+
+---
+
+## 0.11.0
+
+**Member messages, with block and report** (owner, 2026-10-05: "a way for members to send messages to one another … as well as block or report"). From `docs/mockups/messages.html`, with the owner's answers: anyone can write, as requests; text only for now; reports show the whole conversation.
+
+- **`CMP_Messages`**, four new tables `cmp_conversations`, `cmp_messages`, `cmp_blocks`, `cmp_message_reports` (`CMP_DB_VERSION` 9), and a **Messages** tab right after Feed, with an unread count ("Messages (2)").
+- **Writing:** "Message" on any member's profile. One conversation per pair of members; text up to 2,000 characters; Ctrl/⌘+Enter sends.
+- **Requests:** between members who aren't connected (no active dynamic) the first message is a request. It waits under **Requests** (with a count) until accepted; replying accepts it too. The sender can send at most 3 messages until then. Connected members go straight to the inbox. Members can turn requests off ("Accept message requests from members I'm not connected with"); their profile then says "Not accepting message requests". At most 20 new conversations a day per member. New requests send an in-site notification (new category "New message requests", can be turned off).
+- **Read state** is tracked by message, so unread dots and counts are exact even when messages share a second.
+- **Delete** a conversation from your side; the other member keeps theirs. A later message brings it back with only the new messages.
+- **Block** (from a conversation, a request or a profile): they can't message you or start a conversation, neither of you can see the other's profile or feed posts, the conversation disappears for both, dynamic proposals are refused, and any dynamic between you ends (which archives homework and turns a lock into a self-lock). They aren't told. **Messages → Blocked** lists who you blocked, with Unblock.
+- **Report** (from a conversation or a profile): a reason (harassment or threats, unwanted sexual content, spam or scam, underage or not consenting, something else), an optional note, and "Also block them" (on by default). The site admin email gets a link, never the messages themselves. Administrators review on **Users → Member reports** ("Member reports (N)" while any are open): who, why, and the whole conversation; opening one is audit-logged; "Mark as reviewed" closes it. Otherwise nobody but the two members can read a conversation.
+- **Privacy:** export lists the messages you sent and who you blocked; erase removes the member's conversations (both sides), blocks both ways and the reports they made; reports about them are kept.
+- **Verification** (local WordPress 7.1.2): new `tests/messages-e2e.sh` 46/46; `setup-e2e.sh` 39/39, `profile-e2e.sh` 84/84, `dob-e2e.sh` 34/34, `dynamics-e2e.sh` 34/34 (its nonce helper now picks the dynamics form, since profiles carry more forms), `homework-e2e.sh` 44/44, `chastity-e2e.sh` 55/55, `feed-e2e.sh` 41/41, `account-e2e.sh` 64/64, `e2e.sh` 60/60. In a browser at 375 px: inbox, conversation and its menu, sending, a request, and profile buttons.
+
+---
+
+## 0.10.0
+
+**Kink picker** (owner, 2026-10-05: the kinks list "becomes cumbersome"; approved from `docs/mockups/kink-picker.html`).
+
+- **Only your picks are listed** on the Profile tab and setup step, each with Love it / Like it / Curious and Giving / Receiving / Both as tap-sized buttons (tap the chosen Giving / Receiving / Both again to clear it) and a × to remove it. A "N of 40 picked" count.
+- **Add kinks** by typing (Enter adds the first match) or tapping a category; results are tap targets. Without JavaScript, "Browse all kinks" lists every kink by category with the same buttons, and saves the same way.
+- **Categories** (11): Bondage & restraint · Impact · Chastity & control · Service & protocol · Pup & pet · Role & age play · Fetish & gear · Sensation · Body worship · Exhibition & voyeur · Other. The site team sets each kink's category on Users → Member Profile Options → Kinks (new Category column).
+- **62 starter kinks** (the 30 from 0.5.0 plus 32 more). A one-time upgrade (`CMP_DB_VERSION` 8) gives existing kinks a category and adds the new ones; kinks the site team renamed or retired, and ones they added, are left as they are.
+- **On profiles** kinks are grouped under Love it / Like it / Curious, with giving / receiving beside each.
+
+**Fixes**
+
+- **Show switches came back.** 0.9.1 accidentally removed the script that reveals a field's "Show to members" switch once it's filled in, so a newly filled field couldn't be switched off until after saving. Restored. A picker's empty radios don't count as "filled".
+- **Single-choice fields start blank.** Body type, position, hosting and "how active" had no blank choice, so any Profile tab save quietly set them to their first option ("Slim", "Top", …). They now start on "Not set". Members who saved their profile since 0.5.0 may show a body type or position they never chose; they can set it back to "Not set".
+
+**Verification** (local WordPress 7.1.2): `setup-e2e.sh` 39/39 (new: categories, upgrade, admin categories, picker markup, removing), `profile-e2e.sh` 84/84, `dob-e2e.sh` 34/34, `dynamics-e2e.sh` 34/34, `homework-e2e.sh` 44/44, `chastity-e2e.sh` 55/55, `feed-e2e.sh` 41/41, `account-e2e.sh` 64/64, `e2e.sh` 60/60. In a browser at 375 px: search, Enter to add, categories, levels, clearing a direction, removing, saving, the Show switch appearing and hiding, and the grouped profile view.
+
+---
+
 ## 0.9.1
 
 **Profile fixes from the owner's review of the live site (2026-10-05).**

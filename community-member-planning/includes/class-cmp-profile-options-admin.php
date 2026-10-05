@@ -53,6 +53,7 @@ class CMP_Profile_Options_Admin {
 				'label'  => isset( $row['label'] ) ? (string) $row['label'] : '',
 				'active' => ! empty( $row['active'] ),
 				'order'  => isset( $row['order'] ) ? (int) $row['order'] : 0,
+				'group'  => isset( $row['group'] ) ? (string) $row['group'] : '',
 			);
 		}
 		// "Add several at once": one per line, active, after the existing ones.
@@ -70,6 +71,15 @@ class CMP_Profile_Options_Admin {
 		self::back( $list, 'saved' );
 	}
 
+	private static function group_select( $i, $selected, $label ) {
+		/* translators: %s: option name */
+		$html = '<select name="rows[' . (int) $i . '][group]" aria-label="' . esc_attr( sprintf( __( 'Category of %s', 'cmp' ), $label ) ) . '">';
+		foreach ( CMP_Profile_Fields::kink_groups() as $k => $l ) {
+			$html .= '<option value="' . esc_attr( $k ) . '"' . selected( $selected, $k, false ) . '>' . esc_html( $l ) . '</option>';
+		}
+		return $html . '</select>';
+	}
+
 	public static function render() {
 		if ( ! current_user_can( CMP_Profile_Fields::CAP ) ) {
 			return;
@@ -79,6 +89,7 @@ class CMP_Profile_Options_Admin {
 		$current = isset( $lists[ $current ] ) ? $current : key( $lists );
 		$notice  = isset( $_GET['cmp_notice'] ) ? sanitize_key( wp_unslash( $_GET['cmp_notice'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$rows    = CMP_Profile_Fields::raw_options( $current );
+		$grouped = 'kinks' === $current;
 		$error   = get_transient( 'cmp_options_error_' . get_current_user_id() );
 		delete_transient( 'cmp_options_error_' . get_current_user_id() );
 		?>
@@ -105,7 +116,7 @@ class CMP_Profile_Options_Admin {
 					<p><?php esc_html_e( '"Not listed" is always offered first and is every member\'s starting value.', 'cmp' ); ?></p>
 				<?php endif; ?>
 				<table class="widefat striped" style="max-width:760px">
-					<thead><tr><th scope="col"><?php esc_html_e( 'Name shown to members', 'cmp' ); ?></th><th scope="col" style="width:90px"><?php esc_html_e( 'Offered', 'cmp' ); ?></th><th scope="col" style="width:90px"><?php esc_html_e( 'Order', 'cmp' ); ?></th><th scope="col"><?php esc_html_e( 'Key (never changes)', 'cmp' ); ?></th></tr></thead>
+					<thead><tr><th scope="col"><?php esc_html_e( 'Name shown to members', 'cmp' ); ?></th><?php echo $grouped ? '<th scope="col">' . esc_html__( 'Category', 'cmp' ) . '</th>' : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><th scope="col" style="width:90px"><?php esc_html_e( 'Offered', 'cmp' ); ?></th><th scope="col" style="width:90px"><?php esc_html_e( 'Order', 'cmp' ); ?></th><th scope="col"><?php esc_html_e( 'Key (never changes)', 'cmp' ); ?></th></tr></thead>
 					<tbody>
 						<?php
 						$i = 0;
@@ -113,6 +124,7 @@ class CMP_Profile_Options_Admin {
 							?>
 							<tr>
 								<td><input type="hidden" name="rows[<?php echo (int) $i; ?>][key]" value="<?php echo esc_attr( $o['key'] ); ?>" /><input type="text" class="regular-text" maxlength="80" name="rows[<?php echo (int) $i; ?>][label]" value="<?php echo esc_attr( $o['label'] ); ?>" aria-label="<?php esc_attr_e( 'Name', 'cmp' ); ?>" /></td>
+								<?php echo $grouped ? '<td>' . self::group_select( $i, isset( $o['group'] ) ? $o['group'] : 'other', $o['label'] ) . '</td>' : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 								<td><input type="checkbox" name="rows[<?php echo (int) $i; ?>][active]" value="1" <?php checked( ! empty( $o['active'] ) ); ?> aria-label="<?php echo esc_attr( sprintf( /* translators: %s: option name */ __( 'Offer %s', 'cmp' ), $o['label'] ) ); ?>" /></td>
 								<td><input type="number" class="small-text" name="rows[<?php echo (int) $i; ?>][order]" value="<?php echo (int) $o['order']; ?>" aria-label="<?php esc_attr_e( 'Order', 'cmp' ); ?>" /></td>
 								<td><code><?php echo esc_html( $o['key'] ); ?></code></td>
@@ -124,6 +136,7 @@ class CMP_Profile_Options_Admin {
 							?>
 							<tr>
 								<td><input type="text" class="regular-text" maxlength="80" name="rows[<?php echo (int) $i; ?>][label]" value="" placeholder="<?php esc_attr_e( 'New choice', 'cmp' ); ?>" aria-label="<?php esc_attr_e( 'New choice', 'cmp' ); ?>" /></td>
+								<?php echo $grouped ? '<td>' . self::group_select( $i, 'other', __( 'the new choice', 'cmp' ) ) . '</td>' : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 								<td><input type="checkbox" name="rows[<?php echo (int) $i; ?>][active]" value="1" checked aria-label="<?php esc_attr_e( 'Offer this new choice', 'cmp' ); ?>" /></td>
 								<td><input type="number" class="small-text" name="rows[<?php echo (int) $i; ?>][order]" value="<?php echo (int) ( 10 * ( count( $rows ) + $n + 1 ) ); ?>" aria-label="<?php esc_attr_e( 'Order', 'cmp' ); ?>" /></td>
 								<td></td>

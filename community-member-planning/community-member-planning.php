@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Community Member Planning
  * Description: Private member area for the Community Events Calendar: member access (verified email + 18+ self-attestation), in-app notifications, an append-only audit log, and a front-end Account page (name, email, password, devices, privacy requests) that replaces the WordPress dashboard for members, and member profiles with per-field visibility and private profile/cover photos. My Calendars, connections, sharing and the member directory are added in later releases. Reads public events only through the Community Events Calendar's read-only API. Shortcode: [cmp_member_area]. Setup: Settings → Member Planning.
- * Version: 0.9.1
+ * Version: 0.12.0
  * Requires at least: 6.5
  * Requires PHP: 8.1
  * Author: RA Marketing
@@ -13,8 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CMP_VERSION', '0.9.1' );
-define( 'CMP_DB_VERSION', 7 );
+define( 'CMP_VERSION', '0.12.0' );
+define( 'CMP_DB_VERSION', 10 );
 define( 'CMP_FILE', __FILE__ );
 define( 'CMP_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CMP_URL', plugin_dir_url( __FILE__ ) );
@@ -40,6 +40,8 @@ require_once CMP_DIR . 'includes/class-cmp-dynamics.php';
 require_once CMP_DIR . 'includes/class-cmp-homework.php';
 require_once CMP_DIR . 'includes/class-cmp-chastity.php';
 require_once CMP_DIR . 'includes/class-cmp-feed.php';
+require_once CMP_DIR . 'includes/class-cmp-messages.php';
+require_once CMP_DIR . 'includes/class-cmp-follows.php';
 require_once CMP_DIR . 'includes/class-cmp-profile-options-admin.php';
 require_once CMP_DIR . 'includes/class-cmp-site-menu.php';
 require_once CMP_DIR . 'includes/class-cmp-account-bar.php';
@@ -65,6 +67,8 @@ final class CMP_Plugin {
 		CMP_Homework::init();
 		CMP_Chastity::init();
 		CMP_Feed::init();
+		CMP_Messages::init();
+		CMP_Follows::init();
 		CMP_Profile_Options_Admin::init();
 		CMP_Site_Menu::init();
 		CMP_Account_Bar::init();

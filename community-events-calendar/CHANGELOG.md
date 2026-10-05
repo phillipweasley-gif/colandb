@@ -6,6 +6,17 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.28.0
+
+**Hooks for "people you follow"** (with Community Member Planning 0.12.0, owner 2026-10-05).
+
+- New filter `cec_event_social_label( $label, $event_id )`: a short label for the current viewer (e.g. "2 people you follow are going"). Empty by default, so the calendar looks exactly as before without Community Member Planning.
+- When a label is set: a small pink dot on the event's pill or bar in the month grid (the label is in its tooltip and read by screen readers), and a line under the event on the phone day list (server-rendered and JavaScript-rendered).
+- New action `cec_rsvp_created( $event_id, $user_id )` after an RSVP is saved (`$user_id` is 0 for guests).
+- Verification: `e2e.sh` 60/60 and `follows-e2e.sh` 27/27 on local WordPress 7.1.2; the dot and phone line checked in a browser at 1280 px and 375 px.
+
+---
+
 ## 1.27.2
 
 **New filter `cec_register_redirect`** ( `$redirect`, `$user_id` ): where a brand-new account goes after `[cec_register]`. The default is unchanged (the form's redirect, usually Submit an Event); the member plugin uses it to send new members to their member area (owner report 2026-10-04: after registering on the live site they landed on Submit an Event instead of the member profile).

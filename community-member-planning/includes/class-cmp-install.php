@@ -40,7 +40,7 @@ class CMP_Install {
 	}
 
 	public static function table_names() {
-		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ) );
+		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ), self::table( 'follows' ) );
 	}
 
 	private static function create_tables() {
@@ -51,6 +51,7 @@ class CMP_Install {
 		self::add_caps();
 		// 0.5.0: starter options for any profile list that has none yet.
 		CMP_Profile_Fields::seed_defaults();
+		CMP_Profile_Fields::upgrade_kinks();
 		update_option( self::DB_VERSION_OPTION, CMP_DB_VERSION, false );
 	}
 
@@ -283,6 +284,69 @@ class CMP_Install {
 			KEY idx_user (user_id)
 		) $charset;";
 
-		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes );
+		// Messages (0.11.0): one conversation per pair of members (user_a is
+		// the lower ID), its messages, blocks, and reports.
+		$convs  = 'CREATE TABLE ' . self::table( 'conversations' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			user_a bigint(20) unsigned NOT NULL,
+			user_b bigint(20) unsigned NOT NULL,
+			started_by bigint(20) unsigned NOT NULL,
+			status varchar(10) NOT NULL DEFAULT 'request',
+			last_message_at datetime NOT NULL,
+			last_sender_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			last_message_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			a_read_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			b_read_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			a_deleted_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			b_deleted_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY idx_pair (user_a,user_b),
+			KEY idx_b (user_b,last_message_at),
+			KEY idx_started (started_by,created_at)
+		) $charset;";
+		$msgs   = 'CREATE TABLE ' . self::table( 'messages' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			conversation_id bigint(20) unsigned NOT NULL,
+			sender_id bigint(20) unsigned NOT NULL,
+			body text NOT NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY idx_conv (conversation_id,id),
+			KEY idx_sender (sender_id)
+		) $charset;";
+		$blocks = 'CREATE TABLE ' . self::table( 'blocks' ) . " (
+			blocker_id bigint(20) unsigned NOT NULL,
+			blocked_id bigint(20) unsigned NOT NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (blocker_id,blocked_id),
+			KEY idx_blocked (blocked_id)
+		) $charset;";
+		$reports = 'CREATE TABLE ' . self::table( 'message_reports' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			reporter_id bigint(20) unsigned NOT NULL,
+			reported_id bigint(20) unsigned NOT NULL,
+			conversation_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			reason varchar(20) NOT NULL,
+			note text NULL,
+			status varchar(10) NOT NULL DEFAULT 'open',
+			closed_by bigint(20) unsigned NULL,
+			closed_at datetime NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY idx_status (status,id),
+			KEY idx_reported (reported_id)
+		) $charset;";
+
+		// Follows (0.12.0).
+		$follows = 'CREATE TABLE ' . self::table( 'follows' ) . " (
+			follower_id bigint(20) unsigned NOT NULL,
+			followed_id bigint(20) unsigned NOT NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (follower_id,followed_id),
+			KEY idx_followed (followed_id)
+		) $charset;";
+
+		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports, $follows );
 	}
 }

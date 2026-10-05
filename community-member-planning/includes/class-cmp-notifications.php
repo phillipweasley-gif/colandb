@@ -21,6 +21,8 @@ class CMP_Notifications {
 		'submission',
 		'review_decision',
 		'lock',
+		'message',
+		'follow',
 	);
 
 	const QUIET_START = 22;
