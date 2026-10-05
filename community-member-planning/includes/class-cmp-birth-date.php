@@ -33,6 +33,9 @@ class CMP_Birth_Date {
 		add_filter( 'cec_register_validate', array( __CLASS__, 'validate_signup' ) );
 		add_filter( 'cec_register_error_messages', array( __CLASS__, 'signup_messages' ) );
 		add_action( 'cec_user_registered', array( __CLASS__, 'store_signup' ) );
+		// After sign-up, go to the member area (next: confirm email, then the
+		// profile), not the events plugin's default Submit an Event page.
+		add_filter( 'cec_register_redirect', array( __CLASS__, 'signup_redirect' ) );
 
 		// Site-team correction on the user's wp-admin screen.
 		add_action( 'show_user_profile', array( __CLASS__, 'admin_field' ) );
@@ -182,6 +185,10 @@ class CMP_Birth_Date {
 			'dob_invalid'  => __( 'That date of birth isn\'t a real date. Please check it.', 'cmp' ),
 			'dob_under_18' => __( 'You must be 18 or older to join.', 'cmp' ),
 		);
+	}
+
+	public static function signup_redirect( $redirect ) {
+		return (int) CMP_Settings::get( 'member_page_id' ) ? CMP_Settings::member_page_url() : $redirect;
 	}
 
 	/**

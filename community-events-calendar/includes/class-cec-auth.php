@@ -226,6 +226,16 @@ class CEC_Auth {
 		wp_set_current_user( $user_id );
 		wp_set_auth_cookie( $user_id, true );
 
+		/**
+		 * Where a brand-new account goes next. Defaults to the redirect the
+		 * form carried (usually Submit an Event); the member plugin sends new
+		 * members to their member area to finish setting up instead.
+		 *
+		 * @param string $redirect
+		 * @param int    $user_id
+		 */
+		$redirect = (string) apply_filters( 'cec_register_redirect', $redirect, $user_id );
+
 		wp_safe_redirect( $redirect );
 		exit;
 	}

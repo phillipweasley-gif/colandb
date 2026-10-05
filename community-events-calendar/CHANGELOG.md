@@ -6,6 +6,11 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.27.2
+
+**New filter `cec_register_redirect`** ( `$redirect`, `$user_id` ): where a brand-new account goes after `[cec_register]`. The default is unchanged (the form's redirect, usually Submit an Event); the member plugin uses it to send new members to their member area (owner report 2026-10-04: after registering on the live site they landed on Submit an Event instead of the member profile).
+- Verified in a local WordPress 7.1.2 by `tests/dob-e2e.sh`. `php -l` clean.
+
 ## 1.27.1
 
 **Sign-up extension hooks** for the member plugin's required date of birth (Community Member Planning 0.4.0). `[cec_register]` gains:

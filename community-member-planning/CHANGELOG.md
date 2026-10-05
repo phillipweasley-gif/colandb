@@ -4,6 +4,11 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.4.1
+
+**New accounts land in the member area after sign-up**, not the events plugin's Submit an Event page (owner report 2026-10-04, after registering on the live site). There the next steps are confirming the email address and then the profile. Uses CEC 1.27.2's `cec_register_redirect`, and only when a member page is set. The step-by-step profile setup the owner asked for comes in a later release, from a mockup.
+- Verified in a local WordPress 7.1.2: `tests/dob-e2e.sh` adds "new account lands in the member area, not Submit an Event". `php -l` clean.
+
 ## 0.4.0
 
 **Date of birth at sign-up, and one Show switch per profile field** (owner decisions, 2026-10-04, from an approved mockup). Both override the project brief, which said to store only an 18+ attestation ("not date of birth") and to start every field private.
