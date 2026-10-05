@@ -24,6 +24,7 @@ community-member-planning/
 │   ├── class-cmp-dynamics.php      dynamics between members: propose/accept/end, lead_can_direct(), connections, Dynamics tab
 │   ├── class-cmp-homework.php      homework programs: tasks, daily entries, proof photos, lead review, Homework tab
 │   ├── class-cmp-chastity.php      chastity locks: keyholder controls, verification codes/photos, hygiene, emergency unlock, Chastity tab
+│   ├── class-cmp-feed.php          member feed: text/photo posts, event tags, likes, reports, admin hide, Feed tab
 │   ├── class-cmp-onboarding.php    step-by-step profile setup (6 steps over the normal profile save; home opens it for new members)
 │   ├── class-cmp-birth-date.php    date of birth: sign-up fields via CEC hooks, one-time step, under-18 lock, age, wp-admin correction
 │   ├── class-cmp-email-verification.php

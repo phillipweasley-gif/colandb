@@ -519,3 +519,28 @@
 .cmp-member-area .cmp-cl-emergency p { margin: 8px 0 0; }
 .cmp-member-area .cmp-cl-badge { display: inline-flex !important; gap: 6px; align-items: center; margin: 6px 0 0 !important; background: rgba(255, 80, 215, .15) !important; color: #ffd0f4 !important; border: 1px solid rgba(255, 80, 215, .4); border-radius: 100px; padding: 4px 12px; font-size: 13px; font-weight: 700; }
 .cmp-member-area .cmp-cl-time .cmp-actions { margin-top: 8px; }
+
+/* Feed (0.9.0) */
+.cmp-member-area .cmp-fd-who { display: flex; gap: 10px; align-items: center; }
+.cmp-member-area a.cmp-fd-av { width: 44px; height: 44px; border-radius: 50%; overflow: hidden; flex: 0 0 auto; display: grid !important; place-items: center; background: linear-gradient(135deg, var(--cmp-secondary), #7a3cff) !important; color: #fff !important; font-weight: 800; text-decoration: none !important; }
+.cmp-member-area a.cmp-fd-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cmp-member-area a.cmp-fd-name { display: block; font-weight: 800; color: var(--cmp-text, #f5f4f7) !important; text-decoration: none !important; }
+.cmp-member-area .cmp-fd-who small { color: var(--cmp-muted); font-size: 12.5px; }
+.cmp-member-area .cmp-fd-tag { margin: 10px 0 0; }
+.cmp-member-area .cmp-fd-tag a { display: inline-flex; gap: 6px; align-items: center; min-height: 32px; background: rgba(225, 245, 119, .1) !important; border: 1px solid rgba(225, 245, 119, .35); color: var(--cmp-primary) !important; border-radius: 100px; padding: 4px 12px; font-size: 13px; font-weight: 700; text-decoration: none !important; }
+.cmp-member-area .cmp-fd-body { margin: 10px 0 0; line-height: 1.5; overflow-wrap: anywhere; }
+.cmp-member-area .cmp-fd-photos { display: grid; gap: 4px; margin-top: 10px; grid-template-columns: 1fr 1fr; }
+.cmp-member-area .cmp-fd-photos.cmp-fd-n1 { grid-template-columns: 1fr; }
+.cmp-member-area .cmp-fd-photos a { display: block; border-radius: 10px; overflow: hidden; }
+.cmp-member-area .cmp-fd-photos img { display: block; width: 100%; height: 100%; max-height: 520px; object-fit: cover; }
+.cmp-member-area .cmp-fd-photos:not(.cmp-fd-n1) img { aspect-ratio: 1; }
+.cmp-member-area .cmp-fd-acts { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 10px; }
+.cmp-member-area .cmp-fd-acts form { margin: 0; }
+.cmp-member-area button.cmp-fd-likebtn, .cmp-member-area button.cmp-fd-link { background: transparent !important; border: none !important; box-shadow: none !important; color: var(--cmp-muted) !important; font: inherit !important; font-size: 14px !important; font-weight: 700 !important; min-height: 44px; padding: 0 4px !important; cursor: pointer; text-transform: none !important; letter-spacing: 0 !important; }
+.cmp-member-area button.cmp-fd-likebtn.is-liked { color: var(--cmp-secondary) !important; }
+.cmp-member-area button.cmp-fd-likebtn span[aria-hidden] { font-size: 18px; vertical-align: -1px; }
+.cmp-member-area .cmp-fd-report summary { color: var(--cmp-muted); font-weight: 700; font-size: 14px; min-height: 44px; display: flex; align-items: center; cursor: pointer; list-style: none; }
+.cmp-member-area .cmp-fd-report[open] { flex-basis: 100%; }
+.cmp-member-area .cmp-fd-post.is-hidden { opacity: .6; }
+.cmp-member-area .cmp-fd-pages { display: flex; gap: 8px; justify-content: center; margin: 8px 0 16px; }
+.cmp-member-area .cmp-fd-profile { margin-top: 16px; }

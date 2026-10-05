@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Member Feed</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root { --primary: #e1f577; --secondary: #ff50d7; --text: #f5f4f7; --muted: #a9a6bb; --card: #1b1826; --field: #110f18; --border: rgba(255,255,255,.10); --line: rgba(255,255,255,.08); --page: #0b0a10; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font-family: Inter, system-ui, sans-serif; }
+.intro { max-width: 1150px; margin: 0 auto; padding: 28px 16px 6px; }
+.intro h1 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 22px; margin: 0 0 8px; }
+.intro p { color: var(--muted); max-width: 900px; line-height: 1.55; margin: 0 0 6px; }
+.intro strong { color: var(--text); }
+.row { display: flex; flex-wrap: wrap; gap: 26px; justify-content: center; padding: 18px 16px; align-items: flex-start; }
+.phone { width: 380px; max-width: calc(100vw - 32px); height: 800px; border: 10px solid #26232f; border-radius: 44px; background: #000; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.screen { height: 100%; overflow-y: auto; padding: 18px 14px 30px; }
+.cap { font-size: 12.5px; color: var(--muted); text-align: center; max-width: 380px; margin: 8px auto 0; }
+h2 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 19px; margin: 0 0 10px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+.compose textarea { width: 100%; min-height: 70px; background: var(--field); border: 1.5px solid var(--border); border-radius: 8px; color: var(--text); font: inherit; font-size: 14px; padding: 10px; }
+.crow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+select { background: var(--field); border: 1.5px solid var(--border); color: var(--text); border-radius: 8px; min-height: 44px; padding: 0 10px; font: inherit; font-size: 13px; max-width: 100%; }
+.btn { border: none; border-radius: 100px; min-height: 44px; padding: 0 14px; font-weight: 800; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
+.btn.y { background: var(--primary); color: #0b0a12; }
+.btn.o { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
+.who { display: flex; gap: 10px; align-items: center; }
+.av { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg,#ff50d7,#7a3cff); display: grid; place-items: center; font-weight: 800; flex: 0 0 auto; }
+.who b { display: block; font-size: 14.5px; }
+.who small { color: var(--muted); font-size: 12px; }
+.tag { display: inline-flex; gap: 6px; align-items: center; margin: 10px 0 0; background: rgba(225,245,119,.1); border: 1px solid rgba(225,245,119,.35); color: var(--primary); border-radius: 100px; padding: 5px 10px; font-size: 12.5px; font-weight: 700; }
+.body { font-size: 14.5px; line-height: 1.5; margin: 10px 0 0; }
+.ph { border-radius: 10px; background: linear-gradient(135deg,#2c2238,#14101c); display: grid; place-items: center; color: rgba(255,255,255,.35); font-size: 12px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 10px; }
+.grid2 .ph { aspect-ratio: 1; }
+.acts { display: flex; gap: 14px; margin-top: 10px; font-size: 13px; color: var(--muted); align-items: center; }
+.acts .like { color: var(--secondary); font-weight: 800; }
+.vis { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.desk { width: 1080px; max-width: calc(100vw - 32px); border: 1px solid var(--border); border-radius: 14px; background: #0e0c14; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.5); display: grid; grid-template-columns: 1fr 320px; gap: 18px; }
+.event { padding: 12px; }
+.event h4 { margin: 0 0 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.event b { color: var(--primary); }
+.strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 8px; }
+.strip .ph { aspect-ratio: 1; }
+.decisions { max-width: 1000px; margin: 10px auto 60px; padding: 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.decisions b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="intro">
+	<h1>Member feed</h1>
+	<p>Mockup for <strong>Community Member Planning 0.9.0</strong>: an activity feed inside the member area, where members share text and photo posts and can tag a calendar event (for example photos they took there). Members only; never public. Sample data.</p>
+</div>
+<div class="row">
+	<div>
+		<div class="phone"><div class="screen">
+			<h2>Feed</h2>
+			<div class="card compose">
+				<textarea placeholder="Share something with members…">Great turnout at Leather Night! Thanks to everyone who came out.</textarea>
+				<div class="crow"><button class="btn o">📷 Photos (up to 4)</button></div>
+				<div class="crow"><select><option>Tag an event: Leather Night · Sat Oct 3</option></select></div>
+				<div class="crow"><select><option>All members</option><option>My connections</option></select><button class="btn y">Post</button></div>
+			</div>
+			<div class="card">
+				<div class="who"><div class="av">B</div><div><b>boyJay</b><small>2h · <span class="vis">All members</span></small></div></div>
+				<div class="tag">📅 Leather Night · Sat Oct 3</div>
+				<p class="body">Great turnout at Leather Night! Thanks to everyone who came out.</p>
+				<div class="grid2"><div class="ph">photo</div><div class="ph">photo</div></div>
+				<div class="acts"><span class="like">♥ 12</span><span>Report</span></div>
+			</div>
+			<div class="card">
+				<div class="who"><div class="av">S</div><div><b>SampleSir</b><small>Yesterday · <span class="vis">My connections</span></small></div></div>
+				<p class="body">Proud of my boy for a full week of homework. 7/7.</p>
+				<div class="acts"><span>♡ 3</span><span>Report</span></div>
+			</div>
+		</div></div>
+		<div class="cap">Phone: write, add photos, tag an event, choose who sees it.</div>
+	</div>
+	<div class="desk">
+		<div>
+			<h2>Feed</h2>
+			<div class="card">
+				<div class="who"><div class="av">B</div><div><b>boyJay</b><small>2h · <span class="vis">All members</span></small></div></div>
+				<div class="tag">📅 Leather Night · Sat Oct 3</div>
+				<p class="body">Great turnout at Leather Night! Thanks to everyone who came out.</p>
+				<div class="grid2"><div class="ph" style="aspect-ratio:4/3">photo</div><div class="ph" style="aspect-ratio:4/3">photo</div></div>
+				<div class="acts"><span class="like">♥ 12</span><span>Report</span></div>
+			</div>
+		</div>
+		<div>
+			<div class="card event">
+				<h4>Tagged event</h4>
+				<b>Leather Night</b><br><span style="color:var(--muted);font-size:13px">Sat Oct 3 · 4 posts by members</span>
+				<div class="strip"><div class="ph">photo</div><div class="ph">photo</div><div class="ph">photo</div></div>
+			</div>
+			<div class="card" style="font-size:13px;color:var(--muted)">Filter: <b style="color:var(--text)">Everyone</b> · My connections · Just me</div>
+		</div>
+	</div>
+</div>
+<div class="decisions">
+	<h2 style="font-size:16px">Decisions made overnight, for the owner to confirm</h2>
+	<ol>
+		<li><b>Members only.</b> Posts and photos are never public and never indexed; each post is "All members" or "My connections" (members in an active dynamic with you).</li>
+		<li><b>Posts:</b> text up to 2,000 characters and up to 4 photos (re-encoded, location data removed). Optionally tag one calendar event from the last 60 days or the next 30.</li>
+		<li><b>Event tag</b> links to the event page; the feed can be filtered to one event to see everyone's photos from it.</li>
+		<li><b>Likes</b> (♥) only for now; <b>no comments</b> yet (they need more moderation).</li>
+		<li><b>Moderation:</b> any member can report a post; the site admin is emailed; admins can hide any post from the feed; authors can delete their own posts.</li>
+		<li><b>Profiles</b> show the member's recent posts that you're allowed to see.</li>
+		<li><b>Not yet:</b> tagging other people (consent first), comments, automatic activity items (e.g. "started a dynamic"), and showing member photos on the public event page.</li>
+	</ol>
+</div>
+</body>
+</html>

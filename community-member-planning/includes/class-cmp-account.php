@@ -447,7 +447,7 @@ class CMP_Account {
 					$rows[] = array( 'name' => $name, 'value' => (string) $value );
 				}
 			}
-			$rows = array_merge( $rows, CMP_Birth_Date::export_rows( $user->ID ), CMP_Dynamics::export_rows( $user->ID ), CMP_Homework::export_rows( $user->ID ), CMP_Chastity::export_rows( $user->ID ) );
+			$rows = array_merge( $rows, CMP_Birth_Date::export_rows( $user->ID ), CMP_Dynamics::export_rows( $user->ID ), CMP_Homework::export_rows( $user->ID ), CMP_Chastity::export_rows( $user->ID ), CMP_Feed::export_rows( $user->ID ) );
 			if ( $rows ) {
 				$data[] = array( 'group_id' => 'cmp-access', 'group_label' => __( 'Member area access', 'cmp' ), 'item_id' => 'cmp-access-' . $user->ID, 'data' => $rows );
 			}
@@ -481,6 +481,7 @@ class CMP_Account {
 			$removed = CMP_Profiles::delete_all( $user->ID ) > 0 || $removed;
 			$removed = CMP_Profile_Images::delete_all( $user->ID ) > 0 || $removed;
 			$removed = CMP_Birth_Date::erase( $user->ID ) || $removed;
+			$removed = CMP_Feed::erase( $user->ID ) > 0 || $removed;
 			$removed = CMP_Chastity::erase( $user->ID ) > 0 || $removed;
 			$removed = CMP_Homework::erase( $user->ID ) > 0 || $removed;
 			$removed = CMP_Dynamics::erase( $user->ID ) > 0 || $removed;
