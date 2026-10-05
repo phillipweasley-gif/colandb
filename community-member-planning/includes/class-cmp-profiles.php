@@ -6,8 +6,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Member profiles (brief §2 "Member profile"): the values a member enters
  * for each field in CMP_Profile_Fields, with a visibility per field
- * (Private / Connections / Members, default Private), the member area's
- * Profile tab, and the one rule for who may see what (can_view()).
+ * (Private / Connections / Members), the member area's Profile tab, and the
+ * one rule for who may see what (can_view()).
+ *
+ * Since 0.4.0 (owner decision 2026-10-04) the Profile tab shows one "Show to
+ * members" switch per filled-in field instead of a three-way menu: empty
+ * fields have no switch, and a newly filled field starts shown (Members).
+ * Switched off is Private; a stored Connections choice is kept until the
+ * member switches that field on. Age is calculated from the date of birth
+ * (CMP_Birth_Date), so it only has a switch.
  *
  * Search choices ("Include in member search", directory opt-in) are stored
  * per field but not offered yet: they only mean something once the member
@@ -87,6 +94,10 @@ class CMP_Profiles {
 				return $user ? wp_date( 'F Y', strtotime( $user->user_registered . ' UTC' ) ) : '';
 			case 'image':
 				return CMP_Profile_Images::get( $user_id, $key ) ? true : '';
+			case 'age':
+				// Calculated from the date of birth; never typed in (0.4.0).
+				$age = CMP_Birth_Date::age( $user_id );
+				return $age ? array( 'mode' => 'exact', 'value' => $age ) : '';
 		}
 		$rows = null === $rows ? self::rows( $user_id ) : $rows;
 		return $rows[ $key ]['value'];
@@ -120,6 +131,43 @@ class CMP_Profiles {
 			),
 			array( '%d', '%s', '%s', '%s', '%d', '%s' )
 		);
+	}
+
+	/** Whether the member has ever saved anything (value or choice) for a field. */
+	private static function has_row( $user_id, $key ) {
+		global $wpdb;
+		$table = CMP_Install::table( 'profile_values' );
+		return (bool) $wpdb->get_var( $wpdb->prepare( "SELECT 1 FROM $table WHERE user_id = %d AND field_key = %s", $user_id, $key ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	}
+
+	/**
+	 * Drops an age typed in before 0.4.0, keeping its visibility choice: age
+	 * now comes only from the date of birth.
+	 */
+	public static function clear_manual_age( $user_id ) {
+		$rows = self::rows( $user_id );
+		if ( '' !== $rows['age']['value'] && null !== $rows['age']['value'] ) {
+			self::save_field( $user_id, 'age', '', $rows['age']['visibility'] );
+		}
+	}
+
+	/**
+	 * A brand-new account (sign-up with a date of birth): its display name,
+	 * age and member-since date are filled in from the start, so like any
+	 * filled-in field they start shown to members. Never applied to existing members, whose
+	 * earlier choices stay as they were.
+	 */
+	public static function set_new_member_defaults( $user_id ) {
+		foreach ( array( 'display_name', 'age', 'member_since' ) as $key ) {
+			if ( ! self::has_row( $user_id, $key ) ) {
+				self::save_field( $user_id, $key, null, 'members' );
+			}
+		}
+	}
+
+	/** Whether a field currently has something to show. */
+	private static function is_filled( $key, $value ) {
+		return '' !== CMP_Profile_Fields::display( $key, $value );
 	}
 
 	public static function delete_all( $user_id ) {
@@ -207,15 +255,16 @@ class CMP_Profiles {
 			exit;
 		}
 		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- each value is cleaned by CMP_Profile_Fields::clean().
-		$input = isset( $_POST['f'] ) && is_array( $_POST['f'] ) ? wp_unslash( $_POST['f'] ) : array();
-		$vis   = isset( $_POST['v'] ) && is_array( $_POST['v'] ) ? wp_unslash( $_POST['v'] ) : array();
+		$input   = isset( $_POST['f'] ) && is_array( $_POST['f'] ) ? wp_unslash( $_POST['f'] ) : array();
+		$show    = isset( $_POST['s'] ) && is_array( $_POST['s'] ) ? wp_unslash( $_POST['s'] ) : array();
+		$present = isset( $_POST['sp'] ) && is_array( $_POST['sp'] ) ? wp_unslash( $_POST['sp'] ) : array();
 		// phpcs:enable
 
 		$rows   = self::rows( $user_id );
 		$clean  = array();
 		$errors = array();
 		foreach ( CMP_Profile_Fields::fields() as $key => $f ) {
-			if ( in_array( $f['type'], array( 'account', 'system', 'image' ), true ) ) {
+			if ( in_array( $f['type'], array( 'account', 'system', 'image', 'age' ), true ) ) {
 				continue;
 			}
 			$value = CMP_Profile_Fields::clean( $key, isset( $input[ $key ] ) ? $input[ $key ] : '' );
@@ -226,7 +275,7 @@ class CMP_Profiles {
 			}
 		}
 		if ( $errors ) {
-			set_transient( self::ERRORS . $user_id, array( 'errors' => $errors, 'input' => $input, 'vis' => $vis ), self::ERRORS_TTL );
+			set_transient( self::ERRORS . $user_id, array( 'errors' => $errors, 'input' => $input, 'show' => $show, 'present' => $present ), self::ERRORS_TTL );
 			wp_safe_redirect( self::url( 'profile_invalid', 'cmp-profile-errors' ) );
 			exit;
 		}
@@ -239,9 +288,19 @@ class CMP_Profiles {
 			if ( 'image' === $f['type'] ) {
 				continue; // Saved with the photo itself.
 			}
-			$v = isset( $vis[ $key ] ) ? sanitize_key( $vis[ $key ] ) : 'private';
-			$v = in_array( $v, CMP_Profile_Fields::VISIBILITY, true ) ? $v : 'private';
 			$has_value = array_key_exists( $key, $clean );
+			$current   = $rows[ $key ]['visibility'];
+			$filled    = self::is_filled( $key, $has_value ? $clean[ $key ] : self::value( $user_id, $key, $rows ) );
+			if ( ! $filled || empty( $present[ $key ] ) ) {
+				// Nothing to share, or no switch was shown: leave the choice alone.
+				$v = $current;
+			} elseif ( ! empty( $show[ $key ] ) ) {
+				$v = 'members';
+			} else {
+				// Switched off. A Connections choice made before 0.4.0 stays
+				// Connections rather than silently becoming Only me.
+				$v = 'connections' === $current ? 'connections' : 'private';
+			}
 			if ( $has_value && $clean[ $key ] !== $rows[ $key ]['value'] && ! ( '' === $clean[ $key ] && ( '' === $rows[ $key ]['value'] || null === $rows[ $key ]['value'] ) ) ) {
 				$changed_values[] = $key;
 			}
@@ -276,14 +335,21 @@ class CMP_Profiles {
 		);
 	}
 
-	private static function visibility_select( $key, $current, $label ) {
-		$id   = 'cmp_v_' . $key;
-		$html = '<span class="cmp-visibility"><label for="' . esc_attr( $id ) . '">' . esc_html__( 'Who can see this', 'cmp' ) . '<span class="screen-reader-text">: ' . esc_html( $label ) . '</span></label>'
-			. '<select id="' . esc_attr( $id ) . '" name="v[' . esc_attr( $key ) . ']">';
-		foreach ( self::visibility_labels() as $value => $text ) {
-			$html .= '<option value="' . esc_attr( $value ) . '"' . selected( $current, $value, false ) . '>' . esc_html( $text ) . '</option>';
-		}
-		return $html . '</select></span>';
+	/**
+	 * The "Show to members" switch. $hidden: the field is empty, so there is
+	 * nothing to share yet; member.js reveals the switch (already on) once
+	 * something is filled in. Without JavaScript the hidden switch still
+	 * posts "on", so a newly filled field starts shown either way.
+	 */
+	private static function show_switch( $key, $on, $label, $hidden ) {
+		$id = 'cmp_s_' . $key;
+		return '<span class="cmp-show" data-cmp-show' . ( $hidden ? ' hidden' : '' ) . '>'
+			. '<input type="hidden" name="sp[' . esc_attr( $key ) . ']" value="1" />'
+			. '<input type="checkbox" class="cmp-switch-input" id="' . esc_attr( $id ) . '" name="s[' . esc_attr( $key ) . ']" value="1"' . checked( $on, true, false ) . ' />'
+			. '<label for="' . esc_attr( $id ) . '" class="cmp-switch-label"><span class="cmp-switch" aria-hidden="true"></span>'
+			. '<span class="cmp-show-state" data-on="' . esc_attr__( 'Shown', 'cmp' ) . '" data-off="' . esc_attr__( 'Hidden', 'cmp' ) . '"></span>'
+			. '<span class="screen-reader-text">' . esc_html( sprintf( /* translators: %s: field label */ __( 'Show %s to members', 'cmp' ), $label ) ) . '</span></label>'
+			. '</span>';
 	}
 
 	private static function error_html( $key, $errors ) {
@@ -354,20 +420,8 @@ class CMP_Profiles {
 				}
 				return $html;
 			case 'age':
-				$value = is_array( $value ) ? $value : array();
-				$mode  = isset( $value['mode'] ) ? (string) $value['mode'] : '';
-				$exact = 'exact' === $mode && isset( $value['value'] ) ? (string) $value['value'] : ( isset( $value['exact'] ) ? (string) $value['exact'] : '' );
-				$band  = 'band' === $mode && isset( $value['value'] ) ? (string) $value['value'] : ( isset( $value['band'] ) ? (string) $value['band'] : '' );
-				$html  = '<span class="cmp-age" data-cmp-age>';
-				$html .= '<span class="cmp-choice"><input type="radio" id="' . esc_attr( $id ) . '_none" name="' . esc_attr( $name . '[mode]' ) . '" value=""' . checked( '', $mode, false ) . ' /><label for="' . esc_attr( $id ) . '_none">' . esc_html__( "Don't show an age", 'cmp' ) . '</label></span>';
-				$html .= '<span class="cmp-choice"><input type="radio" id="' . esc_attr( $id ) . '_exact" name="' . esc_attr( $name . '[mode]' ) . '" value="exact"' . checked( 'exact', $mode, false ) . ' /><label for="' . esc_attr( $id ) . '_exact">' . esc_html__( 'My age:', 'cmp' ) . '</label>'
-					. '<input type="number" min="18" max="120" step="1" inputmode="numeric" class="cmp-age-number" id="' . esc_attr( $id ) . '_exact_value" name="' . esc_attr( $name . '[exact]' ) . '" value="' . esc_attr( $exact ) . '" aria-label="' . esc_attr__( 'Age in years, 18 to 120', 'cmp' ) . '"' . $bad . ' /></span>';
-				$html .= '<span class="cmp-choice"><input type="radio" id="' . esc_attr( $id ) . '_band" name="' . esc_attr( $name . '[mode]' ) . '" value="band"' . checked( 'band', $mode, false ) . ' /><label for="' . esc_attr( $id ) . '_band">' . esc_html__( 'An age range:', 'cmp' ) . '</label>'
-					. '<select id="' . esc_attr( $id ) . '_band_value" name="' . esc_attr( $name . '[band]' ) . '" aria-label="' . esc_attr__( 'Age range', 'cmp' ) . '"><option value="">' . esc_html__( 'Choose…', 'cmp' ) . '</option>';
-				foreach ( CMP_Profile_Fields::AGE_BANDS as $k => $label ) {
-					$html .= '<option value="' . esc_attr( $k ) . '"' . selected( $band, $k, false ) . '>' . esc_html( $label ) . '</option>';
-				}
-				return $html . '</select></span></span>';
+				$text = CMP_Profile_Fields::display( 'age', $value );
+				return '<span class="cmp-readonly cmp-age-value">' . esc_html( '' !== $text ? $text : __( 'Not available yet', 'cmp' ) ) . '</span>';
 		}
 		return '';
 	}
@@ -383,7 +437,7 @@ class CMP_Profiles {
 			'identity'     => sprintf( /* translators: %d: maximum choices */ __( 'Choose up to %d, and/or describe it yourself.', 'cmp' ), 10 ),
 			'availability' => __( 'Set by you; never worked out from when you sign in.', 'cmp' ),
 			'looking_for'  => sprintf( /* translators: %d: maximum choices */ __( 'Choose up to %d.', 'cmp' ), 10 ),
-			'age'          => __( 'Optional. We never ask for your date of birth, and an age you enter doesn\'t change by itself.', 'cmp' ),
+			'age'          => __( 'Worked out from your date of birth, and updates on your birthday. Your birth date itself is never shown.', 'cmp' ),
 			'member_since' => __( 'Set automatically from when you joined.', 'cmp' ),
 		);
 		return isset( $help[ $key ] ) ? $help[ $key ] : '';
@@ -395,18 +449,17 @@ class CMP_Profiles {
 		$saved   = get_transient( self::ERRORS . $user_id );
 		$errors  = $saved && ! empty( $saved['errors'] ) ? $saved['errors'] : array();
 		$input   = $saved && isset( $saved['input'] ) ? (array) $saved['input'] : array();
-		$vis_in  = $saved && isset( $saved['vis'] ) ? (array) $saved['vis'] : array();
+		$show_in = $saved && isset( $saved['show'] ) ? (array) $saved['show'] : null;
 		$fields  = CMP_Profile_Fields::fields();
 
 		ob_start();
 		?>
 		<section class="cmp-step" aria-labelledby="cmp-profile-title">
 			<h2 id="cmp-profile-title" class="cmp-title"><?php esc_html_e( 'Your profile', 'cmp' ); ?></h2>
-			<p><?php esc_html_e( 'Everything here is optional apart from your display name, and starts out visible only to you. For each item, choose who can see it.', 'cmp' ); ?></p>
+			<p><?php esc_html_e( 'Fill in only what you want. Anything you fill in is shown to signed-in members; switch it off to keep it to yourself.', 'cmp' ); ?></p>
 			<ul class="cmp-legend">
-				<li><strong><?php esc_html_e( 'Only me', 'cmp' ); ?></strong> — <?php esc_html_e( 'nobody else, not even site administrators.', 'cmp' ); ?></li>
-				<li><strong><?php esc_html_e( 'My connections', 'cmp' ); ?></strong> — <?php esc_html_e( 'members you have connected with. Connections are coming in a later update; until then this is the same as Only me.', 'cmp' ); ?></li>
-				<li><strong><?php esc_html_e( 'All members', 'cmp' ); ?></strong> — <?php esc_html_e( 'anyone signed in to the member area. Never the public, search engines or anyone signed out.', 'cmp' ); ?></li>
+				<li><strong><?php esc_html_e( 'Shown', 'cmp' ); ?></strong> — <?php esc_html_e( 'anyone signed in to the member area. Never the public, search engines or anyone signed out.', 'cmp' ); ?></li>
+				<li><strong><?php esc_html_e( 'Hidden', 'cmp' ); ?></strong> — <?php esc_html_e( 'nobody else, not even site administrators.', 'cmp' ); ?></li>
 			</ul>
 		</section>
 
@@ -433,7 +486,8 @@ class CMP_Profiles {
 						continue;
 					}
 					$value  = array_key_exists( $key, $input ) ? $input[ $key ] : self::value( $user_id, $key, $rows );
-					$vis    = isset( $vis_in[ $key ] ) ? sanitize_key( $vis_in[ $key ] ) : $rows[ $key ]['visibility'];
+					$filled = self::is_filled( $key, $value );
+					$on     = null !== $show_in ? ! empty( $show_in[ $key ] ) : ( ! $filled || 'members' === $rows[ $key ]['visibility'] );
 					$help   = self::help( $key, $f );
 					$is_set = in_array( $f['type'], array( 'location', 'multi', 'age' ), true );
 					$label  = esc_html( $f['label'] );
@@ -460,7 +514,7 @@ class CMP_Profiles {
 						echo self::input_html( $key, $f, $value, $errors ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 					}
 					echo $is_set ? '</fieldset>' : '</div>';
-					echo self::visibility_select( $key, $vis, $f['label'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					echo self::show_switch( $key, $on, $f['label'], ! $filled ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 					echo '</div>';
 				}
 				?>
@@ -482,7 +536,7 @@ class CMP_Profiles {
 		?>
 		<section class="cmp-panel" id="cmp-preview">
 			<h3 class="cmp-panel-title" id="cmp-preview-title"><?php esc_html_e( 'What other members see', 'cmp' ); ?></h3>
-			<p class="cmp-muted"><?php esc_html_e( 'Based on what is saved now: only the items set to All members.', 'cmp' ); ?></p>
+			<p class="cmp-muted"><?php esc_html_e( 'Based on what is saved now: only the items switched on.', 'cmp' ); ?></p>
 			<?php echo self::card_html( $user_id, $user_id, true ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 		</section>
 		<?php

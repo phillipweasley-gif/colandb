@@ -446,6 +446,7 @@ class CMP_Account {
 					$rows[] = array( 'name' => $name, 'value' => (string) $value );
 				}
 			}
+			$rows = array_merge( $rows, CMP_Birth_Date::export_rows( $user->ID ) );
 			if ( $rows ) {
 				$data[] = array( 'group_id' => 'cmp-access', 'group_label' => __( 'Member area access', 'cmp' ), 'item_id' => 'cmp-access-' . $user->ID, 'data' => $rows );
 			}
@@ -478,6 +479,7 @@ class CMP_Account {
 			$removed = (bool) $wpdb->delete( CMP_Install::table( 'notifications' ), array( 'user_id' => $user->ID ), array( '%d' ) );
 			$removed = CMP_Profiles::delete_all( $user->ID ) > 0 || $removed;
 			$removed = CMP_Profile_Images::delete_all( $user->ID ) > 0 || $removed;
+			$removed = CMP_Birth_Date::erase( $user->ID ) || $removed;
 			foreach ( array( CMP_Email_Verification::META_VERIFIED_EMAIL, CMP_Email_Verification::META_VERIFIED_AT, CMP_Email_Verification::META_TOKEN_HASH, CMP_Email_Verification::META_TOKEN_EXPIRES, CMP_Email_Verification::META_TOKEN_EMAIL, CMP_Access::META_ATTESTED_AT, CMP_Access::META_ATTESTED_VERSION, CMP_Notifications::META_DISABLED, CMP_Notifications::META_TIMEZONE, self::META_CHANGE_HASH, self::META_CHANGE_EXPIRES, self::META_CHANGE_EMAIL ) as $key ) {
 				$removed = delete_user_meta( $user->ID, $key ) || $removed;
 			}
@@ -486,7 +488,12 @@ class CMP_Account {
 		return array(
 			'items_removed'  => $removed,
 			'items_retained' => (bool) $user,
-			'messages'       => $user ? array( __( 'Member area: the security audit log (who changed what, and when) is kept, as required for account security.', 'cmp' ) ) : array(),
+			'messages'       => $user ? array_filter(
+				array(
+					__( 'Member area: the security audit log (who changed what, and when) is kept, as required for account security.', 'cmp' ),
+					CMP_Birth_Date::is_blocked( $user->ID ) ? __( 'Member area: the lock on this account (it gave a date of birth under 18) is kept, so erasing data can\'t reopen the member area to it.', 'cmp' ) : '',
+				)
+			) : array(),
 			'done'           => true,
 		);
 	}

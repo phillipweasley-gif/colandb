@@ -206,8 +206,16 @@ class CMP_Profile_Images {
 
 		$decorative = ! empty( $_POST['decorative'] );
 		$alt        = $decorative ? '' : trim( sanitize_text_field( wp_unslash( isset( $_POST['alt'] ) ? $_POST['alt'] : '' ) ) );
-		$visibility = isset( $_POST['visibility'] ) ? sanitize_key( wp_unslash( $_POST['visibility'] ) ) : 'private';
-		$visibility = in_array( $visibility, CMP_Profile_Fields::VISIBILITY, true ) ? $visibility : 'private';
+		// Show switch (0.4.0): on = Members. Off = Only me, except that a
+		// Connections choice made before 0.4.0 stays Connections. Older
+		// forms that still post "visibility" are read as before.
+		$stored_vis = CMP_Profiles::rows( $user_id )[ $kind ]['visibility'];
+		if ( isset( $_POST['show_present'] ) ) {
+			$visibility = ! empty( $_POST['show'] ) ? 'members' : ( 'connections' === $stored_vis ? 'connections' : 'private' );
+		} else {
+			$visibility = isset( $_POST['visibility'] ) ? sanitize_key( wp_unslash( $_POST['visibility'] ) ) : 'private';
+			$visibility = in_array( $visibility, CMP_Profile_Fields::VISIBILITY, true ) ? $visibility : 'private';
+		}
 		$file       = isset( $_FILES['photo'] ) && is_array( $_FILES['photo'] ) ? $_FILES['photo'] : null; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 		$uploaded   = $file && isset( $file['error'] ) && UPLOAD_ERR_NO_FILE !== (int) $file['error'];
 
@@ -393,13 +401,11 @@ class CMP_Profile_Images {
 					<input type="text" id="<?php echo esc_attr( $id ); ?>-alt" name="alt" maxlength="150" value="<?php echo esc_attr( $img ? $img->alt : '' ); ?>" aria-describedby="<?php echo esc_attr( $id ); ?>-alt-help" />
 					<span class="cmp-muted" id="<?php echo esc_attr( $id ); ?>-alt-help"><?php esc_html_e( 'Read out by screen readers. Up to 150 characters, for example "Me at the spring market".', 'cmp' ); ?></span>
 				</p>
-				<p class="cmp-field">
-					<label for="<?php echo esc_attr( $id ); ?>-visibility"><?php esc_html_e( 'Who can see this', 'cmp' ); ?></label>
-					<select id="<?php echo esc_attr( $id ); ?>-visibility" name="visibility">
-						<?php foreach ( CMP_Profiles::visibility_labels() as $value => $text ) : ?>
-							<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $visibility, $value ); ?>><?php echo esc_html( $text ); ?></option>
-						<?php endforeach; ?>
-					</select>
+				<p class="cmp-field cmp-show-photo">
+					<input type="hidden" name="show_present" value="1" />
+					<?php // A new photo starts shown, like any filled-in field. ?>
+					<input type="checkbox" class="cmp-switch-input" id="<?php echo esc_attr( $id ); ?>-show" name="show" value="1" <?php checked( ! $img || 'members' === $visibility ); ?> />
+					<label for="<?php echo esc_attr( $id ); ?>-show" class="cmp-switch-label"><span class="cmp-switch" aria-hidden="true"></span><span class="cmp-show-text"><?php esc_html_e( 'Show to members', 'cmp' ); ?></span></label>
 				</p>
 				<div class="cmp-actions">
 					<button type="submit" class="cmp-btn" data-cmp-photo-save><?php echo esc_html( $img ? __( 'Save', 'cmp' ) : __( 'Upload', 'cmp' ) ); ?></button>

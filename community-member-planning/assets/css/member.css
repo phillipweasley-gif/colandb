@@ -232,7 +232,31 @@
 .cmp-member-area .cmp-fieldset > legend { font-weight: 700; padding: 0; margin: 0 0 4px; color: var(--cmp-text); }
 .cmp-member-area .cmp-fieldset { border: 0; margin: 0 0 16px; padding: 0; }
 .cmp-member-area .cmp-readonly { color: var(--cmp-text); }
-.cmp-member-area .cmp-visibility { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; color: var(--cmp-muted); }
+/* "Show to members" switch (0.4.0). Scoped with !important on its look:
+   themes (Hello Elementor's reset.css) restyle checkboxes and labels. */
+.cmp-member-area .cmp-show[hidden] { display: none !important; }
+.cmp-member-area .cmp-show, .cmp-member-area .cmp-show-photo { display: flex; align-items: center; justify-content: flex-end; }
+.cmp-member-area .cmp-show-photo { justify-content: flex-start; }
+.cmp-member-area .cmp-switch-input { position: absolute !important; opacity: 0 !important; width: 1px !important; height: 1px !important; margin: 0 !important; pointer-events: none; }
+.cmp-member-area .cmp-switch-label {
+	display: inline-flex !important; align-items: center !important; gap: 10px !important;
+	min-height: 44px !important; padding: 0 !important; margin: 0 !important; cursor: pointer;
+	color: var(--cmp-muted) !important; font-size: 0.9rem !important; font-weight: 600 !important;
+	background: transparent !important; border: 0 !important; text-transform: none !important;
+}
+.cmp-member-area .cmp-switch { position: relative; width: 48px; height: 28px; border-radius: 100px; background: #3a3647; flex-shrink: 0; transition: background .15s; }
+.cmp-member-area .cmp-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #d8d6e0; transition: transform .15s; }
+.cmp-member-area .cmp-switch-input:checked + .cmp-switch-label .cmp-switch { background: var(--cmp-secondary); }
+.cmp-member-area .cmp-switch-input:checked + .cmp-switch-label .cmp-switch::after { transform: translateX(20px); background: #fff; }
+.cmp-member-area .cmp-switch-input:focus-visible + .cmp-switch-label .cmp-switch { outline: 2px solid var(--cmp-primary); outline-offset: 2px; }
+.cmp-member-area .cmp-show-state::before { content: attr(data-off); }
+.cmp-member-area .cmp-switch-input:checked + .cmp-switch-label .cmp-show-state::before { content: attr(data-on); }
+.cmp-member-area .cmp-switch-input:checked + .cmp-switch-label { color: var(--cmp-secondary) !important; }
+.cmp-member-area .cmp-show-state { min-width: 52px; text-align: right; order: -1; }
+.cmp-member-area .cmp-age-value { font-size: 1.1rem; font-weight: 700; }
+/* Date of birth: Month / Day / Year in one row. */
+.cmp-member-area .cmp-dob { display: grid; grid-template-columns: 1.4fr 1fr 1.2fr; gap: 8px; max-width: 420px; }
+.cmp-member-area .cmp-dob select { min-height: 44px; width: 100% !important; }
 .cmp-member-area .cmp-field-error { color: var(--cmp-error); font-weight: 600; }
 .cmp-member-area .cmp-field-error::before { content: "!\00a0"; }
 .cmp-member-area .cmp-field-error[hidden] { display: none !important; }
@@ -312,7 +336,16 @@
 	.cmp-member-area .cmp-notification .cmp-btn { grid-column: 2; justify-self: start; }
 	.cmp-member-area .cmp-grid,
 	.cmp-member-area .cmp-grid-3,
-	.cmp-member-area .cmp-profile-row { grid-template-columns: 1fr; }
+	/* Phones: the switch sits beside the field's label (top right of the
+	   row); only the label and its first help line make room for it, so
+	   the inputs below keep the full width. */
+	.cmp-member-area .cmp-profile-row { grid-template-columns: 1fr; position: relative; }
+	.cmp-member-area .cmp-profile-row > .cmp-show { position: absolute; top: 8px; right: 0; }
+	.cmp-member-area .cmp-profile-row:first-of-type > .cmp-show { top: -8px; }
+	.cmp-member-area .cmp-profile-input > label,
+	.cmp-member-area .cmp-profile-input > legend,
+	.cmp-member-area .cmp-profile-input > .cmp-label,
+	.cmp-member-area .cmp-profile-input > .cmp-muted:first-of-type { padding-right: 118px !important; }
 	.cmp-member-area .cmp-card-head { flex-direction: column; align-items: flex-start; }
 	.cmp-member-area .cmp-tabs ul a { padding: 10px 12px !important; }
 }

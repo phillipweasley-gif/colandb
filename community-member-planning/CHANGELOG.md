@@ -4,6 +4,32 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.4.0
+
+**Date of birth at sign-up, and one Show switch per profile field** (owner decisions, 2026-10-04, from an approved mockup). Both override the project brief, which said to store only an 18+ attestation ("not date of birth") and to start every field private.
+
+- **Date of birth is required** (`CMP_Birth_Date`, user meta `cmp_birth_date`).
+  - Sign-up: the events plugin's `[cec_register]` form gets Month / Day / Year lists through its new hooks (CEC 1.27.1). No date, an impossible date (30 Feb) or an age under 18 refuses the sign-up before the account exists. The events plugin stores nothing.
+  - Existing members: the "Confirm you are 18 or older" checkbox step becomes "One more step: enter your date of birth", asked once. Accounts that only ticked the old box are sent back to it (`CMP_Access::has_attested()` now means "an 18+ date on file and not locked").
+  - Under 18 from a signed-in account: the member area is **locked** (`cmp_age_blocked_at`) and says to contact the site team, so a different year can't simply be tried next. Nothing is stored except the lock.
+  - Entered once: members can't change it. The site team can correct it, or unlock a locked account, on the wp-admin user screen (administrators only, nonce-checked, audited without the date).
+  - Never shown to anyone, never searchable, never in the audit log. Included in "export my data"; "erase my data" removes it but keeps an under-18 lock.
+- **Age is calculated** from the date of birth (site timezone) and changes on the member's birthday. The typed age / age range from 0.1–0.3 is gone; any stored typed age is cleared when the date is recorded, keeping its visibility choice.
+- **Show switches replace "Who can see this"** on every field and photo.
+  - Empty fields have no switch. Filling one in reveals its switch already on (member.js; without JavaScript the hidden switch still posts "on").
+  - On = All members (signed-in, verified members only; never the public). Off = Only me. A "My connections" choice made before 0.4.0 is kept while the switch stays off.
+  - A field that stays empty keeps its stored choice. New photos start shown.
+- **Defaults:** a brand-new account's display name, age and member-since start shown (`set_new_member_defaults()`). Existing members' fields keep exactly what they had, so nothing becomes visible without their say.
+- Copy updated: the Profile intro, the age help text, the welcome notification and the step names. The Settings "18+ attestation wording" text is no longer shown to members; its version number is still recorded.
+- **Verification**, in a real local WordPress 7.1.2 (PHP 8.4, SQLite) via `tests/`:
+  - new `tests/dob-e2e.sh` 33/33: sign-up refusals and success, turning 18 today, new-member defaults, existing member asked once, date not changeable from the member area, typed age cleared, under-18 lock (retry with an adult year stays locked, REST closed), wp-admin correction and unlock, a bad nonce, no-JS "filled field starts shown", switch off, photo switch on for a new photo, birth date never on the profile page, export and erase;
+  - `e2e.sh` 59/59 (updated for the date step; adds missing and impossible dates and an audit check);
+  - `account-e2e.sh` 64/64;
+  - `profile-e2e.sh` 68 passed, with the 12 photo checks not runnable on this Mac (no ImageMagick `convert` to make test images; they failed the same way before this change);
+  - `php -l` clean on every file.
+  - Checked in the browser on the Hello Elementor theme at 375px: the date step, the profile switches (typing reveals a switch already on) and the sign-up form.
+  - Known test-script limit, not a site bug: under Hello Elementor `e2e.sh`'s `restnonce()` picks up another script's nonce first, so its 5 REST checks fail there; they pass on the default theme.
+
 ## 0.3.0
 
 **Phase 2 increment 2.1: member profiles**, plus site-wide sign-in controls the owner asked for on 2026-10-04.

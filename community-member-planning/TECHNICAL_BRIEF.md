@@ -20,7 +20,8 @@ community-member-planning/
 │   ├── class-cmp-install.php       tables via dbDelta, CMP_DB_VERSION upgrades
 │   ├── class-cmp-settings.php      Settings → Member Planning (cmp_settings option)
 │   ├── class-cmp-audit.php         append-only audit log
-│   ├── class-cmp-access.php        the gate: logged_out → unverified → unattested → member
+│   ├── class-cmp-access.php        the gate: logged_out → unverified → unattested (no 18+ date of birth, or locked) → member
+│   ├── class-cmp-birth-date.php    date of birth: sign-up fields via CEC hooks, one-time step, under-18 lock, age, wp-admin correction
 │   ├── class-cmp-email-verification.php
 │   ├── class-cmp-notifications.php in-app inbox, quiet hours, category opt-out
 │   ├── class-cmp-rest.php          cmp/v1 routes + no-store headers
@@ -48,7 +49,9 @@ community-member-planning/
 | `{prefix}cmp_profile_values` | user_id + field_key (PK), value (JSON; NULL for display name / photos / member since), visibility (private / connections / members), searchable (0 until 2.4), updated_at. No row = empty, Private, not searchable. |
 | `{prefix}cmp_profile_images` | user_id + kind (avatar / cover) (PK), mime (always image/jpeg), width, height, bytes, sha256, data (MEDIUMBLOB, re-encoded JPEG), alt, decorative, created_at. |
 | option `cmp_profile_options` | The five pick-lists: list => [ { key, label, active, order } ]. Keys are stable; options are retired, never deleted. |
-| user meta `cmp_age_attested_at`, `cmp_age_attestation_version` | 18+ attestation (UTC timestamp, wording version). Never a date of birth. |
+| user meta `cmp_age_attested_at`, `cmp_age_attestation_version` | When the member passed the age step (UTC timestamp) and which wording version applied. |
+| user meta `cmp_birth_date` | Date of birth, `Y-m-d` (0.4.0; owner decision 2026-10-04 overriding the project brief's "store the attestation flag and timestamp, not date of birth"). Required at sign-up and asked once of existing members. Never shown to anyone, never searchable, never written to the audit log; members can't edit it (the site team corrects it on the wp-admin user screen). Included in the export, removed by the eraser. `CMP_Birth_Date`. |
+| user meta `cmp_age_blocked_at` | Set when a signed-in account gives a date under 18: the member area stays closed until the site team unlocks it. Kept by the eraser on purpose. |
 | user meta `cmp_notify_disabled_categories`, `cmp_timezone` | Notification opt-outs; member timezone for quiet hours (UI arrives with profiles). |
 | option `cmp_settings` | member_page_id, privacy_notice_url, attestation_text, attestation_version, delete_data_on_delete, lock_dashboard (default on) |
 | option `cmp_db_version` | Schema version. Don't delete on a live site. |

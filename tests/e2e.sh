@@ -54,7 +54,7 @@ ok "logged-in page still no-store" $(grep -qi '^cache-control:.*no-store' $T/a1.
 code=$(curl -s -b $T/alice.jar -o /dev/null -w '%{http_code}' "$H/?rest_route=/cmp/v1/notifications")
 ok "REST blocked while unverified (401/403)" $([ "$code" = 401 ] || [ "$code" = 403 ] && echo 1 || echo 0)
 N=$(nonce $T/a1.html)
-r=$(post alice -d "action=cmp_attest&_cmp_nonce=$N&cmp_attest_18=1")
+r=$(post alice -d "action=cmp_attest&_cmp_nonce=$N&cmp_dob[m]=2&cmp_dob[d]=14&cmp_dob[y]=1983")
 ok "cannot skip ahead to attestation" $([ "$($W eval 'echo CMP_Access::state(get_user_by("login","alice")->ID);')" = unverified ] && echo 1 || echo 0)
 r=$(post alice -d "action=cmp_send_verification&_cmp_nonce=bad")
 ok "bad nonce rejected" $(echo "$r" | grep -q 'cmp_notice=expired' && echo 1 || echo 0)
@@ -77,15 +77,17 @@ ok "link is single-use" $(echo "$r" | grep -q 'verify_failed' && echo 1 || echo 
 
 echo "== Alice: verified, not yet 18+ attested"
 get alice a2 "$PAGE"
-ATTEST_TEXT=$($W eval 'echo esc_html( CMP_Settings::get("attestation_text") );')
-ok "shows 18+ step with configured wording" $(grep -qF -- "$ATTEST_TEXT" $T/a2.html && echo 1 || echo 0)
+ok "shows the date-of-birth step" $([ "$(has $T/a2.html 'Date of birth')$(has $T/a2.html 'name="cmp_dob\[y\]"')" = 11 ] && echo 1 || echo 0)
 ok "step 1 shown as completed" $(has $T/a2.html 'cmp-steps-done')
 N=$(nonce $T/a2.html)
 r=$(post alice -d "action=cmp_attest&_cmp_nonce=$N")
-ok "unticked box -> validation error" $(echo "$r" | grep -q 'attest_required' && echo 1 || echo 0)
-r=$(post alice -d "action=cmp_attest&_cmp_nonce=$N&cmp_attest_18=1")
-ok "attest -> welcome" $(echo "$r" | grep -q 'cmp_notice=welcome' && echo 1 || echo 0)
-ok "stores timestamp + version only" $($W eval '$u=get_user_by("login","alice")->ID; echo ( get_user_meta($u,"cmp_age_attested_at",true) && 1===(int)get_user_meta($u,"cmp_age_attestation_version",true) && ! get_user_meta($u,"cmp_birth_date",true) ) ? 1 : 0;')
+ok "no date -> asked for it" $(echo "$r" | grep -q 'cmp_notice=dob_missing' && echo 1 || echo 0)
+r=$(post alice -d "action=cmp_attest&_cmp_nonce=$N&cmp_dob[m]=2&cmp_dob[d]=30&cmp_dob[y]=1990")
+ok "impossible date (30 Feb) refused" $(echo "$r" | grep -q 'cmp_notice=dob_invalid' && echo 1 || echo 0)
+r=$(post alice -d "action=cmp_attest&_cmp_nonce=$N&cmp_dob[m]=2&cmp_dob[d]=14&cmp_dob[y]=1983")
+ok "valid date -> welcome" $(echo "$r" | grep -q 'cmp_notice=welcome' && echo 1 || echo 0)
+ok "stores the date + the 18+ timestamp and version" $($W eval '$u=get_user_by("login","alice")->ID; echo ( "1983-02-14"===get_user_meta($u,"cmp_birth_date",true) && get_user_meta($u,"cmp_age_attested_at",true) && 1===(int)get_user_meta($u,"cmp_age_attestation_version",true) ) ? 1 : 0;')
+ok "audit records that a date was set, never the date" $($W eval '$u=get_user_by("login","alice")->ID; global $wpdb; $j=wp_json_encode($wpdb->get_results("SELECT * FROM ".CMP_Install::table("audit_log")." WHERE object_id=$u")); echo false!==strpos($j,"birth_date_recorded") && false===strpos($j,"1983") ? 1 : 0;')
 
 echo "== Alice: member"
 get alice a3 "$PAGE"
@@ -103,7 +105,7 @@ ok "REST write without X-WP-Nonce rejected" $([ "$code" != 200 ] && echo 1 || ec
 
 echo "== Bob: another full member"
 BOB=$($W user get bob --field=ID)
-$W eval "update_user_meta($BOB,'cmp_verified_email','bob@example.com'); update_user_meta($BOB,'cmp_age_attested_at',gmdate('Y-m-d H:i:s'));" >/dev/null
+$W eval "update_user_meta($BOB,'cmp_verified_email','bob@example.com'); update_user_meta($BOB,'cmp_age_attested_at',gmdate('Y-m-d H:i:s')); update_user_meta($BOB,'cmp_birth_date','1979-11-03');" >/dev/null
 login bob bobpass
 get bob b1 "$PAGE"
 BN=$(restnonce $T/b1.html)
