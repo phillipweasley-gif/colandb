@@ -10,7 +10,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * app's; when two members nod at each other both are told and invited to
  * say hello; wording never assumes anyone's pronouns (names only).
  *
- * - One nod per member per member; it can be taken back. At most DAILY a day.
+ * - One nod per member per member every 24 hours (owner, 0.15.1): after
+ *   that you can nod again, and they're told again. A nod can be taken
+ *   back. At most DAILY nods a day in total.
  * - Members only, never yourself, never across a block (a block removes
  *   nods both ways).
  * - Mutual nods count as connected for messages (straight to the inbox).
@@ -19,6 +21,7 @@ class CMP_Nods {
 
 	const NONCE = 'cmp_nods';
 	const DAILY = 30;
+	const AGAIN = DAY_IN_SECONDS;
 
 	public static function init() {
 		add_action( 'admin_post_cmp_nod', array( __CLASS__, 'handle' ) );
@@ -30,6 +33,7 @@ class CMP_Nods {
 			'nod_sent'   => array( 'success', __( 'Nod sent. They\'ll see it under Messages → Nods.', 'cmp' ) ),
 			'nod_mutual' => array( 'success', __( 'You both nodded. Say hello?', 'cmp' ) ),
 			'nod_undone' => array( 'success', __( 'Nod taken back.', 'cmp' ) ),
+			'nod_wait'   => array( 'error', __( 'You\'ve already nodded at them today. You can nod again 24 hours after your last nod.', 'cmp' ) ),
 			'nod_limit'  => array( 'error', __( 'You\'ve sent as many nods as allowed today. Try again tomorrow.', 'cmp' ) ),
 			'nod_gone'   => array( 'error', __( 'That member isn\'t available.', 'cmp' ) ),
 		);
@@ -42,6 +46,28 @@ class CMP_Nods {
 	public static function has_nodded( $from, $to ) {
 		global $wpdb;
 		return (bool) $wpdb->get_var( $wpdb->prepare( 'SELECT 1 FROM ' . self::t() . ' WHERE from_id = %d AND to_id = %d', $from, $to ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	/** Seconds until $from may nod at $to again (0 = now). */
+	public static function wait_left( $from, $to ) {
+		global $wpdb;
+		$at = $wpdb->get_var( $wpdb->prepare( 'SELECT created_at FROM ' . self::t() . ' WHERE from_id = %d AND to_id = %d', $from, $to ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return $at ? max( 0, strtotime( $at . ' UTC' ) + self::AGAIN - time() ) : 0;
+	}
+
+	/** Who this member nodded at, newest first: rows of to_id, created_at. */
+	public static function sent( $user_id ) {
+		global $wpdb;
+		$rows    = $wpdb->get_results( $wpdb->prepare( 'SELECT to_id, created_at FROM ' . self::t() . ' WHERE from_id = %d ORDER BY created_at DESC LIMIT 200', $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$blocked = CMP_Messages::blocked_ids( $user_id );
+		return array_values(
+			array_filter(
+				$rows,
+				function ( $r ) use ( $blocked ) {
+					return ! in_array( (int) $r->to_id, $blocked, true ) && CMP_Access::is_member( $r->to_id );
+				}
+			)
+		);
 	}
 
 	public static function mutual( $a, $b ) {
@@ -111,17 +137,22 @@ class CMP_Nods {
 			$wpdb->delete( self::t(), array( 'from_id' => $user_id, 'to_id' => $member ), array( '%d', '%d' ) );
 			self::back( $member, 'nod_undone' );
 		}
-		if ( self::has_nodded( $user_id, $member ) ) {
-			self::back( $member, self::mutual( $user_id, $member ) ? 'nod_mutual' : 'nod_sent' );
+		$again = self::has_nodded( $user_id, $member );
+		if ( $again && self::wait_left( $user_id, $member ) ) {
+			self::back( $member, 'nod_wait' ); // Once per member every 24 hours.
 		}
 		$today = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . self::t() . ' WHERE from_id = %d AND created_at > %s', $user_id, gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( $today >= self::DAILY ) {
 			self::back( $member, 'nod_limit' );
 		}
-		$wpdb->insert( self::t(), array( 'from_id' => $user_id, 'to_id' => $member, 'created_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+		if ( $again ) {
+			$wpdb->update( self::t(), array( 'created_at' => gmdate( 'Y-m-d H:i:s' ), 'seen_at' => null ), array( 'from_id' => $user_id, 'to_id' => $member ) );
+		} else {
+			$wpdb->insert( self::t(), array( 'from_id' => $user_id, 'to_id' => $member, 'created_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+		}
 		$me   = wp_get_current_user()->display_name;
 		$them = get_userdata( $member )->display_name;
-		if ( self::has_nodded( $member, $user_id ) ) {
+		if ( ! $again && self::has_nodded( $member, $user_id ) ) {
 			// Mutual: tell both, by name only (no pronouns assumed).
 			/* translators: %s: member */
 			CMP_Notifications::add( $member, 'nod', sprintf( __( 'You and %s both nodded. Say hello?', 'cmp' ), $me ), CMP_Messages::url( array( 'to' => $user_id ) ) );
@@ -144,9 +175,13 @@ class CMP_Nods {
 
 	/** "Nod" / "Nodded" (tap again to take it back) for a profile header. */
 	public static function button_html( $viewer_id, $owner_id, $back = '' ) {
-		$sent = self::has_nodded( $viewer_id, $owner_id );
+		$sent = self::has_nodded( $viewer_id, $owner_id ) && self::wait_left( $viewer_id, $owner_id );
 		$name = get_userdata( $owner_id );
 		$name = $name ? $name->display_name : '';
+		if ( ! $sent && self::has_nodded( $viewer_id, $owner_id ) ) {
+			/* translators: %s: member */
+			return self::form_open( 'nod', $owner_id, $back ) . '<button type="submit" class="cmp-btn cmp-btn-outline cmp-nod-btn" aria-pressed="false" title="' . esc_attr( sprintf( __( 'It\'s been a day since you nodded at %s. Nod again?', 'cmp' ), $name ) ) . '"><span class="cmp-nod-icon" aria-hidden="true"></span>' . esc_html__( 'Nod again', 'cmp' ) . '</button></form>';
+		}
 		if ( $sent ) {
 			/* translators: %s: member */
 			return self::form_open( 'undo', $owner_id, $back ) . '<button type="submit" class="cmp-btn cmp-btn-outline cmp-nod-btn is-sent" aria-pressed="true" title="' . esc_attr( sprintf( __( 'You nodded at %s. Tap to take it back.', 'cmp' ), $name ) ) . '"><span class="cmp-nod-icon" aria-hidden="true"></span>' . esc_html( self::mutual( $viewer_id, $owner_id ) ? __( 'Nodded both ways', 'cmp' ) : __( 'Nodded', 'cmp' ) ) . '</button></form>';
@@ -160,10 +195,10 @@ class CMP_Nods {
 		$rows = self::received( $user_id );
 		self::mark_seen( $user_id );
 		$back = CMP_Messages::url( array( 'box' => 'nods' ) );
-		$html = '<section class="cmp-panel cmp-nod-list"><h3 class="cmp-panel-title">' . esc_html__( 'Nods', 'cmp' ) . '</h3>';
+		$html = '<section class="cmp-panel cmp-nod-list"><h3 class="cmp-panel-title">' . esc_html__( 'Nodded at you', 'cmp' ) . '</h3>';
 		$html .= '<p class="cmp-muted">' . esc_html__( 'A nod is a quiet "I noticed you". Nod back, send a message, or let it be: nobody is told if you don\'t respond.', 'cmp' ) . '</p>';
 		if ( ! $rows ) {
-			return $html . '<p class="cmp-empty">' . esc_html__( 'No nods yet.', 'cmp' ) . '</p></section>';
+			return $html . '<p class="cmp-empty">' . esc_html__( 'No nods yet.', 'cmp' ) . '</p></section>' . self::sent_html( $user_id, $back );
 		}
 		$html .= '<ul class="cmp-nod-rows">';
 		foreach ( $rows as $r ) {
@@ -176,6 +211,30 @@ class CMP_Nods {
 				$html .= self::form_open( 'nod', $from, $back ) . '<button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline cmp-nod-btn"><span class="cmp-nod-icon" aria-hidden="true"></span>' . esc_html__( 'Nod back', 'cmp' ) . '</button></form>';
 			}
 			$html .= '<a class="cmp-btn cmp-btn-small" href="' . esc_url( CMP_Messages::url( array( 'to' => $from ) ) ) . '">' . esc_html__( 'Message', 'cmp' ) . '</a></span></li>';
+		}
+		return $html . '</ul></section>' . self::sent_html( $user_id, $back );
+	}
+
+	/** "You nodded at": everyone you nodded at, when, and whether you can nod again yet. */
+	private static function sent_html( $user_id, $back ) {
+		$rows = self::sent( $user_id );
+		$html = '<section class="cmp-panel cmp-nod-list"><h3 class="cmp-panel-title">' . esc_html__( 'You nodded at', 'cmp' ) . '</h3>';
+		if ( ! $rows ) {
+			return $html . '<p class="cmp-empty">' . esc_html__( 'You haven\'t nodded at anyone yet. Find people under Members.', 'cmp' ) . '</p></section>';
+		}
+		$html .= '<ul class="cmp-nod-rows">';
+		foreach ( $rows as $r ) {
+			$to     = (int) $r->to_id;
+			$u      = get_userdata( $to );
+			$mutual = self::has_nodded( $to, $user_id );
+			$left   = self::wait_left( $user_id, $to );
+			/* translators: %s: time ago */
+			$when   = sprintf( __( 'nodded %s ago', 'cmp' ), human_time_diff( strtotime( $r->created_at . ' UTC' ) ) ) . ( $mutual ? ' · ' . __( 'they nodded back', 'cmp' ) : '' );
+			$html  .= '<li class="cmp-nod-row"><a class="cmp-nod-who" href="' . esc_url( CMP_Profiles::member_url( $to ) ) . '"><b>' . esc_html( $u ? $u->display_name : '' ) . '</b><small>' . esc_html( $when ) . '</small></a><span class="cmp-actions">';
+			if ( ! $left ) {
+				$html .= self::form_open( 'nod', $to, $back ) . '<button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline cmp-nod-btn"><span class="cmp-nod-icon" aria-hidden="true"></span>' . esc_html__( 'Nod again', 'cmp' ) . '</button></form>';
+			}
+			$html .= '<a class="cmp-btn cmp-btn-small" href="' . esc_url( CMP_Messages::url( array( 'to' => $to ) ) ) . '">' . esc_html__( 'Message', 'cmp' ) . '</a></span></li>';
 		}
 		return $html . '</ul></section>';
 	}

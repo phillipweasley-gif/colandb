@@ -18,6 +18,29 @@
 		} );
 	}
 
+	// While one of our forms is submitting, other scripts on the page (for
+	// example the page builder's or push service's "Leave site?" warnings)
+	// must not stop it (0.15.1). A capturing listener on window runs before
+	// theirs and stops them; it only acts during our own submit.
+	var submitting = false;
+	window.addEventListener( 'beforeunload', function ( e ) {
+		if ( submitting ) {
+			e.stopImmediatePropagation();
+		}
+	}, true );
+
+	// Coming back with the Back button shows the page as it was left: unlock it.
+	window.addEventListener( 'pageshow', function () {
+		submitting = false;
+		Array.prototype.forEach.call( document.querySelectorAll( '.cmp-member-area form[data-cmp-sent]' ), function ( f ) {
+			f.removeAttribute( 'data-cmp-sent' );
+			Array.prototype.forEach.call( f.querySelectorAll( '.is-busy' ), function ( b ) {
+				b.classList.remove( 'is-busy' );
+				b.removeAttribute( 'aria-disabled' );
+			} );
+		} );
+	} );
+
 	Array.prototype.forEach.call( document.querySelectorAll( '.cmp-member-area form.cmp-form' ), function ( form ) {
 		form.addEventListener( 'submit', function ( event ) {
 			var button = event.submitter || form.querySelector( 'button[type="submit"]' );
@@ -38,6 +61,17 @@
 				button.setAttribute( 'aria-disabled', 'true' );
 				button.classList.add( 'is-busy' );
 			}
+			submitting = true;
+			// If the page didn't actually leave (a dialog was cancelled, or the
+			// network dropped), unlock the form so pressing it again works.
+			window.setTimeout( function () {
+				submitting = false;
+				form.removeAttribute( 'data-cmp-sent' );
+				if ( button ) {
+					button.removeAttribute( 'aria-disabled' );
+					button.classList.remove( 'is-busy' );
+				}
+			}, 6000 );
 		} );
 	} );
 }() );

@@ -132,7 +132,7 @@ class CMP_Messages {
 	/**
 	 * The member's conversations, newest first.
 	 *
-	 * @param string $box 'inbox' (open, plus requests they sent) or 'requests' (requests sent to them).
+	 * @param string $box 'inbox' (open conversations), 'requests' (requests sent to them) or 'sent' (their requests not yet accepted).
 	 */
 	public static function conversations( $user_id, $box = 'inbox' ) {
 		global $wpdb;
@@ -144,8 +144,9 @@ class CMP_Messages {
 			if ( ! self::can_use( $c, $user_id ) || (int) $c->{ $side . '_deleted_id' } >= (int) $c->last_message_id ) {
 				continue;
 			}
-			$incoming_request = 'request' === $c->status && (int) $c->started_by !== (int) $user_id;
-			if ( ( 'requests' === $box ) === $incoming_request ) {
+			// requests: waiting for you; sent: your requests waiting for them (0.15.1); inbox: the rest.
+			$which = 'request' === $c->status ? ( (int) $c->started_by === (int) $user_id ? 'sent' : 'requests' ) : 'inbox';
+			if ( $which === $box ) {
 				$out[] = $c;
 			}
 		}
@@ -429,13 +430,13 @@ class CMP_Messages {
 			return self::render_thread( $user_id, self::conversation( $c ) );
 		}
 		$requests = self::conversations( $user_id, 'requests' );
-		$box      = in_array( $box, array( 'inbox', 'requests', 'nods', 'blocked' ), true ) ? $box : 'inbox';
+		$box      = in_array( $box, array( 'inbox', 'requests', 'sent', 'nods', 'blocked' ), true ) ? $box : 'inbox';
 		$nods_n   = CMP_Nods::unseen_count( $user_id );
 		$html     = '<section class="cmp-step" aria-labelledby="cmp-msg-title"><h2 id="cmp-msg-title" class="cmp-title">' . esc_html__( 'Messages', 'cmp' ) . '</h2>';
 		$html    .= '<p class="cmp-muted">' . esc_html__( 'Private between you and the other member. To start one, open a member\'s profile and choose Message.', 'cmp' ) . '</p>';
 		$html    .= '<nav class="cmp-msg-boxes" aria-label="' . esc_attr__( 'Message lists', 'cmp' ) . '">';
 		$req_n    = count( $requests );
-		foreach ( array( 'inbox' => __( 'Inbox', 'cmp' ), 'requests' => __( 'Requests', 'cmp' ), 'nods' => __( 'Nods', 'cmp' ), 'blocked' => __( 'Blocked', 'cmp' ) ) as $k => $l ) {
+		foreach ( array( 'inbox' => __( 'Inbox', 'cmp' ), 'requests' => __( 'Requests', 'cmp' ), 'sent' => __( 'Sent', 'cmp' ), 'nods' => __( 'Nods', 'cmp' ), 'blocked' => __( 'Blocked', 'cmp' ) ) as $k => $l ) {
 			$badge = 'requests' === $k ? $req_n : ( 'nods' === $k ? $nods_n : 0 );
 			$html .= '<a href="' . esc_url( self::url( 'inbox' === $k ? array() : array( 'box' => $k ) ) ) . '"' . ( $k === $box ? ' aria-current="page" class="is-current"' : '' ) . '>' . esc_html( $l ) . ( $badge ? ' <span class="cmp-msg-badge">' . (int) $badge . '</span>' : '' ) . '</a>';
 		}
@@ -446,10 +447,15 @@ class CMP_Messages {
 		if ( 'nods' === $box ) {
 			return $html . CMP_Nods::list_html( $user_id );
 		}
-		$list  = 'requests' === $box ? $requests : self::conversations( $user_id, 'inbox' );
+		$list  = 'requests' === $box ? $requests : self::conversations( $user_id, $box );
 		$html .= '<section class="cmp-panel cmp-msg-list">';
 		if ( ! $list ) {
-			$html .= '<p class="cmp-empty">' . esc_html( 'requests' === $box ? __( 'No message requests.', 'cmp' ) : __( 'No messages yet.', 'cmp' ) ) . '</p>';
+			$empty = array(
+				'requests' => __( 'No message requests.', 'cmp' ),
+				'sent'     => __( 'No requests waiting. Messages to members you\'re not connected with wait here until they accept.', 'cmp' ),
+				'inbox'    => __( 'No messages yet.', 'cmp' ),
+			);
+			$html .= '<p class="cmp-empty">' . esc_html( $empty[ $box ] ) . '</p>';
 		}
 		foreach ( $list as $conv ) {
 			$other  = self::other( $conv, $user_id );
@@ -457,7 +463,7 @@ class CMP_Messages {
 			$last   = $last ? $last[0] : null;
 			$unread = self::is_unread( $conv, $user_id );
 			$prefix = $last && (int) $last->sender_id === (int) $user_id ? __( 'You: ', 'cmp' ) : '';
-			$state  = 'request' === $conv->status && (int) $conv->started_by === (int) $user_id ? ' · ' . __( 'request sent', 'cmp' ) : '';
+			$state  = 'request' === $conv->status && (int) $conv->started_by === (int) $user_id ? ' · ' . __( 'waiting for them to accept', 'cmp' ) : '';
 			$html  .= '<a class="cmp-msg-row' . ( $unread ? ' is-unread' : '' ) . '" href="' . esc_url( self::url( array( 'c' => $conv->id ) ) ) . '">' . self::avatar( $other, $user_id ) . '<span class="cmp-msg-mid"><b>' . esc_html( self::name( $other ) ) . '</b><small>' . esc_html( $prefix . ( $last ? wp_html_excerpt( $last->body, 80, '…' ) : '' ) . $state ) . '</small></span><span class="cmp-msg-when">' . esc_html( self::when( $conv->last_message_at ) ) . ( $unread ? '<span class="cmp-msg-dot"><span class="screen-reader-text">' . esc_html__( 'Unread', 'cmp' ) . '</span></span>' : '' ) . '</span></a>';
 		}
 		$html .= '</section>';
@@ -510,7 +516,7 @@ class CMP_Messages {
 		$wpdb->update( self::t( 'conversations' ), array( $side . '_read_id' => (int) $conv->last_message_id ), array( 'id' => $conv->id ) );
 		$profile = CMP_Profiles::member_url( $other );
 		$html    = '<section class="cmp-step cmp-msg-thread" aria-labelledby="cmp-msg-title">';
-		$html   .= '<div class="cmp-msg-head"><a href="' . esc_url( self::url( $incoming ? array( 'box' => 'requests' ) : array() ) ) . '" class="cmp-msg-back" aria-label="' . esc_attr__( 'Back to messages', 'cmp' ) . '">←</a>' . self::avatar( $other, $user_id ) . '<h2 id="cmp-msg-title" class="cmp-msg-name"><a href="' . esc_url( $profile ) . '">' . esc_html( self::name( $other ) ) . '</a></h2>';
+		$html   .= '<div class="cmp-msg-head"><a href="' . esc_url( self::url( $incoming ? array( 'box' => 'requests' ) : ( 'request' === $conv->status ? array( 'box' => 'sent' ) : array() ) ) ) . '" class="cmp-msg-back" aria-label="' . esc_attr__( 'Back to messages', 'cmp' ) . '">←</a>' . self::avatar( $other, $user_id ) . '<h2 id="cmp-msg-title" class="cmp-msg-name"><a href="' . esc_url( $profile ) . '">' . esc_html( self::name( $other ) ) . '</a></h2>';
 		$html   .= '<details class="cmp-msg-menu"><summary aria-label="' . esc_attr__( 'More', 'cmp' ) . '">⋯</summary><div class="cmp-msg-menu-body">';
 		$html   .= '<a href="' . esc_url( $profile ) . '">' . esc_html__( 'View profile', 'cmp' ) . '</a>';
 		$html   .= self::form_open( 'delete', array( 'conversation' => (int) $conv->id ) ) . '<button type="submit" class="cmp-msg-menu-item" data-cmp-confirm="' . esc_attr__( 'Delete this conversation from your messages? They keep their copy.', 'cmp' ) . '">' . esc_html__( 'Delete conversation', 'cmp' ) . '</button></form>';

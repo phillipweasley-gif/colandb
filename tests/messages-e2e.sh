@@ -65,8 +65,10 @@ ok "Dana notified (message request)" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE u
 get dana d0 "$PAGE&cmp_tab=messages"
 get dana d1 "$PAGE&cmp_tab=messages&box=requests"
 ok "Dana: not in Inbox, under Requests (badge, tab count)" $([ "$(hasnt $T/d0.html 'saw you at Leather Night')$(has $T/d1.html 'saw you at Leather Night')$(has $T/d0.html 'cmp-msg-badge')$(has $T/d0.html 'Messages (1)')" = 1111 ] && echo 1 || echo 0)
-get carl c3 "$PAGE&cmp_tab=messages"
-ok "Carl: in his inbox as 'request sent'" $(has $T/c3.html 'request sent')
+get carl c3 "$PAGE&cmp_tab=messages&box=sent"
+ok "Carl: under Sent, waiting for Dana to accept (0.15.1)" $([ "$(has $T/c3.html 'Dana Receiver')$(has $T/c3.html 'waiting for them to accept')" = 11 ] && echo 1 || echo 0)
+get carl c3b "$PAGE&cmp_tab=messages"
+ok "...not mixed into his Inbox" $(hasnt $T/c3b.html 'Dana Receiver')
 act carl $CN send --data-urlencode "conversation=$CID" --data-urlencode "body=second" >/dev/null
 act carl $CN send --data-urlencode "conversation=$CID" --data-urlencode "body=third" >/dev/null
 r=$(act carl $CN send --data-urlencode "conversation=$CID" --data-urlencode "body=fourth")
