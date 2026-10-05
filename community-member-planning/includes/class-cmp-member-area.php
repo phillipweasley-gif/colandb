@@ -188,7 +188,7 @@ class CMP_Member_Area {
 			'expired'         => array( 'error', __( 'Your session expired. Please try again.', 'cmp' ) ),
 			'welcome'         => array( 'success', __( "You're in. Welcome to the member area.", 'cmp' ) ),
 		);
-		$map += CMP_Account::notices() + CMP_Profiles::notices() + CMP_Profile_Images::notices() + CMP_Dynamics::notices() + CMP_Homework::notices() + CMP_Chastity::notices() + CMP_Feed::notices() + CMP_Messages::notices() + CMP_Follows::notices() + CMP_Directory::notices();
+		$map += CMP_Account::notices() + CMP_Profiles::notices() + CMP_Profile_Images::notices() + CMP_Dynamics::notices() + CMP_Homework::notices() + CMP_Chastity::notices() + CMP_Feed::notices() + CMP_Messages::notices() + CMP_Follows::notices() + CMP_Directory::notices() + CMP_Nods::notices();
 		if ( ! isset( $map[ $notice ] ) ) {
 			return '';
 		}
