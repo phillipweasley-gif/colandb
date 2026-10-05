@@ -201,7 +201,7 @@ Our site is hosted in [country/region of hosting]. If you use the site from outs
 
 ## 14. Changes to this statement
 
-If we make a significant change, we'll post it here with a new "Last updated" date and let members know in the member area and by email before it takes effect.
+If we make a significant change, we'll post it here with a new "Last updated" date and let members know with a notice in the member area before it takes effect.
 
 ## 15. Contact
 
