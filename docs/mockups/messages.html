@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Member Messages</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root { --primary: #e1f577; --secondary: #ff50d7; --text: #f5f4f7; --muted: #a9a6bb; --card: #1b1826; --card2: #241f33; --field: #110f18; --border: rgba(255,255,255,.12); --line: rgba(255,255,255,.08); --page: #0b0a10; --bad: #ff6b6b; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font-family: Inter, system-ui, sans-serif; }
+.intro { max-width: 1150px; margin: 0 auto; padding: 28px 16px 6px; }
+.intro h1 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 22px; margin: 0 0 8px; }
+.intro p { color: var(--muted); max-width: 900px; line-height: 1.55; margin: 0 0 6px; }
+.intro strong { color: var(--text); }
+.row { display: flex; flex-wrap: wrap; gap: 22px; justify-content: center; padding: 18px 16px; align-items: flex-start; }
+.phone { width: 360px; max-width: calc(100vw - 32px); height: 740px; border: 10px solid #26232f; border-radius: 40px; background: #000; overflow: hidden; display: flex; flex-direction: column; }
+.cap { font-size: 12.5px; color: var(--muted); text-align: center; max-width: 360px; margin: 8px auto 0; }
+.bar { display: flex; align-items: center; gap: 10px; padding: 14px; border-bottom: 1px solid var(--line); }
+.bar h2 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 17px; margin: 0; flex: 1; }
+.av { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg,#ff50d7,#7a3cff); display: grid; place-items: center; font-weight: 800; flex: 0 0 auto; }
+.tabs { display: flex; gap: 6px; padding: 10px 14px; }
+.tabs span { border: 1.5px solid var(--border); border-radius: 100px; padding: 8px 12px; font-size: 13px; font-weight: 700; }
+.tabs .on { border-color: var(--primary); color: var(--primary); }
+.badge { background: var(--secondary); color: #fff; border-radius: 100px; font-size: 11px; padding: 1px 7px; margin-left: 4px; }
+.list { flex: 1; overflow: auto; }
+.conv { display: flex; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); align-items: center; }
+.conv b { display: block; font-size: 14.5px; }
+.conv small { color: var(--muted); font-size: 12.5px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 210px; }
+.conv .t { margin-left: auto; color: var(--muted); font-size: 11.5px; text-align: right; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--secondary); display: inline-block; margin-top: 4px; }
+.thread { flex: 1; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.msg { max-width: 78%; padding: 9px 12px; border-radius: 16px; font-size: 14px; line-height: 1.4; }
+.them { background: var(--card2); border-bottom-left-radius: 4px; align-self: flex-start; }
+.me { background: var(--primary); color: #0b0a12; border-bottom-right-radius: 4px; align-self: flex-end; }
+.when { font-size: 11px; color: var(--muted); align-self: center; margin: 6px 0; }
+.compose { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.compose input { flex: 1; min-height: 44px; background: var(--field); border: 1.5px solid var(--border); border-radius: 100px; color: var(--text); padding: 0 14px; font: inherit; }
+.btn { border: none; border-radius: 100px; min-height: 44px; padding: 0 16px; font-weight: 800; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
+.y { background: var(--primary); color: #0b0a12; }
+.o { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
+.r { background: transparent; color: var(--bad); border: 1.5px solid rgba(255,107,107,.5); }
+.menu { position: absolute; right: 14px; top: 60px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 6px; width: 210px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.menu div { padding: 12px; font-size: 14px; border-radius: 8px; }
+.menu .bad { color: var(--bad); }
+.req { margin: 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.req p { margin: 6px 0 12px; font-size: 14px; line-height: 1.45; }
+.acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.sheet { margin-top: auto; background: var(--card); border-top: 1px solid var(--border); border-radius: 18px 18px 0 0; padding: 16px; }
+.sheet h3 { margin: 0 0 6px; font-size: 16px; }
+.sheet p { margin: 0 0 10px; font-size: 13.5px; color: var(--muted); line-height: 1.45; }
+.opt { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.opt i { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border); flex: 0 0 auto; }
+.opt i.on { border-color: var(--primary); background: radial-gradient(var(--primary) 45%, transparent 50%); }
+.chk { display: flex; gap: 10px; align-items: center; font-size: 14px; margin: 10px 0; }
+.chk b { width: 20px; height: 20px; border-radius: 4px; background: var(--primary); display: grid; place-items: center; color: #000; font-size: 13px; }
+textarea { width: 100%; min-height: 60px; background: var(--field); border: 1.5px solid var(--border); border-radius: 10px; color: var(--text); font: inherit; font-size: 14px; padding: 10px; margin: 6px 0 10px; }
+.decisions { max-width: 1000px; margin: 10px auto 60px; padding: 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.decisions b { color: var(--text); }
+.decisions h2 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 16px; }
+</style>
+</head>
+<body>
+<div class="intro">
+	<h1>Member messages</h1>
+	<p>Mockup for <strong>Community Member Planning 0.11.0</strong>: private one-to-one messages between members, with <strong>block</strong> and <strong>report</strong>. A new <strong>Messages</strong> tab with an unread count, and a "Message" button on every member profile. Sample data.</p>
+</div>
+<div class="row">
+	<div>
+		<div class="phone">
+			<div class="bar"><h2>Messages</h2></div>
+			<div class="tabs"><span class="on">Inbox</span><span>Requests<span class="badge">1</span></span></div>
+			<div class="list">
+				<div class="conv"><div class="av">S</div><div><b>SampleSir</b><small>Good boy. Check in tomorrow at 8.</small></div><div class="t">9:41<br><span class="dot"></span></div></div>
+				<div class="conv"><div class="av">J</div><div><b>boyJay</b><small>You: See you at Leather Night!</small></div><div class="t">Sat</div></div>
+				<div class="conv"><div class="av">M</div><div><b>MAsT Columbus</b><small>Thanks for coming out last week.</small></div><div class="t">Oct 1</div></div>
+			</div>
+		</div>
+		<div class="cap">1 · Inbox. Requests from people you're not connected with wait in their own list.</div>
+	</div>
+	<div>
+		<div class="phone" style="position:relative">
+			<div class="bar"><span style="font-size:20px">←</span><div class="av">S</div><h2 style="font-family:Inter;text-transform:none;color:var(--text);font-size:16px">SampleSir</h2><span style="font-size:22px">⋯</span></div>
+			<div class="thread">
+				<div class="when">Today</div>
+				<div class="msg them">How did the morning check-in go?</div>
+				<div class="msg me">Done and logged, Sir. Photo is up.</div>
+				<div class="msg them">Good boy. Check in tomorrow at 8.</div>
+			</div>
+			<div class="compose"><input placeholder="Message"><button class="btn y">Send</button></div>
+			<div class="menu"><div>View profile</div><div>Mute</div><div class="bad">Block SampleSir</div><div class="bad">Report</div></div>
+		</div>
+		<div class="cap">2 · A conversation. The ⋯ menu has View profile, Mute, Block and Report.</div>
+	</div>
+	<div>
+		<div class="phone">
+			<div class="bar"><span style="font-size:20px">←</span><h2>Request</h2></div>
+			<div class="req">
+				<div style="display:flex;gap:10px;align-items:center"><div class="av">R</div><div><b>RopeGuy</b><br><small style="color:var(--muted)">Not connected · 38 M Top · Columbus</small></div></div>
+				<p>Hey, saw you at Leather Night. Want to grab a drink at the next one?</p>
+				<div class="acts"><button class="btn y">Accept</button><button class="btn o">Delete</button><button class="btn r">Block</button></div>
+				<p style="margin:10px 0 0;color:var(--muted);font-size:12.5px">They won't know you've seen it until you reply.</p>
+			</div>
+			<div class="sheet">
+				<h3>Report RopeGuy</h3>
+				<p>The site team will see the last 20 messages in this conversation so they can review it. Nobody else is told.</p>
+				<div class="opt"><i class="on"></i>Harassment or threats</div>
+				<div class="opt"><i></i>Unwanted sexual content</div>
+				<div class="opt"><i></i>Spam or scam</div>
+				<div class="opt"><i></i>Underage or not consenting</div>
+				<div class="opt"><i></i>Something else</div>
+				<textarea placeholder="Anything else the team should know (optional)"></textarea>
+				<div class="chk"><b>✓</b>Also block them</div>
+				<button class="btn r" style="width:100%">Send report</button>
+			</div>
+		</div>
+		<div class="cap">3 · A message request, and the report sheet.</div>
+	</div>
+</div>
+<div class="decisions">
+	<h2>Decisions for you</h2>
+	<ol>
+		<li><b>Who can message:</b> any full member can message any other. If you're not connected (no active dynamic), it arrives under <b>Requests</b>; nothing goes to your Inbox until you accept. You can turn off requests entirely.</li>
+		<li><b>Block:</b> they can't message you, see your profile or your feed posts, propose a dynamic, or find you; they aren't told. Your past conversation disappears for both of you. Unblock any time from Account → Blocked members.</li>
+		<li><b>Report:</b> pick a reason; the site team gets an email and can read <b>only</b> the reported conversation's last 20 messages (otherwise admins can't read messages). Optional "Also block them".</li>
+		<li><b>Text only</b> to start (up to 2,000 characters). Photos in messages could come later.</li>
+		<li><b>Notifications:</b> unread count on the Messages tab and in the account menu; an in-site notification for new requests. A new page load shows new messages (no live chat yet).</li>
+		<li><b>Delete:</b> you can delete a conversation from your side; the other person keeps their copy.</li>
+		<li><b>Limits:</b> at most 20 new requests a day per member, to stop spam.</li>
+	</ol>
+</div>
+</body>
+</html>

@@ -15,7 +15,8 @@ has()  { grep -q -- "$2" "$1" && echo 1 || echo 0; }
 hasnt(){ grep -q -- "$2" "$1" && echo 0 || echo 1; }
 login(){ rm -f $T/$1.jar; curl -s -c $T/$1.jar -b $T/$1.jar -o /dev/null "$H/wp-login.php"; curl -s -c $T/$1.jar -b $T/$1.jar -o /dev/null -d "log=$2&pwd=$3&wp-submit=Log+In&testcookie=1" "$H/wp-login.php"; }
 get()  { curl -s -b $T/$1.jar -c $T/$1.jar -D $T/$2.h -o $T/$2.html "$3"; }
-dnonce(){ grep -o 'name="_cmp_nonce" value="[^"]*"' $1 | head -1 | cut -d'"' -f4; }
+# The dynamics form's nonce (profiles also carry message / block forms, 0.11.0).
+dnonce(){ php -r 'preg_match("~name=\"action\" value=\"cmp_dyn_[a-z]+\".*?name=\"_cmp_nonce\" value=\"([^\"]+)\"~s",file_get_contents($argv[1]),$m); echo $m[1]??"";' "$1"; }
 post() { curl -s -b $T/$1.jar -c $T/$1.jar -o /dev/null -w '%{redirect_url}' "$H/wp-admin/admin-post.php" "${@:2}"; }
 uid()  { $W user get $1 --field=ID 2>/dev/null; }
 ev()   { $W eval "$1" 2>&1; }

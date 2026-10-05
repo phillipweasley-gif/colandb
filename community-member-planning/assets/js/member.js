@@ -699,3 +699,20 @@
 		render();
 	} );
 }() );
+
+/* Messages (0.11.0): open a conversation at its newest message; Ctrl/⌘ + Enter sends. */
+( function () {
+	'use strict';
+	var box = document.querySelector( '.cmp-member-area [data-cmp-msg-scroll]' );
+	if ( box ) {
+		box.scrollTop = box.scrollHeight;
+	}
+	Array.prototype.forEach.call( document.querySelectorAll( '.cmp-member-area [data-cmp-msg-body]' ), function ( t ) {
+		t.addEventListener( 'keydown', function ( e ) {
+			if ( 'Enter' === e.key && ( e.metaKey || e.ctrlKey ) && t.value.trim() ) {
+				e.preventDefault();
+				t.form.requestSubmit();
+			}
+		} );
+	} );
+}() );

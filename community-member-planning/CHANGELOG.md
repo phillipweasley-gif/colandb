@@ -4,6 +4,22 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.11.0
+
+**Member messages, with block and report** (owner, 2026-10-05: "a way for members to send messages to one another … as well as block or report"). From `docs/mockups/messages.html`, with the owner's answers: anyone can write, as requests; text only for now; reports show the whole conversation.
+
+- **`CMP_Messages`**, four new tables `cmp_conversations`, `cmp_messages`, `cmp_blocks`, `cmp_message_reports` (`CMP_DB_VERSION` 9), and a **Messages** tab right after Feed, with an unread count ("Messages (2)").
+- **Writing:** "Message" on any member's profile. One conversation per pair of members; text up to 2,000 characters; Ctrl/⌘+Enter sends.
+- **Requests:** between members who aren't connected (no active dynamic) the first message is a request. It waits under **Requests** (with a count) until accepted; replying accepts it too. The sender can send at most 3 messages until then. Connected members go straight to the inbox. Members can turn requests off ("Accept message requests from members I'm not connected with"); their profile then says "Not accepting message requests". At most 20 new conversations a day per member. New requests send an in-site notification (new category "New message requests", can be turned off).
+- **Read state** is tracked by message, so unread dots and counts are exact even when messages share a second.
+- **Delete** a conversation from your side; the other member keeps theirs. A later message brings it back with only the new messages.
+- **Block** (from a conversation, a request or a profile): they can't message you or start a conversation, neither of you can see the other's profile or feed posts, the conversation disappears for both, dynamic proposals are refused, and any dynamic between you ends (which archives homework and turns a lock into a self-lock). They aren't told. **Messages → Blocked** lists who you blocked, with Unblock.
+- **Report** (from a conversation or a profile): a reason (harassment or threats, unwanted sexual content, spam or scam, underage or not consenting, something else), an optional note, and "Also block them" (on by default). The site admin email gets a link, never the messages themselves. Administrators review on **Users → Member reports** ("Member reports (N)" while any are open): who, why, and the whole conversation; opening one is audit-logged; "Mark as reviewed" closes it. Otherwise nobody but the two members can read a conversation.
+- **Privacy:** export lists the messages you sent and who you blocked; erase removes the member's conversations (both sides), blocks both ways and the reports they made; reports about them are kept.
+- **Verification** (local WordPress 7.1.2): new `tests/messages-e2e.sh` 46/46; `setup-e2e.sh` 39/39, `profile-e2e.sh` 84/84, `dob-e2e.sh` 34/34, `dynamics-e2e.sh` 34/34 (its nonce helper now picks the dynamics form, since profiles carry more forms), `homework-e2e.sh` 44/44, `chastity-e2e.sh` 55/55, `feed-e2e.sh` 41/41, `account-e2e.sh` 64/64, `e2e.sh` 60/60. In a browser at 375 px: inbox, conversation and its menu, sending, a request, and profile buttons.
+
+---
+
 ## 0.10.0
 
 **Kink picker** (owner, 2026-10-05: the kinks list "becomes cumbersome"; approved from `docs/mockups/kink-picker.html`).
