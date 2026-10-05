@@ -645,6 +645,7 @@ class CMP_Profiles {
 		<?php echo CMP_Profile_Images::render_panels( $user_id, $rows ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 
 		<?php echo CMP_Follows::settings_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
+		<?php echo CMP_Directory::settings_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 
 		<section class="cmp-panel" id="cmp-about">
 			<h3 class="cmp-panel-title" id="cmp-about-title"><?php esc_html_e( 'About you', 'cmp' ); ?></h3>
@@ -712,12 +713,25 @@ class CMP_Profiles {
 	 * A profile as one viewer sees it. Used for the preview and for viewing
 	 * another member's profile.
 	 */
-	public static function card_html( $owner_id, $viewer_id, $as_members = false ) {
-		$rows = self::rows( $owner_id );
-		$can  = function ( $key ) use ( $owner_id, $viewer_id, $as_members, $rows ) {
+	/**
+	 * A profile as a viewer sees it (0.13.0: Facebook / FetLife style).
+	 * Cover image across the top with the profile photo overlapping it,
+	 * then tabs: About · Kinks · Going to · Posts (only those with content).
+	 * Items shown to all members link to Members, filtered by that item.
+	 *
+	 * @param array $extras actions, counts, going, posts: HTML for the header
+	 *                      buttons, follower counts and the two extra tabs.
+	 */
+	public static function card_html( $owner_id, $viewer_id, $as_members = false, $extras = array() ) {
+		$extras = wp_parse_args( $extras, array( 'actions' => '', 'counts' => '', 'going' => '', 'posts' => '' ) );
+		$rows   = self::rows( $owner_id );
+		$can    = function ( $key ) use ( $owner_id, $viewer_id, $as_members, $rows ) {
 			return $as_members ? 'members' === $rows[ $key ]['visibility'] : self::can_view( $key, $owner_id, $viewer_id, $rows );
 		};
-		// Visible, non-empty values only.
+		// Only answers shown to all members are searchable, so only those link.
+		$linkable = function ( $key ) use ( $rows ) {
+			return 'members' === $rows[ $key ]['visibility'] && CMP_Directory::is_filter( $key );
+		};
 		$val = function ( $key ) use ( $can, $owner_id, $rows ) {
 			if ( ! $can( $key ) ) {
 				return '';
@@ -729,152 +743,176 @@ class CMP_Profiles {
 			$v = $val( $key );
 			return '' === $v ? '' : CMP_Profile_Fields::display( $key, $v );
 		};
-		// Option labels of a visible multi field, for chips.
-		$chips = function ( $key ) use ( $val ) {
+		// option key => label for a visible single / multi field ("" key for free text).
+		$opts = function ( $key ) use ( $val ) {
 			$v = $val( $key );
 			if ( '' === $v ) {
 				return array();
 			}
-			$f      = CMP_Profile_Fields::field( $key );
-			$o      = CMP_Profile_Fields::options( $f['list'], true );
-			$labels = array();
+			$f   = CMP_Profile_Fields::field( $key );
+			$o   = CMP_Profile_Fields::options( $f['list'], true );
+			$out = array();
+			if ( 'single' === $f['type'] ) {
+				return isset( $o[ $v ] ) ? array( $v => $o[ $v ] ) : array();
+			}
 			foreach ( isset( $v['keys'] ) ? (array) $v['keys'] : array() as $k ) {
 				if ( isset( $o[ $k ] ) ) {
-					$labels[] = $o[ $k ];
+					$out[ $k ] = $o[ $k ];
 				}
 			}
 			if ( ! empty( $v['other'] ) && ! empty( $f['other'] ) ) {
-				$labels[] = $v['other'];
+				$out[''] = $v['other'];
 			}
-			return $labels;
+			return $out;
 		};
-		$chip_html = function ( $labels ) {
-			return $labels ? '<ul class="cmp-chips">' . implode( '', array_map( function ( $l ) {
-				return '<li>' . esc_html( $l ) . '</li>';
-			}, $labels ) ) . '</ul>' : '';
+		$item = function ( $key, $opt, $label ) use ( $linkable ) {
+			if ( '' !== (string) $opt && $linkable( $key ) ) {
+				return '<a class="cmp-pv-link" href="' . esc_url( CMP_Directory::url( array( $key => $opt ) ) ) . '">' . esc_html( $label ) . '</a>';
+			}
+			return esc_html( $label );
+		};
+		$inline = function ( $key ) use ( $opts, $item ) {
+			$parts = array();
+			foreach ( $opts( $key ) as $k => $l ) {
+				$parts[] = $item( $key, $k, $l );
+			}
+			return implode( ', ', $parts );
+		};
+		$chips = function ( $key ) use ( $opts, $item ) {
+			$o = $opts( $key );
+			if ( ! $o ) {
+				return '';
+			}
+			$html = '<ul class="cmp-chips">';
+			foreach ( $o as $k => $l ) {
+				$html .= '<li>' . $item( $key, $k, $l ) . '</li>';
+			}
+			return $html . '</ul>';
 		};
 
 		$name   = $txt( 'display_name' ) ? $txt( 'display_name' ) : __( 'Member', 'cmp' );
 		$avatar = $can( 'avatar' ) ? CMP_Profile_Images::get( $owner_id, 'avatar', false ) : null;
 		$cover  = $can( 'cover' ) ? CMP_Profile_Images::get( $owner_id, 'cover', false ) : null;
-		$roles  = $chips( 'roles' );
-		$gender = $chips( 'gender' );
-
+		$roles  = array_values( $opts( 'roles' ) );
+		$gender = array_values( $opts( 'gender' ) );
 		// FetLife-style "43 M Dom" tag next to the name.
 		$tag = trim( $txt( 'age' ) . ' ' . ( $gender ? mb_substr( $gender[0], 0, 1 ) : '' ) . ' ' . ( $roles ? $roles[0] : '' ) );
-		// Sniffies-style stat line: whatever is shown, in a fixed order.
-		$stat = array_filter(
-			array(
-				$txt( 'age' ),
-				$txt( 'height' ),
-				$txt( 'weight' ),
-				mb_strtolower( $txt( 'body_type' ) ),
-				mb_strtolower( implode( ', ', $chips( 'identity' ) ) ),
-				mb_strtolower( $txt( 'position' ) ),
-				implode( ', ', array_slice( $roles, 0, 3 ) ),
-			)
-		);
+		$loc = $val( 'location' );
+		$where = '';
+		if ( '' !== $loc ) {
+			$city  = is_array( $loc ) && ! empty( $loc['city'] ) ? (string) $loc['city'] : '';
+			$where = $city && $linkable( 'location' ) ? '<a class="cmp-pv-link" href="' . esc_url( CMP_Directory::url( array( 'city' => $city ) ) ) . '">' . esc_html( $txt( 'location' ) ) . '</a>' : esc_html( $txt( 'location' ) );
+		}
+		$line = array_filter( array( $where, esc_html( $txt( 'pronouns' ) ), esc_html( $txt( 'expression' ) ) ) );
+
+		// Header.
+		$html  = '<article class="cmp-prof cmp-pv" aria-label="' . esc_attr( $name ) . '" data-cmp-pv>';
+		$html .= '<div class="cmp-pv-cover">' . ( $cover ? CMP_Profile_Images::img_html( $owner_id, 'cover', $cover ) : '' ) . '</div>';
+		$html .= '<header class="cmp-pv-head"><div class="cmp-pv-avatar">' . ( $avatar ? CMP_Profile_Images::img_html( $owner_id, 'avatar', $avatar ) : '<span aria-hidden="true">' . esc_html( mb_strtoupper( mb_substr( $name, 0, 1 ) ) ) . '</span>' ) . '</div>';
+		$html .= '<div class="cmp-pv-who"><h3 class="cmp-pv-name">' . esc_html( $name ) . ( $tag ? ' <small>' . esc_html( $tag ) . '</small>' : '' ) . '</h3>';
+		if ( $line ) {
+			$html .= '<p class="cmp-pv-line">' . implode( ' · ', $line ) . '</p>';
+		}
+		$html .= CMP_Chastity::profile_badge_html( $owner_id ) . $extras['counts'] . '</div>';
+		$html .= $extras['actions'] ? '<div class="cmp-pv-actions">' . $extras['actions'] . '</div>' : '';
+		$html .= '</header>';
+
+		// About: details beside the rest.
 		$details = array_filter(
 			array(
-				__( 'Gender', 'cmp' )       => implode( ', ', $gender ),
-				__( 'Pronouns', 'cmp' )     => $txt( 'pronouns' ),
-				__( 'Orientation', 'cmp' )  => $txt( 'identity' ),
-				__( 'Roles', 'cmp' )        => implode( ', ', $roles ),
-				__( 'Expression', 'cmp' )   => $txt( 'expression' ),
-				__( 'Active', 'cmp' )       => $txt( 'active_level' ),
-				__( 'Looking for', 'cmp' )  => $txt( 'looking_for' ),
-				__( 'Member since', 'cmp' ) => $txt( 'member_since' ),
+				__( 'Gender', 'cmp' )       => $inline( 'gender' ),
+				__( 'Orientation', 'cmp' )  => $inline( 'identity' ),
+				__( 'Roles', 'cmp' )        => $inline( 'roles' ),
+				__( 'Position', 'cmp' )     => $inline( 'position' ),
+				__( 'Body type', 'cmp' )    => $inline( 'body_type' ),
+				__( 'Height', 'cmp' )       => esc_html( $txt( 'height' ) ),
+				__( 'Weight', 'cmp' )       => esc_html( $txt( 'weight' ) ),
+				__( 'Active', 'cmp' )       => $inline( 'active_level' ),
+				__( 'Hosting', 'cmp' )      => $inline( 'hosting' ),
+				__( 'Availability', 'cmp' ) => esc_html( $txt( 'availability' ) ),
+				__( 'Member since', 'cmp' ) => esc_html( $txt( 'member_since' ) ),
 			)
 		);
-		$stats = array_filter(
-			array(
-				__( 'Age', 'cmp' )       => $txt( 'age' ),
-				__( 'Height', 'cmp' )    => $txt( 'height' ),
-				__( 'Weight', 'cmp' )    => $txt( 'weight' ),
-				__( 'Body type', 'cmp' ) => $txt( 'body_type' ),
-				__( 'Position', 'cmp' )  => $txt( 'position' ),
-				__( 'Hosting', 'cmp' )   => $txt( 'hosting' ),
-				__( 'Availability', 'cmp' ) => $txt( 'availability' ),
-			)
-		);
-
-		$html  = '<article class="cmp-prof" aria-label="' . esc_attr( $name ) . '">';
-		$html .= '<header class="cmp-prof-band">';
-		$html .= '<div class="cmp-prof-photo">' . ( $cover ? '<span class="cmp-prof-cover">' . CMP_Profile_Images::img_html( $owner_id, 'cover', $cover ) . '</span>' : '' )
-			. ( $avatar ? CMP_Profile_Images::img_html( $owner_id, 'avatar', $avatar ) : '<span class="cmp-avatar-placeholder" aria-hidden="true">' . esc_html( mb_strtoupper( mb_substr( $name, 0, 1 ) ) ) . '</span>' ) . '</div>';
-		$html .= '<div class="cmp-prof-head"><h3 class="cmp-prof-name">' . esc_html( $name ) . ( $tag ? ' <small>' . esc_html( $tag ) . '</small>' : '' ) . '</h3>';
-		if ( $txt( 'location' ) ) {
-			$html .= '<p class="cmp-prof-loc">' . esc_html( $txt( 'location' ) ) . '</p>';
-		}
-		if ( $stat ) {
-			$html .= '<p class="cmp-prof-stat">' . esc_html( implode( ' · ', $stat ) ) . '</p>';
-		}
-		$html .= CMP_Chastity::profile_badge_html( $owner_id );
+		$side = '';
 		if ( $details ) {
-			$html .= '<dl class="cmp-prof-table">';
-			foreach ( $details as $label => $text ) {
-				$html .= '<div><dt>' . esc_html( $label ) . '</dt><dd>' . esc_html( $text ) . '</dd></div>';
-			}
-			$html .= '</dl>';
-		}
-		$html .= '</div></header>';
-
-		$side = CMP_Dynamics::profile_card_html( $owner_id );
-		if ( $stats ) {
-			$side .= '<section class="cmp-prof-card cmp-prof-stats"><h4>' . esc_html__( 'Stats', 'cmp' ) . '</h4><dl class="cmp-prof-table">';
-			foreach ( $stats as $label => $text ) {
-				$side .= '<div><dt>' . esc_html( $label ) . '</dt><dd>' . esc_html( $text ) . '</dd></div>';
+			$side .= '<section class="cmp-prof-card"><h4>' . esc_html__( 'Details', 'cmp' ) . '</h4><dl class="cmp-prof-table">';
+			foreach ( $details as $label => $value ) {
+				$side .= '<div><dt>' . esc_html( $label ) . '</dt><dd>' . $value . '</dd></div>';
 			}
 			$side .= '</dl></section>';
 		}
-
-		$main = '';
+		$side .= CMP_Dynamics::profile_card_html( $owner_id );
+		$main  = '';
 		if ( $txt( 'bio' ) ) {
 			$main .= '<section class="cmp-prof-card"><h4>' . esc_html__( 'About', 'cmp' ) . '</h4><blockquote class="cmp-prof-bio">' . nl2br( esc_html( $txt( 'bio' ) ) ) . '</blockquote></section>';
 		}
 		foreach ( array( 'looking_for', 'not_looking_for', 'interests' ) as $key ) {
-			$labels = $chips( $key );
-			if ( $labels ) {
-				$main .= '<section class="cmp-prof-card"><h4>' . esc_html( CMP_Profile_Fields::field( $key )['label'] ) . '</h4>' . $chip_html( $labels ) . '</section>';
+			$c = $chips( $key );
+			if ( $c ) {
+				$main .= '<section class="cmp-prof-card"><h4>' . esc_html( CMP_Profile_Fields::field( $key )['label'] ) . '</h4>' . $c . '</section>';
 			}
 		}
-		$kinks = $val( 'kinks' );
+		if ( $txt( 'hard_limits' ) ) {
+			$main .= '<section class="cmp-prof-card"><h4>' . esc_html__( 'Hard limits', 'cmp' ) . '</h4><p>' . nl2br( esc_html( $txt( 'hard_limits' ) ) ) . '</p></section>';
+		}
+		$health = array_merge( array_values( $opts( 'practices' ) ), $txt( 'last_tested' ) ? array( sprintf( /* translators: %s: month and year */ __( 'Tested %s', 'cmp' ), $txt( 'last_tested' ) ) ) : array(), array_values( $opts( 'substances' ) ) );
+		if ( $health ) {
+			$main .= '<section class="cmp-prof-card"><h4>' . esc_html__( 'Health & safer sex', 'cmp' ) . '</h4><ul class="cmp-chips">' . implode( '', array_map( function ( $l ) {
+				return '<li>' . esc_html( $l ) . '</li>';
+			}, $health ) ) . '</ul></section>';
+		}
+		$about = '' === $main && '' === $side
+			? '<p class="cmp-empty">' . esc_html( $as_members ? __( 'Nothing else is shared with members yet.', 'cmp' ) : __( 'This member hasn\'t shared anything else with you.', 'cmp' ) ) . '</p>'
+			: '<div class="cmp-pv-about">' . ( $side ? '<div class="cmp-pv-side">' . $side . '</div>' : '' ) . '<div class="cmp-pv-main">' . $main . '</div></div>';
+
+		// Kinks, grouped by how much (0.10.0).
+		$kinks_html = '';
+		$kinks      = $val( 'kinks' );
 		if ( '' !== $kinks ) {
 			$o    = CMP_Profile_Fields::options( 'kinks', true );
 			$lvls = CMP_Profile_Fields::kink_level_labels();
 			$dirs = CMP_Profile_Fields::kink_dir_labels();
-			// Grouped by how much (0.10.0), like FetLife's fetish lists.
-			$by = array();
+			$by   = array();
 			foreach ( (array) $kinks as $row ) {
 				if ( isset( $row['k'], $o[ $row['k'] ], $lvls[ $row['lvl'] ] ) ) {
 					$by[ $row['lvl'] ][] = $row;
 				}
 			}
-			$main .= '<section class="cmp-prof-card cmp-prof-kinks"><h4>' . esc_html__( 'Kinks', 'cmp' ) . '</h4>';
 			foreach ( $lvls as $lv => $lv_label ) {
 				if ( empty( $by[ $lv ] ) ) {
 					continue;
 				}
-				$main .= '<h5 class="cmp-kink-lvl is-' . esc_attr( $lv ) . '">' . esc_html( $lv_label ) . '</h5><ul class="cmp-chips">';
+				$kinks_html .= '<h5 class="cmp-kink-lvl is-' . esc_attr( $lv ) . '">' . esc_html( $lv_label ) . '</h5><ul class="cmp-chips">';
 				foreach ( $by[ $lv ] as $row ) {
-					$main .= '<li>' . esc_html( $o[ $row['k'] ] ) . ( ! empty( $row['dir'] ) && isset( $dirs[ $row['dir'] ] ) ? ' <small>' . esc_html( mb_strtolower( $dirs[ $row['dir'] ] ) ) . '</small>' : '' ) . '</li>';
+					$kinks_html .= '<li>' . $item( 'kinks', $row['k'], $o[ $row['k'] ] ) . ( ! empty( $row['dir'] ) && isset( $dirs[ $row['dir'] ] ) ? ' <small>' . esc_html( mb_strtolower( $dirs[ $row['dir'] ] ) ) . '</small>' : '' ) . '</li>';
 				}
-				$main .= '</ul>';
+				$kinks_html .= '</ul>';
 			}
-			$main .= '</section>';
-		}
-		if ( $txt( 'hard_limits' ) ) {
-			$main .= '<section class="cmp-prof-card"><h4>' . esc_html__( 'Hard limits', 'cmp' ) . '</h4><p>' . nl2br( esc_html( $txt( 'hard_limits' ) ) ) . '</p></section>';
-		}
-		$health = array_merge( $chips( 'practices' ), $txt( 'last_tested' ) ? array( sprintf( /* translators: %s: month and year */ __( 'Tested %s', 'cmp' ), $txt( 'last_tested' ) ) ) : array(), $chips( 'substances' ) );
-		if ( $health ) {
-			$main .= '<section class="cmp-prof-card"><h4>' . esc_html__( 'Health & safer sex', 'cmp' ) . '</h4>' . $chip_html( $health ) . '</section>';
+			$kinks_html = $kinks_html ? '<section class="cmp-prof-card cmp-prof-kinks"><h4>' . esc_html__( 'Kinks', 'cmp' ) . '</h4>' . $kinks_html . '</section>' : '';
 		}
 
-		if ( '' === $main && '' === $side && ! $details ) {
-			$main = '<p class="cmp-empty">' . esc_html( $as_members ? __( 'Nothing else is shared with members yet.', 'cmp' ) : __( 'This member hasn\'t shared anything else with you.', 'cmp' ) ) . '</p>';
+		$tabs = array_filter(
+			array(
+				'about' => array( __( 'About', 'cmp' ), $about ),
+				'kinks' => array( __( 'Kinks', 'cmp' ), $kinks_html ),
+				'going' => array( __( 'Going to', 'cmp' ), $extras['going'] ),
+				'posts' => array( __( 'Posts', 'cmp' ), $extras['posts'] ),
+			),
+			function ( $t ) {
+				return '' !== $t[1];
+			}
+		);
+		$uid   = 'cmp-pv-' . (int) $owner_id;
+		$html .= '<div class="cmp-pv-tabs" role="tablist" aria-label="' . esc_attr__( 'Profile sections', 'cmp' ) . '" hidden data-cmp-pv-tabs>';
+		$first = true;
+		foreach ( $tabs as $k => $t ) {
+			$html .= '<button type="button" role="tab" id="' . esc_attr( $uid . '-tab-' . $k ) . '" aria-controls="' . esc_attr( $uid . '-' . $k ) . '" aria-selected="' . ( $first ? 'true' : 'false' ) . '" data-cmp-pv-tab="' . esc_attr( $k ) . '">' . esc_html( $t[0] ) . '</button>';
+			$first = false;
 		}
-		$html .= '<div class="cmp-prof-body">' . ( $side ? '<aside class="cmp-prof-side">' . $side . '</aside>' : '' ) . '<div class="cmp-prof-main">' . $main . '</div></div>';
+		$html .= '</div>';
+		foreach ( $tabs as $k => $t ) {
+			$html .= '<div class="cmp-pv-panel" role="tabpanel" id="' . esc_attr( $uid . '-' . $k ) . '" aria-labelledby="' . esc_attr( $uid . '-tab-' . $k ) . '" data-cmp-pv-panel="' . esc_attr( $k ) . '">' . $t[1] . '</div>';
+		}
 		return $html . '</article>';
 	}
 
@@ -893,10 +931,19 @@ class CMP_Profiles {
 		<section class="cmp-step" aria-labelledby="cmp-member-title">
 			<h2 id="cmp-member-title" class="cmp-title"><?php esc_html_e( 'Member profile', 'cmp' ); ?></h2>
 			<div class="cmp-notice cmp-notice-info cmp-self-view"><p><?php esc_html_e( 'This is your profile as other members see it. Items you switched off aren\'t here.', 'cmp' ); ?> <a href="<?php echo esc_url( self::url() ); ?>"><?php esc_html_e( 'Edit my profile', 'cmp' ); ?></a></p></div>
-			<?php echo self::card_html( $user_id, $user_id, true ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-			<?php echo CMP_Follows::counts_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
-			<?php echo CMP_Follows::going_html( $user_id, $user_id, true ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
-			<?php echo CMP_Feed::profile_html( $user_id, $user_id, true ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
+			<?php
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
+			echo self::card_html(
+				$user_id,
+				$user_id,
+				true,
+				array(
+					'counts' => CMP_Follows::counts_html( $user_id ),
+					'going'  => CMP_Follows::going_html( $user_id, $user_id, true ),
+					'posts'  => CMP_Feed::profile_html( $user_id, $user_id, true ),
+				)
+			);
+			?>
 		</section>
 		<?php
 		return ob_get_clean();
@@ -918,12 +965,22 @@ class CMP_Profiles {
 		<section class="cmp-step" aria-labelledby="cmp-member-title">
 			<h2 id="cmp-member-title" class="cmp-title"><?php esc_html_e( 'Member profile', 'cmp' ); ?></h2>
 			<?php if ( $ok ) : ?>
-				<?php echo self::card_html( $owner_id, $viewer ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-				<?php echo CMP_Follows::counts_html( $owner_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
-				<?php echo CMP_Messages::profile_actions_html( $viewer, $owner_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
-				<?php echo CMP_Follows::going_html( $owner_id, $viewer ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
+				<?php
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
+				echo self::card_html(
+					$owner_id,
+					$viewer,
+					false,
+					array(
+						'actions' => CMP_Messages::profile_actions_html( $viewer, $owner_id, false ),
+						'counts'  => CMP_Follows::counts_html( $owner_id ),
+						'going'   => CMP_Follows::going_html( $owner_id, $viewer ),
+						'posts'   => CMP_Feed::profile_html( $owner_id, $viewer ),
+					)
+				);
+				?>
 				<?php echo CMP_Dynamics::propose_html( $viewer, $owner_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
-				<?php echo CMP_Feed::profile_html( $owner_id, $viewer ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
+				<?php echo CMP_Messages::report_html( $owner_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 			<?php else : ?>
 				<p class="cmp-empty"><?php esc_html_e( 'This profile isn\'t available.', 'cmp' ); ?></p>
 			<?php endif; ?>

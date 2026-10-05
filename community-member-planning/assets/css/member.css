@@ -373,49 +373,58 @@
 
 
 /* Profile display (0.5.0): Sniffies-style on phones, FetLife-style from 900px. */
+/* Profile view (0.13.0): Facebook / FetLife style. Cover across the top,
+   profile photo overlapping it, then tabs. Laid out by the profile's own
+   width (container queries), since themes give the member area very
+   different widths. */
 .cmp-member-area .cmp-prof { border: 1px solid var(--cmp-border); border-radius: var(--cmp-radius); overflow: hidden; background: #0e0c14; container-type: inline-size; }
-.cmp-member-area .cmp-prof-band { position: relative; }
-.cmp-member-area .cmp-prof-photo { position: relative; aspect-ratio: 1 / 1; max-height: 420px; width: 100%; background: linear-gradient(160deg, #3b2a4a, #14101c 70%); display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.cmp-member-area .cmp-prof-photo > img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.cmp-member-area .cmp-prof-cover { display: none; }
-.cmp-member-area .cmp-prof-photo .cmp-avatar-placeholder { font-family: 'Archivo Black', sans-serif; font-size: 4rem; color: rgba(255,255,255,.3); }
-.cmp-member-area .cmp-prof-head { padding: 14px 16px; background: linear-gradient(180deg, rgba(0,0,0,.0), rgba(0,0,0,.35)); }
-.cmp-member-area .cmp-prof-name { font-size: 1.35rem; font-weight: 800; margin: 0; color: var(--cmp-text); }
-.cmp-member-area .cmp-prof-name small { font-size: 0.95rem; font-weight: 700; color: var(--cmp-primary); margin-left: 6px; }
-.cmp-member-area .cmp-prof-loc { margin: 2px 0 0; color: var(--cmp-muted); font-size: 0.9rem; }
-.cmp-member-area .cmp-prof-stat { margin: 6px 0 0; color: #e6e3ee; font-size: 0.92rem; }
-.cmp-member-area .cmp-prof-head .cmp-prof-table { display: none; }
+.cmp-member-area .cmp-pv-cover { aspect-ratio: 3 / 1; max-height: 300px; width: 100%; background: linear-gradient(120deg, #3a1f4f, #7a2d6b 45%, #1d3a5a); overflow: hidden; }
+.cmp-member-area .cmp-pv-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cmp-member-area .cmp-pv-head { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-start; padding: 0 16px 14px; position: relative; }
+.cmp-member-area .cmp-pv-avatar { width: 104px; height: 104px; margin-top: -52px; border-radius: 50%; border: 4px solid #0e0c14; overflow: hidden; flex: 0 0 auto; background: linear-gradient(135deg, var(--cmp-secondary), #7a3cff); display: grid; place-items: center; color: #fff; font-family: 'Archivo Black', 'Arial Black', sans-serif; font-size: 40px; position: relative; }
+.cmp-member-area .cmp-pv-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cmp-member-area .cmp-pv-who { flex: 1 1 220px; min-width: 0; padding-top: 10px; }
+.cmp-member-area .cmp-pv-name { margin: 0; font-size: 1.45rem; font-weight: 800; color: var(--cmp-text); overflow-wrap: anywhere; }
+.cmp-member-area .cmp-pv-name small { font-size: 0.95rem; font-weight: 700; color: var(--cmp-primary); margin-left: 6px; }
+.cmp-member-area .cmp-pv-line { margin: 4px 0 0; color: var(--cmp-muted); font-size: 0.92rem; }
+.cmp-member-area .cmp-pv-who .cmp-fl-counts { margin: 4px 0 0; font-size: 0.88rem; }
+.cmp-member-area .cmp-pv-actions { flex: 1 1 100%; }
+.cmp-member-area .cmp-pv-actions .cmp-actions { margin: 0 !important; }
+.cmp-member-area a.cmp-pv-link { color: inherit !important; text-decoration: underline !important; text-decoration-color: rgba(225, 245, 119, .55) !important; text-underline-offset: 3px; background: transparent !important; }
+.cmp-member-area a.cmp-pv-link:hover { color: var(--cmp-primary) !important; }
+.cmp-member-area .cmp-chips li:has(> a.cmp-pv-link) { padding: 0; }
+.cmp-member-area .cmp-chips li > a.cmp-pv-link { display: inline-block; padding: 5px 11px; text-decoration: none !important; border-radius: 100px; }
+.cmp-member-area .cmp-chips li > a.cmp-pv-link:hover { background: rgba(225, 245, 119, .1) !important; }
+.cmp-member-area .cmp-pv-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 0 12px; border-bottom: 1px solid var(--cmp-border); scrollbar-width: none; }
+.cmp-member-area .cmp-pv-tabs[hidden] { display: none !important; }
+.cmp-member-area .cmp-pv-tabs button { flex: 0 0 auto; background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; color: var(--cmp-muted) !important; font: inherit !important; font-weight: 700 !important; font-size: 15px !important; text-transform: none !important; letter-spacing: 0 !important; min-height: 46px; padding: 0 10px !important; cursor: pointer; }
+.cmp-member-area .cmp-pv-tabs button[aria-selected="true"] { color: var(--cmp-primary) !important; box-shadow: inset 0 -3px 0 var(--cmp-primary) !important; }
+.cmp-member-area .cmp-pv-panel { padding: 4px 16px 16px; }
+.cmp-member-area .cmp-pv:not(.has-tabs) .cmp-pv-panel { border-top: 1px solid var(--cmp-border); }
+.cmp-member-area .cmp-pv-panel > .cmp-panel, .cmp-member-area .cmp-pv-panel > section.cmp-fd-profile { margin-top: 12px; }
 .cmp-member-area .cmp-prof-table { display: grid; gap: 4px; margin: 0; font-size: 0.92rem; }
-.cmp-member-area .cmp-prof-table > div { display: grid; grid-template-columns: 120px 1fr; gap: 12px; }
+.cmp-member-area .cmp-prof-table > div { display: grid; grid-template-columns: 110px 1fr; gap: 12px; }
 .cmp-member-area .cmp-prof-table dt { color: var(--cmp-muted); }
 .cmp-member-area .cmp-prof-table dd { margin: 0; overflow-wrap: anywhere; }
-.cmp-member-area .cmp-prof-body { display: flex; flex-direction: column-reverse; gap: 0; padding: 4px 16px 16px; }
 .cmp-member-area .cmp-prof-card { padding: 12px 0; border-top: 1px solid var(--cmp-border); }
-.cmp-member-area .cmp-prof-card h4 { margin: 0 0 8px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--cmp-muted); font-weight: 800; }
+.cmp-member-area .cmp-pv-panel > .cmp-prof-card:first-child, .cmp-member-area .cmp-pv-side > .cmp-prof-card:first-child { border-top: none; }
+.cmp-member-area .cmp-prof-card h4 { margin: 0 0 8px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--cmp-secondary); font-weight: 800; }
 .cmp-member-area .cmp-prof-card p { margin: 0; line-height: 1.55; }
+.cmp-member-area .cmp-chips { list-style: none !important; margin: 0 !important; padding: 0 !important; display: flex; flex-wrap: wrap; gap: 6px; }
+.cmp-member-area .cmp-chips li { margin: 0 !important; font-size: 0.85rem; padding: 5px 11px; border-radius: 100px; background: var(--cmp-card-alt); border: 1px solid var(--cmp-border); }
 .cmp-member-area .cmp-prof-bio { margin: 0; border-left: 3px solid var(--cmp-secondary); padding: 4px 0 4px 12px; line-height: 1.55; color: #e6e3ee; }
-.cmp-member-area .cmp-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.cmp-member-area .cmp-chips li { font-size: 0.85rem; padding: 5px 11px; border-radius: 100px; background: var(--cmp-card-alt); border: 1px solid var(--cmp-border); }
-/* On phones the stat line covers the Stats card. */
-.cmp-member-area .cmp-prof-side .cmp-prof-stats { display: none; }
-
-/* Laid out by the profile's own width (themes give the member area very
-   different widths): header band from 600px, two columns from 820px. */
 @container (min-width: 600px) {
-	.cmp-member-area .cmp-prof-band { display: grid; grid-template-columns: 180px 1fr; gap: 24px; padding: 24px; background: linear-gradient(180deg, #1c1726, #120f19); border-bottom: 1px solid var(--cmp-border); }
-	.cmp-member-area .cmp-prof-photo { aspect-ratio: 1 / 1; width: 180px; border-radius: 10px; }
-	.cmp-member-area .cmp-prof-head { padding: 0; background: none; }
-	.cmp-member-area .cmp-prof-name { font-family: 'Archivo Black', sans-serif; font-size: 1.6rem; color: var(--cmp-secondary); }
-	.cmp-member-area .cmp-prof-name small { font-family: inherit; color: var(--cmp-text); }
-	.cmp-member-area .cmp-prof-stat { display: none; }
-	.cmp-member-area .cmp-prof-head .cmp-prof-table { display: grid; margin-top: 12px; }
-	.cmp-member-area .cmp-prof-body { padding: 20px 24px 24px; display: flex; flex-direction: column; }
-	.cmp-member-area .cmp-prof-side .cmp-prof-stats { display: block; }
-	.cmp-member-area .cmp-prof-card { background: var(--cmp-card); border: 1px solid var(--cmp-border); border-radius: var(--cmp-radius); padding: 14px 16px; margin-bottom: 14px; }
+	.cmp-member-area .cmp-pv-head { padding: 0 24px 16px; }
+	.cmp-member-area .cmp-pv-avatar { width: 148px; height: 148px; margin-top: -74px; font-size: 54px; border-width: 5px; }
+	.cmp-member-area .cmp-pv-name { font-size: 1.75rem; }
+	.cmp-member-area .cmp-pv-tabs { padding: 0 20px; }
+	.cmp-member-area .cmp-pv-panel { padding: 8px 24px 24px; }
+	.cmp-member-area .cmp-prof-card { background: var(--cmp-card); border: 1px solid var(--cmp-border) !important; border-radius: var(--cmp-radius); padding: 14px 16px; margin-top: 14px; }
 }
 @container (min-width: 820px) {
-	.cmp-member-area .cmp-prof-body { display: grid; grid-template-columns: 260px 1fr; gap: 24px; }
-	.cmp-member-area .cmp-prof-body:not(:has(.cmp-prof-side)) { grid-template-columns: 1fr; }
+	.cmp-member-area .cmp-pv-actions { flex: 0 1 auto; padding-top: 14px; }
+	.cmp-member-area .cmp-pv-about { display: grid; grid-template-columns: 280px 1fr; gap: 20px; align-items: start; }
+	.cmp-member-area .cmp-pv-about:not(:has(.cmp-pv-side)) { grid-template-columns: 1fr; }
 }
 
 /* Dynamics (0.6.0). */
@@ -627,3 +636,30 @@
 .cmp-member-area .cmp-fl-events small { display: block; color: var(--cmp-muted); font-size: 12.5px; }
 .cmp-member-area .cmp-fl-date { flex: 0 0 48px; text-align: center; border: 1.5px solid var(--cmp-border); border-radius: 10px; padding: 4px 0; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--cmp-secondary); }
 .cmp-member-area .cmp-fl-date b { display: block; font-size: 18px; color: var(--cmp-text); letter-spacing: 0; }
+
+/* Members (0.13.0) */
+.cmp-member-area .cmp-dir-wrap { container-type: inline-size; }
+.cmp-member-area .cmp-dir { display: grid; gap: 16px; }
+.cmp-member-area .cmp-dir-filters > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 800; color: var(--cmp-primary); }
+.cmp-member-area .cmp-dir-filters .cmp-field { margin-bottom: 10px; }
+.cmp-member-area .cmp-dir-filters select, .cmp-member-area .cmp-dir-filters input[type="search"], .cmp-member-area .cmp-dir-filters input[type="text"], .cmp-member-area .cmp-dir-filters input[type="number"] { width: 100%; }
+.cmp-member-area .cmp-dir-count { margin: 0 0 8px; color: var(--cmp-muted); font-weight: 700; }
+.cmp-member-area .cmp-dir-active { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.cmp-member-area a.cmp-dir-chip { display: inline-flex !important; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 100px; border: 1.5px solid var(--cmp-primary); color: var(--cmp-primary) !important; text-decoration: none !important; background: rgba(225, 245, 119, .08) !important; font-size: 13px; font-weight: 700; }
+.cmp-member-area .cmp-dir-grid { list-style: none !important; margin: 0 !important; padding: 0 !important; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.cmp-member-area .cmp-dir-card { margin: 0 !important; }
+.cmp-member-area .cmp-dir-card > a { display: block !important; height: 100%; background: var(--cmp-card) !important; border: 1px solid var(--cmp-border); border-radius: 12px; overflow: hidden; color: var(--cmp-text) !important; text-decoration: none !important; }
+.cmp-member-area .cmp-dir-card > a:hover { border-color: var(--cmp-primary); }
+.cmp-member-area .cmp-dir-cover { display: block; aspect-ratio: 3 / 1; background: linear-gradient(120deg, #2c2238, #3a1f4f); overflow: hidden; }
+.cmp-member-area .cmp-dir-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cmp-member-area .cmp-dir-av { display: grid; place-items: center; width: 60px; height: 60px; margin: -30px 0 0 10px; border-radius: 50%; border: 3px solid var(--cmp-card); overflow: hidden; background: linear-gradient(135deg, var(--cmp-secondary), #7a3cff); color: #fff; font-weight: 800; position: relative; }
+.cmp-member-area .cmp-dir-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cmp-member-area .cmp-dir-body { display: block; padding: 6px 10px 12px; }
+.cmp-member-area .cmp-dir-body b { display: block; overflow-wrap: anywhere; }
+.cmp-member-area .cmp-dir-body small { display: block; color: var(--cmp-muted); font-size: 12.5px; margin-top: 2px; }
+.cmp-member-area .cmp-dir-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.cmp-member-area .cmp-dir-chips span { font-size: 11.5px; padding: 3px 8px; border-radius: 100px; background: var(--cmp-card-alt); border: 1px solid var(--cmp-border); }
+@container (min-width: 700px) {
+	.cmp-member-area .cmp-dir { grid-template-columns: 260px minmax(0, 1fr); align-items: start; }
+	.cmp-member-area .cmp-dir-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

@@ -716,3 +716,44 @@
 		} );
 	} );
 }() );
+
+/* Profile tabs (0.13.0): About · Kinks · Going to · Posts. Without this
+   script every section shows, one after another. */
+( function () {
+	'use strict';
+	Array.prototype.forEach.call( document.querySelectorAll( '.cmp-member-area [data-cmp-pv]' ), function ( card ) {
+		var bar = card.querySelector( '[data-cmp-pv-tabs]' );
+		var tabs = card.querySelectorAll( '[data-cmp-pv-tab]' );
+		if ( ! bar || tabs.length < 2 ) {
+			return;
+		}
+		bar.hidden = false;
+		card.classList.add( 'has-tabs' );
+		var show = function ( key, focus ) {
+			Array.prototype.forEach.call( tabs, function ( t ) {
+				var on = t.getAttribute( 'data-cmp-pv-tab' ) === key;
+				t.setAttribute( 'aria-selected', on ? 'true' : 'false' );
+				t.tabIndex = on ? 0 : -1;
+				if ( on && focus ) {
+					t.focus();
+				}
+			} );
+			Array.prototype.forEach.call( card.querySelectorAll( '[data-cmp-pv-panel]' ), function ( p ) {
+				p.hidden = p.getAttribute( 'data-cmp-pv-panel' ) !== key;
+			} );
+		};
+		Array.prototype.forEach.call( tabs, function ( t, i ) {
+			t.addEventListener( 'click', function () {
+				show( t.getAttribute( 'data-cmp-pv-tab' ) );
+			} );
+			t.addEventListener( 'keydown', function ( e ) {
+				var d = 'ArrowRight' === e.key ? 1 : ( 'ArrowLeft' === e.key ? -1 : 0 );
+				if ( d ) {
+					e.preventDefault();
+					show( tabs[ ( i + d + tabs.length ) % tabs.length ].getAttribute( 'data-cmp-pv-tab' ), true );
+				}
+			} );
+		} );
+		show( tabs[0].getAttribute( 'data-cmp-pv-tab' ) );
+	} );
+}() );

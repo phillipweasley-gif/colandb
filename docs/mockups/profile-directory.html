@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profiles and Member Search</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root { --primary: #e1f577; --secondary: #ff50d7; --text: #f5f4f7; --muted: #a9a6bb; --card: #1b1826; --card2: #211d2e; --field: #110f18; --border: rgba(255,255,255,.12); --line: rgba(255,255,255,.08); --page: #0b0a10; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font-family: Inter, system-ui, sans-serif; }
+.intro { max-width: 1150px; margin: 0 auto; padding: 28px 16px 6px; }
+.intro h1 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 22px; margin: 0 0 8px; }
+.intro p { color: var(--muted); max-width: 900px; line-height: 1.55; margin: 0 0 6px; }
+.intro strong { color: var(--text); }
+.label { max-width: 1150px; margin: 24px auto 8px; padding: 0 16px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 24px; justify-content: center; padding: 0 16px 18px; align-items: flex-start; }
+.desk { width: 1060px; max-width: calc(100vw - 32px); border: 1px solid var(--border); border-radius: 14px; background: #0e0c14; overflow: hidden; }
+.phone { width: 360px; max-width: calc(100vw - 32px); height: 760px; border: 10px solid #26232f; border-radius: 40px; background: #000; overflow: hidden; }
+.screen { height: 100%; overflow-y: auto; }
+/* Profile header */
+.cover { height: 240px; background: linear-gradient(120deg, #3a1f4f, #7a2d6b 45%, #1d3a5a); position: relative; }
+.cover::after { content: "cover image"; position: absolute; right: 14px; bottom: 10px; font-size: 11px; color: rgba(255,255,255,.4); }
+.head { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-start; padding: 0 28px 18px; margin-top: -70px; position: relative; }
+.av { width: 150px; height: 150px; border-radius: 50%; border: 5px solid #0e0c14; background: linear-gradient(135deg,#ff50d7,#7a3cff); display: grid; place-items: center; font-family: 'Archivo Black'; font-size: 54px; flex: 0 0 auto; }
+.who { flex: 1 1 260px; margin-top: 82px; }
+.who h2 { margin: 0; font-size: 28px; }
+.who h2 small { font-size: 16px; color: var(--muted); font-weight: 600; margin-left: 6px; }
+.who p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.acts { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 8px; }
+@media (min-width: 1000px) { .head .acts { margin-top: 82px; } }
+.btn { border: none; border-radius: 100px; min-height: 42px; padding: 0 16px; font-weight: 800; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
+.y { background: var(--primary); color: #0b0a12; }
+.o { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
+.tabs { display: flex; gap: 22px; padding: 0 28px; border-bottom: 1px solid var(--line); font-weight: 700; font-size: 14px; }
+.tabs span { padding: 12px 0; color: var(--muted); }
+.tabs .on { color: var(--primary); box-shadow: inset 0 -3px 0 var(--primary); }
+.body { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 18px; padding: 18px 28px 28px; }
+@media (max-width: 760px) { .body, .dir { grid-template-columns: 1fr !important; } .grid { grid-template-columns: repeat(2, 1fr) !important; } }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+.card h4 { margin: 0 0 10px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--secondary); }
+dl { margin: 0; font-size: 13.5px; }
+dl div { display: grid; grid-template-columns: 100px 1fr; gap: 8px; padding: 5px 0; border-top: 1px solid var(--line); }
+dl div:first-child { border-top: none; }
+dt { color: var(--muted); }
+dd { margin: 0; }
+a.chip, .chip { display: inline-block; margin: 0 6px 6px 0; padding: 6px 11px; border-radius: 100px; background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--text); font-size: 13px; text-decoration: none; }
+a.chip:hover, .chip.hl { border-color: var(--primary); color: var(--primary); }
+a.link { color: var(--text); text-decoration: underline; text-decoration-color: rgba(225,245,119,.5); text-underline-offset: 3px; }
+.bio { font-size: 14.5px; line-height: 1.55; margin: 0; }
+.tip { font-size: 12px; color: var(--primary); margin-top: 8px; }
+/* phone profile */
+.pcover { height: 150px; background: linear-gradient(120deg, #3a1f4f, #7a2d6b 45%, #1d3a5a); }
+.phead { padding: 0 16px 12px; margin-top: -48px; }
+.pav { width: 96px; height: 96px; border-radius: 50%; border: 4px solid #000; background: linear-gradient(135deg,#ff50d7,#7a3cff); display: grid; place-items: center; font-family: 'Archivo Black'; font-size: 36px; }
+.phead h2 { margin: 8px 0 0; font-size: 22px; }
+.phead p { margin: 3px 0 10px; color: var(--muted); font-size: 13px; }
+.pbody { padding: 0 12px 20px; }
+/* directory */
+.dir { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 18px; padding: 22px; }
+.search { width: 100%; min-height: 46px; background: var(--field); border: 1.5px solid var(--border); border-radius: 10px; color: var(--text); font: inherit; padding: 0 14px; margin-bottom: 14px; }
+.f h5 { margin: 14px 0 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.f label { display: flex; gap: 8px; align-items: center; font-size: 13.5px; padding: 4px 0; }
+.f input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--primary); }
+.f select { width: 100%; min-height: 40px; background: var(--field); border: 1.5px solid var(--border); color: var(--text); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 13px; }
+.active { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+.active .chip { border-color: var(--primary); color: var(--primary); }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.m { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.m .mc { height: 70px; background: linear-gradient(120deg,#2c2238,#3a1f4f); }
+.m .ma { width: 64px; height: 64px; border-radius: 50%; border: 3px solid var(--card); margin: -32px 0 0 12px; background: linear-gradient(135deg,#ff50d7,#7a3cff); display: grid; place-items: center; font-weight: 800; }
+.m .mb { padding: 6px 12px 12px; }
+.m b { display: block; }
+.m small { color: var(--muted); font-size: 12.5px; display: block; margin: 2px 0 8px; }
+.m .chip { font-size: 11.5px; padding: 3px 8px; }
+.decisions { max-width: 1000px; margin: 10px auto 60px; padding: 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.decisions b { color: var(--text); }
+.decisions h2 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 16px; }
+</style>
+</head>
+<body>
+<div class="intro">
+	<h1>Profiles and member search</h1>
+	<p>Mockup for <strong>Community Member Planning 0.13.0</strong>: a Facebook / FetLife-style profile (the cover image across the top, the profile photo overlapping it), a <strong>Members</strong> search with filters, and <strong>clickable profile items</strong>: tap "Leather" or "Bear" on anyone's profile to see every member who shows it. Sample data.</p>
+</div>
+
+<div class="label">1 · Profile on desktop</div>
+<div class="row"><div class="desk">
+	<div class="cover"></div>
+	<div class="head">
+		<div class="av">F</div>
+		<div class="who"><h2>Foxxy Force <small>43 M Dom</small></h2><p>Columbus, Ohio · Leather · he/him · 12 followers</p></div>
+		<div class="acts"><button class="btn y">Follow</button><button class="btn y">Message</button><button class="btn o">Propose a dynamic</button><button class="btn o">⋯</button></div>
+	</div>
+	<div class="tabs"><span class="on">About</span><span>Kinks</span><span>Going to</span><span>Posts</span></div>
+	<div class="body">
+		<div>
+			<div class="card"><h4>Details</h4><dl>
+				<div><dt>Roles</dt><dd><a class="link" href="#">Dom</a>, <a class="link" href="#">Keyholder</a></dd></div>
+				<div><dt>Orientation</dt><dd><a class="link" href="#">Gay</a></dd></div>
+				<div><dt>Body</dt><dd><a class="link" href="#">Athletic</a> · 5'11" · 185 lb</dd></div>
+				<div><dt>Position</dt><dd><a class="link" href="#">Vers</a></dd></div>
+				<div><dt>Location</dt><dd><a class="link" href="#">Columbus, Ohio</a></dd></div>
+				<div><dt>Member since</dt><dd>Oct 2026</dd></div>
+			</dl></div>
+			<div class="card"><h4>Dynamics</h4><p style="margin:0;font-size:13.5px">Keyholder of <a class="link" href="#">boyJay</a></p></div>
+		</div>
+		<div>
+			<div class="card"><h4>About</h4><p class="bio">Leather guy, board member at a local club. Here for community events, mentoring, and keeping a good boy locked.</p></div>
+			<div class="card"><h4>Looking for</h4><a class="chip hl" href="#">Keeping someone locked</a><a class="chip" href="#">Mentee / student</a><a class="chip" href="#">Events</a><a class="chip" href="#">Friendship</a>
+				<div class="tip">Tap any item to see members who show it.</div></div>
+			<div class="card"><h4>Kinks · Love it</h4><a class="chip" href="#">Chastity / keyholding</a><a class="chip" href="#">Leather</a><a class="chip" href="#">Boot worship</a></div>
+		</div>
+	</div>
+</div></div>
+
+<div class="label">2 · Profile on a phone</div>
+<div class="row"><div class="phone"><div class="screen">
+	<div class="pcover"></div>
+	<div class="phead"><div class="pav">F</div><h2>Foxxy Force</h2><p>43 M Dom · Columbus, Ohio · 12 followers</p>
+		<div class="acts"><button class="btn y">Follow</button><button class="btn y">Message</button><button class="btn o">⋯</button></div></div>
+	<div class="tabs" style="padding:0 16px;gap:16px"><span class="on">About</span><span>Kinks</span><span>Going to</span><span>Posts</span></div>
+	<div class="pbody" style="padding-top:12px">
+		<div class="card"><h4>About</h4><p class="bio">Leather guy, board member at a local club. Here for community events, mentoring…</p></div>
+		<div class="card"><h4>Details</h4><dl><div><dt>Roles</dt><dd><a class="link" href="#">Dom</a>, <a class="link" href="#">Keyholder</a></dd></div><div><dt>Orientation</dt><dd><a class="link" href="#">Gay</a></dd></div><div><dt>Body</dt><dd><a class="link" href="#">Athletic</a></dd></div></dl></div>
+		<div class="card"><h4>Looking for</h4><a class="chip" href="#">Keeping someone locked</a><a class="chip" href="#">Events</a></div>
+	</div>
+</div></div></div>
+
+<div class="label">3 · Members (search and filters). Tapping "Keeping someone locked" on a profile opens this, already filtered</div>
+<div class="row"><div class="desk">
+	<div class="dir">
+		<div class="f">
+			<input class="search" placeholder="Search by name">
+			<h5>Role</h5><label><input type="checkbox">Dom</label><label><input type="checkbox">sub</label><label><input type="checkbox">Keyholder</label><label><input type="checkbox">Switch</label><label style="color:var(--muted)">+ more</label>
+			<h5>Looking for</h5><select><option>Keeping someone locked</option></select>
+			<h5>Orientation</h5><select><option>Any</option></select>
+			<h5>Body type</h5><select><option>Any</option></select>
+			<h5>Kinks</h5><select><option>Any</option></select>
+			<h5>Age</h5><div style="display:flex;gap:6px"><select><option>21</option></select><select><option>65+</option></select></div>
+			<h5>Location</h5><select><option>Anywhere</option><option>Columbus area</option></select>
+			<h5>Show</h5><label><input type="checkbox">With a profile photo</label><label><input type="checkbox">People I follow</label>
+		</div>
+		<div>
+			<div class="active">23 members · <span class="chip">Looking for: Keeping someone locked ✕</span><span class="chip">Role: Dom ✕</span> Sort: <b style="color:var(--text)">Newest</b></div>
+			<div class="grid">
+				<div class="m"><div class="mc"></div><div class="ma">S</div><div class="mb"><b>SampleSir</b><small>52 M Dom · Columbus</small><span class="chip">Keyholder</span><span class="chip">Leather</span></div></div>
+				<div class="m"><div class="mc"></div><div class="ma">R</div><div class="mb"><b>RopeGuy</b><small>38 M Top · Dayton</small><span class="chip">Rope bondage</span></div></div>
+				<div class="m"><div class="mc"></div><div class="ma">B</div><div class="mb"><b>BearDaddy</b><small>47 M Dom · Columbus</small><span class="chip">Bear</span><span class="chip">Daddy / boy</span></div></div>
+				<div class="m"><div class="mc"></div><div class="ma">K</div><div class="mb"><b>KeyMaster</b><small>35 M Keyholder · Cleveland</small><span class="chip">Chastity</span></div></div>
+				<div class="m"><div class="mc"></div><div class="ma">L</div><div class="mb"><b>LeatherLou</b><small>61 M Dom · Columbus</small><span class="chip">Leather</span></div></div>
+				<div class="m"><div class="mc"></div><div class="ma">P</div><div class="mb"><b>PupHandler</b><small>29 M Handler · Columbus</small><span class="chip">Pup play</span></div></div>
+			</div>
+		</div>
+	</div>
+</div></div>
+
+<div class="decisions">
+	<h2>Decisions for you</h2>
+	<ol>
+		<li><b>Cover image</b> shows across the top of every profile (desktop and phone) with the profile photo overlapping it, like Facebook and FetLife. No cover: a plain dark band.</li>
+		<li><b>Sections as tabs</b> (About · Kinks · Going to · Posts) so long profiles don't scroll forever.</li>
+		<li><b>Clickable items:</b> roles, orientation, gender, body type, position, looking for, kinks, interests and city link to Members filtered by that item.</li>
+		<li><b>Search only uses what people show to all members.</b> A hidden or connections-only answer is never matched, so searching can't reveal it.</li>
+		<li><b>Filters:</b> name, role, looking for, orientation, gender, body type, position, kinks, age range, city, "has a profile photo", "people I follow". Sort by newest or name.</li>
+		<li><b>Members only</b>, and blocked members never appear either way.</li>
+	</ol>
+</div>
+</body>
+</html>

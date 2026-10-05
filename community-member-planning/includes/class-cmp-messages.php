@@ -553,7 +553,7 @@ class CMP_Messages {
 	}
 
 	/** Message / Block / Report on another member's profile. */
-	public static function profile_actions_html( $viewer_id, $owner_id ) {
+	public static function profile_actions_html( $viewer_id, $owner_id, $with_report = true ) {
 		$ok   = self::can_start( $viewer_id, $owner_id );
 		$conv = self::between( $viewer_id, $owner_id );
 		$html = '<div class="cmp-actions cmp-msg-profile">' . CMP_Follows::button_html( $viewer_id, $owner_id );
@@ -563,7 +563,7 @@ class CMP_Messages {
 			$html .= '<p class="cmp-muted">' . esc_html__( 'Not accepting message requests.', 'cmp' ) . '</p>';
 		}
 		$html .= self::form_open( 'block', array( 'member' => (int) $owner_id ), 'cmp-form cmp-inline-form' ) . '<button type="submit" class="cmp-btn cmp-btn-outline cmp-btn-danger" data-cmp-confirm="' . esc_attr__( 'Block this member? They won\'t be able to message you or see your profile, and any dynamic between you ends. They aren\'t told.', 'cmp' ) . '">' . esc_html__( 'Block', 'cmp' ) . '</button></form>';
-		return $html . '</div>' . self::report_html( $owner_id );
+		return $html . '</div>' . ( $with_report ? self::report_html( $owner_id ) : '' );
 	}
 
 	/* ------------------------------------------------------------------
