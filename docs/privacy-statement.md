@@ -80,11 +80,12 @@ You choose what to fill in, and each item has its own **Show** switch:
 
 ### Collected automatically
 
-- **Sign-in cookies.** These keep you signed in. They're strictly necessary, and we don't use cookies for advertising or tracking.
-- **Server logs** kept by our hosting provider (IP address, browser, pages requested, time) for security and troubleshooting. Our own software doesn't log IP addresses.
-- **[Confirm: analytics.]** [If Google Analytics / Site Kit is turned on, say so here, what it measures, and how to opt out. If not, say "We don't use analytics that track you across sites."]
-- **Fonts.** Pages load fonts from Google Fonts, which receives your IP address to deliver them. [Optional: self-host fonts to remove this.]
-- **Do Not Track and Global Privacy Control.** We don't track you across other sites or sell your data, so there's nothing for these signals to switch off. [If analytics is added, honor them.]
+- **Cookies and browser storage.** Sign-in cookies keep you signed in. A cookie remembers that you confirmed you're 18 or older, so the age notice doesn't keep appearing. The accessibility widget remembers your display choices (such as text size) on your device. We don't use cookies for advertising or tracking.
+- **Security log.** To protect the site, a security log records sign-ins, failed sign-in attempts and changes made by administrators, with the IP address and browser used. It's deleted after 30 days.
+- **Server logs** kept by our hosting provider and by Cloudflare, which protects the site and helps it load quickly (IP address, browser, pages requested, time), for security and troubleshooting.
+- **No analytics.** We don't use Google Analytics or any other analytics that track you.
+- **Fonts.** Pages load fonts from Google Fonts, which receives your IP address to deliver them.
+- **Do Not Track and Global Privacy Control.** We don't track you across other sites or sell your data, so there's nothing for these signals to switch off.
 
 ## 4. Sensitive information
 
@@ -132,11 +133,10 @@ We don't use your information for advertising, profiling for marketing, or autom
 
 | Provider | What for |
 |---|---|
-| [Elementor Cloud / Elementor Hosting] (web hosting, with its infrastructure partners) | Hosting the site and its database. |
-| [Email delivery provider, e.g. Brevo via FluentSMTP] | Sending account and event emails. |
-| [WonderPush / Brevo web push] | Web push notifications, if you allow them. |
+| Elementor (Elementor Hosting) | Hosting the site and its database, and optimizing images in the site's media library (event and page images; member photos aren't stored there). |
+| Cloudflare | Protecting the site from attacks and helping it load quickly. Sees your IP address and the pages you request. |
+| Brevo | Sending account and event emails, and web push notifications if you allow them. We don't use Brevo's marketing tracking, and we don't copy member accounts into Brevo. |
 | Google Fonts | Delivering fonts (receives your IP address). |
-| [Analytics provider, if used] | [Purpose.] |
 
 **Event organizers** see the RSVPs for their events.
 
@@ -161,13 +161,15 @@ We don't use your information for advertising, profiling for marketing, or autom
 | What | How long |
 |---|---|
 | Your account and member content | Until you delete it or ask us to (see below). |
-| Accounts started but never verified | Deleted 60 days after sign-up (for accounts created from [date the clean-up went live] on). |
+| Accounts started but never verified | Deleted 60 days after sign-up (for accounts created from October 5, 2026 on). |
 | Event subscriptions | Until you unsubscribe. |
 | RSVPs, waitlists and event submissions | 12 months after the event. |
 | Volunteer sign-ups | 2 years, or until you ask us to remove them. |
 | Reports about a member | 3 years, for community safety. |
 | Audit log | 2 years. |
-| Hosting server logs | [Your host's period, ideally 30 days.] |
+| Security log (sign-ins, admin changes, with IP address) | 30 days. |
+| Copies of emails the site sends (for delivery problems) | 14 days. |
+| Hosting and Cloudflare server logs | [Your host's period, ideally 30 days.] |
 | Backups | [Your host's period, ideally 30 days.] Deleted data stays in backups until they expire. |
 
 - **Deletion timeline:** after you confirm an erase request, we complete it within 30 days. Your profile disappears from the site as soon as the request is completed, and the remaining copies leave our backups when they expire.
@@ -197,7 +199,7 @@ We use HTTPS throughout. Passwords are stored as one-way hashes. Every form is p
 
 ## 13. Where your data is stored
 
-Our site is hosted in [country/region of hosting]. If you use the site from outside [country], your information is transferred there.
+Our site is hosted in [country/region of hosting], and Cloudflare's network serves it from locations around the world. If you use the site from outside [country], your information is transferred there.
 
 ## 14. Changes to this statement
 
@@ -211,11 +213,12 @@ Questions, requests or concerns: **foxxyforce@gmail.com**. If you need a postal 
 
 ### Notes for the owner (remove before publishing)
 
-1. **Still to fill in:** hosting region (Elementor hosting dashboard), email provider (Settings → FluentSMTP), web push provider, and analytics (the live site prefetches Google Tag Manager, so check whether Site Kit or Analytics is on). The effective date goes in when you publish. Retention periods use the suggested values, taken from comparable sites (Recon publishes a detailed retention table; FetLife purges deleted accounts within 7–30 days).
+1. **Still to fill in:** hosting region (Elementor hosting dashboard), the host's log and backup periods, and the effective date when you publish. Checked in WP admin on 2026-10-05: email goes through Brevo via FluentSMTP (email copies kept 14 days); Brevo web push on, marketing automation off, users not synced; Site Kit installed but never connected (no analytics); Activity Log keeps 30 days with IPs via Cloudflare; age-verification popup; Elementor image optimization and accessibility widget. If any of these change (for example Site Kit gets connected), update the statement. Retention periods use the suggested values, taken from comparable sites (Recon publishes a detailed retention table; FetLife purges deleted accounts within 7–30 days).
 1a. **Who's responsible:** COL&B isn't incorporated, so the organizer is personally the one responsible for the data. A lawyer can tell you whether forming an LLC or nonprofit would change that. No postal address is published, for the organizer's safety; one is offered on request.
 2. **Automatic clean-up** is built in PR #26 (Calendar 1.29.0 + Member Planning 0.15.0). Once it's live, put its go-live date in the "never verified" row. Still manual: completing erase requests (an admin gets a dashboard reminder after 20 days), and posting a member-area notice when this statement changes.
 3. **Elementor Cloud hosting terms:** still to check that adult content is allowed (open item).
 4. **Washington My Health My Data Act** and similar health-data laws cover health information such as the safer-sex fields. A lawyer should confirm whether COL&B needs a separate consumer health data policy.
+4a. **Google Fonts** could be self-hosted to remove that data flow entirely.
 5. **Research basis:** structure and topics were compared with Sniffies (updated May 2026), FetLife (updated Jul 2026), Recon / T101 (updated Aug 2025) and Grindr's US health-data notice. No text was copied. Things we chose deliberately: FetLife's plain-language, values-first style, its court-order-only stance and its no-AI-training commitment; Recon's retention table and its rule that optional fields you leave blank are never searchable. Not adopted: Sniffies' public-by-default profiles and its use of data to train AI.
 6. **Ohio** has no general consumer privacy law, and COL&B is probably below the size thresholds of CCPA-style laws. The state-rights section is written so it's safe to keep either way. A lawyer should confirm.
 7. **Link it:** add "Privacy" to the site footer, the sign-up form ("By creating an account you agree to … and have read our Privacy Statement"), and the member area.
