@@ -245,7 +245,7 @@ class CEC_Subscribers {
 			"%s\n%s: %s\n%s: %s\n%s\n\n%s",
 			$data['title_plain'],
 			__( 'When', 'cec' ),
-			$data['start_display'],
+			CEC_Event_Helper::when_text( $data ),
 			__( 'Where', 'cec' ),
 			CEC_Event_Helper::plain_text( $where['label'] ),
 			$data['permalink'],
