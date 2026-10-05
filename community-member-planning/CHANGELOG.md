@@ -4,6 +4,45 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.17.0
+
+**My calendar** (owner, 2026-10-05: "I don't have a way to 'Add to my calendar' or have a public, friends/dynamic, or private calendar for my profile. That was the whole goal of merging the two features."). Owner's choices:
+- one calendar per member, with an audience per event;
+- audiences: all signed-in members, dynamic partners (an active dynamic) or only me;
+- "Going" counts as the RSVP;
+- the profile's "Going to" becomes a Calendar tab, filtered by who's looking.
+
+Needs Community Events Calendar 1.30.0 for the event-page box and RSVP sync. Without it, the tab and profile still work.
+
+- **"Add to my calendar" on every event page**, under the Google Calendar and .ics links:
+  - Going or Interested, and who can see it on your profile; tappable pills, starting from your default;
+  - after saving: "On your calendar · Going · visible to …", with Change and Remove;
+  - signed-out visitors get a sign-in link; accounts not yet set up are pointed to the member area.
+- **Going = RSVP** on events that take RSVPs here:
+  - the event's capacity applies, and a full event offers Interested;
+  - Interested or Remove takes the RSVP away;
+  - an RSVP made with the event's own form while signed in lands on your calendar as Going.
+- **Calendar tab in the member area:**
+  - upcoming events grouped by month, with who can see each (changing it saves straight away) and Remove;
+  - recent past events;
+  - the default for new events ("Dynamic partners" unless you change it);
+  - a link to browse events.
+- **Profile → Calendar tab** (was "Going to"): each viewer sees only what they're allowed to. Nothing hints that hidden events exist. Your own "as members see it" view shows only all-members events.
+- **One rule for who sees what (`CMP_Calendar::can_see`):** you always; otherwise a signed-in member, not blocked either way, who is in the audience. "Dynamic partners" ends the moment the dynamic does.
+- **Followers:**
+  - "X is going to Y" goes only to followers allowed to see that event;
+  - widening an event's audience tells only the newly included;
+  - the "N people you follow are going" calendar marker counts only what the viewer may see;
+  - the old "Show events I'm going to, to my followers" switch is replaced by a pointer to My calendar.
+- **Upgrade (database version 13), run once:**
+  - adds the `calendar` table;
+  - RSVPs members made while signed in become Going: at All members for those who had the followers switch on (anyone could follow them), Only me for everyone else, so nothing becomes visible that wasn't before;
+  - those who had it on keep All members as their default.
+- **Retention:** calendar entries go 12 months after the event, like RSVPs (`cmp_retention_periods` key `calendar`). Export lists entries and your default, and erasing an account removes them.
+- **Verification:** new `calendar-e2e.sh` 39/39 (event page states, Going/RSVP, capacity, Interested, Remove, validation, every audience, blocks, ended dynamics, notifications, widening, the marker, the tab, the default, form RSVPs, the upgrade, retention, export and erase). All other suites pass.
+
+---
+
 ## 0.16.0
 
 **Dynamics: several types at once, and chastity and homework as add-ons with any dynamic** (owner, 2026-10-05: "I should be able to select multiple. I should also be able to have the chastity option regardless of what the dynamic is providing the other party agrees to it. Same with Homework."). Owner's choices: the proposer picks who leads each add-on; add-ons can be added later with agreement; Keyholder / chastity wearer keeps chastity on automatically; existing dynamics keep only what they use.

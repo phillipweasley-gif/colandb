@@ -52,6 +52,7 @@ class CMP_Retention {
 				'audit_log'  => 730,
 				'reports'    => 1095,
 				'unverified' => 60,
+				'calendar'   => 365,
 			)
 		);
 	}
@@ -95,7 +96,7 @@ class CMP_Retention {
 	public static function run() {
 		global $wpdb;
 		$p    = self::periods();
-		$done = array( 'audit_log' => 0, 'reports' => 0, 'unverified' => 0 );
+		$done = array( 'audit_log' => 0, 'reports' => 0, 'unverified' => 0, 'calendar' => 0 );
 		$done['reports'] = (int) $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . CMP_Install::table( 'message_reports' ) . ' WHERE created_at < %s', gmdate( 'Y-m-d H:i:s', time() - (int) $p['reports'] * DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		require_once ABSPATH . 'wp-admin/includes/user.php';
 		foreach ( self::stale_unverified() as $id ) {
@@ -104,6 +105,7 @@ class CMP_Retention {
 				++$done['unverified'];
 			}
 		}
+		$done['calendar'] = CMP_Calendar::purge_old( (int) $p['calendar'] ); // Like RSVPs: 12 months after the event (0.17.0).
 		// Last, so this run's own entries aren't the oldest thing left.
 		$done['audit_log'] = (int) $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . CMP_Install::table( 'audit_log' ) . ' WHERE created_at < %s', gmdate( 'Y-m-d H:i:s', time() - (int) $p['audit_log'] * DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		update_option( 'cmp_retention_last', array( 'time' => time(), 'removed' => $done ), false );

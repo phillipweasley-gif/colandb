@@ -716,7 +716,7 @@ class CMP_Profiles {
 	/**
 	 * A profile as a viewer sees it (0.13.0: Facebook / FetLife style).
 	 * Cover image across the top with the profile photo overlapping it,
-	 * then tabs: About · Kinks · Going to · Posts (only those with content).
+	 * then tabs: About · Kinks · Calendar · Posts (only those with content).
 	 * Items shown to all members link to Members, filtered by that item.
 	 *
 	 * @param array $extras actions, counts, going, posts: HTML for the header
@@ -895,7 +895,7 @@ class CMP_Profiles {
 			array(
 				'about' => array( __( 'About', 'cmp' ), $about ),
 				'kinks' => array( __( 'Kinks', 'cmp' ), $kinks_html ),
-				'going' => array( __( 'Going to', 'cmp' ), $extras['going'] ),
+				'going' => array( __( 'Calendar', 'cmp' ), $extras['going'] ),
 				'posts' => array( __( 'Posts', 'cmp' ), $extras['posts'] ),
 			),
 			function ( $t ) {
@@ -939,7 +939,7 @@ class CMP_Profiles {
 				true,
 				array(
 					'counts' => CMP_Follows::counts_html( $user_id ),
-					'going'  => CMP_Follows::going_html( $user_id, $user_id, true ),
+					'going'  => CMP_Calendar::profile_html( $user_id, $user_id, true ),
 					'posts'  => CMP_Feed::profile_html( $user_id, $user_id, true ),
 				)
 			);
@@ -974,7 +974,7 @@ class CMP_Profiles {
 					array(
 						'actions' => CMP_Messages::profile_actions_html( $viewer, $owner_id, false ),
 						'counts'  => CMP_Follows::counts_html( $owner_id ),
-						'going'   => CMP_Follows::going_html( $owner_id, $viewer ),
+						'going'   => CMP_Calendar::profile_html( $owner_id, $viewer ),
 						'posts'   => CMP_Feed::profile_html( $owner_id, $viewer ),
 					)
 				);

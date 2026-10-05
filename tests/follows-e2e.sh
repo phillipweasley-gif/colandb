@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # End-to-end test of follow / unfollow (Community Member Planning 0.12.0,
 # with Community Events Calendar 1.28.0): following, the Following feed
-# filter, the opt-in "Going to" card, the calendar label, notifications,
+# filter, followers and My calendar (0.17.0: who sees each event is chosen
+# per event), the calendar label, notifications,
 # blocks, export/erase.
 # Usage: WPTEST=<folder from tests/setup.sh> bash tests/follows-e2e.sh
 S=${WPTEST:?set WPTEST to the folder created by tests/setup.sh}
@@ -31,18 +32,18 @@ pkill -f "php -S 127.0.0.1:8899" 2>/dev/null; sleep 0.5
 PAGE_ID=$(ev 'echo (int) CMP_Settings::get("member_page_id");')
 PAGE="$H/?page_id=$PAGE_ID"
 F_T=$(TBL follows); P_T=$(TBL posts); B_T=$(TBL blocks); N_T=$(TBL notifications); R_T=$(ev 'global $wpdb; echo $wpdb->prefix.CEC_TABLE_RSVP;')
-ev "global \$wpdb; foreach(array('$F_T','$P_T','$B_T','$R_T') as \$t) \$wpdb->query(\"DELETE FROM \$t\");" >/dev/null
+ev "global \$wpdb; \$wpdb->query(\"DELETE FROM \".CMP_Install::table('calendar')); foreach(array('$F_T','$P_T','$B_T','$R_T') as \$t) \$wpdb->query(\"DELETE FROM \$t\");" >/dev/null
 for u in fan star other; do $W user delete $u --yes >/dev/null 2>&1; done
 $W user create fan fan@example.com --role=subscriber --user_pass=fanpass123456 --display_name="Fan Member" >/dev/null
 $W user create star star@example.com --role=subscriber --user_pass=starpass12345 --display_name="Star Member" >/dev/null
 $W user create other other@example.com --role=subscriber --user_pass=otherpass1234 --display_name="Other Member" >/dev/null
 member fan; member star; member other
 FAN=$(uid fan); STAR=$(uid star); OTHER=$(uid other)
-# Events: upcoming (Star going), past (Star went), upcoming draft (Star "going").
+# Events: upcoming, past, upcoming draft.
 EV1=$($W post create --post_type=cec_event --post_status=publish --post_title="ZZ Upcoming Night" --porcelain 2>/dev/null)
 EV2=$($W post create --post_type=cec_event --post_status=publish --post_title="ZZ Past Night" --porcelain 2>/dev/null)
 EV3=$($W post create --post_type=cec_event --post_status=draft --post_title="ZZ Draft Night" --porcelain 2>/dev/null)
-ev "update_post_meta($EV1,'_cec_start',wp_date('Y-m-d\\T19:00',time()+5*DAY_IN_SECONDS)); update_post_meta($EV2,'_cec_start',wp_date('Y-m-d\\T19:00',time()-5*DAY_IN_SECONDS)); update_post_meta($EV3,'_cec_start',wp_date('Y-m-d\\T19:00',time()+6*DAY_IN_SECONDS)); global \$wpdb; foreach(array($EV1,$EV2,$EV3) as \$e) \$wpdb->insert('$R_T',array('event_id'=>\$e,'user_id'=>$STAR,'name'=>'Star','email'=>'star@example.com','guests'=>0,'created_at'=>current_time('mysql')));" >/dev/null
+ev "update_post_meta($EV1,'_cec_start',wp_date('Y-m-d\\T19:00',time()+5*DAY_IN_SECONDS)); update_post_meta($EV2,'_cec_start',wp_date('Y-m-d\\T19:00',time()-5*DAY_IN_SECONDS)); update_post_meta($EV3,'_cec_start',wp_date('Y-m-d\\T19:00',time()+6*DAY_IN_SECONDS));" >/dev/null
 login fan fan fanpass123456; login star star starpass12345; login other other otherpass1234
 
 echo "== Following"
@@ -61,32 +62,30 @@ ok "can't follow yourself" $(echo "$r" | grep -q 'fl_gone' && echo 1 || echo 0)
 r=$(act fan $FN follow --data-urlencode "member=999999")
 ok "can't follow a non-member" $(echo "$r" | grep -q 'fl_gone' && echo 1 || echo 0)
 
-echo "== Going to (opt-in)"
+echo "== Calendar on profiles (0.17.0)"
 get star s0 "$PAGE&cmp_tab=profile"
-SN=$(fnonce $T/s0.html)
-ok "Profile tab: 'Events I'm going to' switch, off" $([ "$(has $T/s0.html 'id="cmp_show_going"')$(hasnt $T/s0.html 'id="cmp_show_going" name="show_going" value="1" checked')" = 11 ] && echo 1 || echo 0)
-r=$(act star $SN going --data-urlencode "show_going=1")
-ok "Star turns it on" $([ "$(ev "echo get_user_meta($STAR,'cmp_show_going',true);")" = 1 ] && echo 1 || echo 0)
+ok "Profile tab: followers section points to My calendar (no old switch)" $([ "$(has $T/s0.html 'Followers and your events')$(hasnt $T/s0.html 'id="cmp_show_going"')" = 11 ] && echo 1 || echo 0)
+ok "Star adds events (a draft can't be added)" $([ "$(ev "echo CMP_Calendar::save($STAR,$EV1,'going','private',false).CMP_Calendar::save($STAR,$EV2,'going','members',false).CMP_Calendar::save($STAR,$EV3,'going','members',false);")" = okokgone ] && echo 1 || echo 0)
+ok "private (and past) events: no notification to followers" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$FAN AND category='follow'")" = 0 ] && echo 1 || echo 0)
+ok "private: no calendar label for the follower" $([ -z "$(ev "wp_set_current_user($FAN); echo apply_filters('cec_event_social_label','',$EV1);")" ] && echo 1 || echo 0)
+ev "CMP_Calendar::save($STAR,$EV1,'going','members',false);" >/dev/null
+ok "shown to all members: followers told (once), non-followers not" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$FAN AND category='follow' AND message LIKE '%going to ZZ Upcoming Night%'")$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$OTHER AND category='follow'")" = 10 ] && echo 1 || echo 0)
 get fan f2 "$PAGE&cmp_member=$STAR"
-ok "follower sees upcoming published events only" $([ "$(has $T/f2.html 'ZZ Upcoming Night')$(hasnt $T/f2.html 'ZZ Past Night')$(hasnt $T/f2.html 'ZZ Draft Night')" = 111 ] && echo 1 || echo 0)
+ok "profile Calendar shows upcoming published events only" $([ "$(has $T/f2.html 'ZZ Upcoming Night')$(hasnt $T/f2.html 'ZZ Past Night')$(hasnt $T/f2.html 'ZZ Draft Night')" = 111 ] && echo 1 || echo 0)
 get other o0 "$PAGE&cmp_member=$STAR"
-ok "a non-follower is invited to follow, sees no events" $([ "$(has $T/o0.html 'Follow Star Member to see')$(hasnt $T/o0.html 'ZZ Upcoming Night')" = 11 ] && echo 1 || echo 0)
+ok "all-members events need no follow" $(has $T/o0.html 'ZZ Upcoming Night')
 get star s1 "$PAGE&cmp_member=$STAR"
-ok "Star's own view: the card, marked followers-only" $([ "$(has $T/s1.html 'ZZ Upcoming Night')$(has $T/s1.html 'Only your followers see this')" = 11 ] && echo 1 || echo 0)
+ok "Star's own view explains who sees it" $([ "$(has $T/s1.html 'ZZ Upcoming Night')$(has $T/s1.html 'Members see the events you show to all members')" = 11 ] && echo 1 || echo 0)
 
 echo "== Calendar label"
 ok "'1 person you follow is going' for the follower" $([ "$(ev "wp_set_current_user($FAN); echo apply_filters('cec_event_social_label','',$EV1);")" = "1 person you follow is going" ] && echo 1 || echo 0)
 ok "nothing for a non-follower" $([ -z "$(ev "wp_set_current_user($OTHER); echo apply_filters('cec_event_social_label','',$EV1);")" ] && echo 1 || echo 0)
 ok "calendar items carry it (desktop and phone)" $(ev "wp_set_current_user($FAN); \$i=CEC_Month_Grid::item_from_event_data(CEC_Event_Helper::data($EV1)); echo '1 person you follow is going'===\$i['detail']['social']?1:0;")
-ev "update_user_meta($STAR,'cmp_show_going',0);" >/dev/null
-ok "gone when Star stops sharing" $([ -z "$(ev "wp_set_current_user($FAN); echo apply_filters('cec_event_social_label','',$EV1);")" ] && echo 1 || echo 0)
+ev "CMP_Calendar::save($STAR,$EV1,'interested','members',false);" >/dev/null
+ok "only Going counts" $([ -z "$(ev "wp_set_current_user($FAN); echo apply_filters('cec_event_social_label','',$EV1);")" ] && echo 1 || echo 0)
+ev "CMP_Calendar::save($STAR,$EV1,'going','members',false);" >/dev/null
 
 echo "== Notifications"
-ev "do_action('cec_rsvp_created',$EV1,$STAR);" >/dev/null
-ok "no RSVP notification while Star doesn't share" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$FAN AND category='follow'")" = 0 ] && echo 1 || echo 0)
-ev "update_user_meta($STAR,'cmp_show_going',1); do_action('cec_rsvp_created',$EV1,$STAR);" >/dev/null
-ok "RSVP notification to followers when sharing" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$FAN AND category='follow' AND message LIKE '%going to ZZ Upcoming Night%'")" = 1 ] && echo 1 || echo 0)
-ok "...not to non-followers" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$OTHER AND category='follow'")" = 0 ] && echo 1 || echo 0)
 get star s2 "$PAGE&cmp_tab=feed"
 PN=$(php -r 'preg_match("~name=\"action\" value=\"cmp_feed\".*?name=\"_cmp_nonce\" value=\"([^\"]+)\"~s",file_get_contents($argv[1]),$m); echo $m[1]??"";' $T/s2.html)
 curl -s -b $T/star.jar -o /dev/null "$H/wp-admin/admin-post.php" -F "action=cmp_feed" -F "_cmp_nonce=$PN" -F "do=post" -F "body=Star post for everyone" -F "visibility=members"
@@ -113,11 +112,11 @@ ok "...and stops following again" $(echo "$r" | grep -q 'fl_gone' && echo 1 || e
 ok "no calendar label across a block" $([ -z "$(ev "wp_set_current_user($OTHER); echo apply_filters('cec_event_social_label','',$EV1);")" ] && echo 1 || echo 0)
 
 echo "== Privacy"
-ok "export lists who you follow and the sharing choice" $(ev "global \$wpdb; \$wpdb->query(\"DELETE FROM $B_T\"); \$wpdb->insert('$F_T',array('follower_id'=>$FAN,'followed_id'=>$OTHER,'created_at'=>gmdate('Y-m-d H:i:s'))); \$j=wp_json_encode(CMP_Account::export('fan@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'Other Member') && false!==strpos(\$j,'Show events')?1:0;")
+ok "export lists who you follow and the calendar default" $(ev "global \$wpdb; \$wpdb->query(\"DELETE FROM $B_T\"); \$wpdb->insert('$F_T',array('follower_id'=>$FAN,'followed_id'=>$OTHER,'created_at'=>gmdate('Y-m-d H:i:s'))); \$j=wp_json_encode(CMP_Account::export('fan@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'Other Member') && false!==strpos(\$j,'Who sees new calendar events by default')?1:0;")
 ok "erase removes follows both ways and the setting" $(ev "CMP_Account::erase('star@example.com'); global \$wpdb; echo 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $F_T WHERE follower_id=$STAR OR followed_id=$STAR\") && ''===get_user_meta($STAR,'cmp_show_going',true)?1:0;")
 
 pkill -f "php -S 127.0.0.1:8899" 2>/dev/null
-ev "global \$wpdb; foreach(array('$F_T','$P_T','$B_T','$R_T') as \$t) \$wpdb->query(\"DELETE FROM \$t\");" >/dev/null
+ev "global \$wpdb; \$wpdb->query(\"DELETE FROM \".CMP_Install::table('calendar')); foreach(array('$F_T','$P_T','$B_T','$R_T') as \$t) \$wpdb->query(\"DELETE FROM \$t\");" >/dev/null
 $W post delete $EV1 $EV2 $EV3 --force >/dev/null 2>&1
 for u in fan star other; do $W user delete $u --yes >/dev/null 2>&1; done
 echo; echo "debug.log (plugin-related):"; grep -i 'cmp\|cec\|member-planning' wp-content/debug.log 2>/dev/null | grep -v 'Upgrad\|upgraded' | tail -5

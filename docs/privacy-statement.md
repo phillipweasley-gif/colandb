@@ -74,7 +74,8 @@ You choose what to fill in, and each item has its own **Show** switch:
 - **Chastity tracking:** locks you start, your keyholder's settings, verification photos and their daily codes, hygiene openings, releases and unlocks.
 - **Feed:** your posts and photos, the event you tag, likes, and reports you make.
 - **Messages:** your conversations, message requests, the members you block, and reports you make.
-- **Follows and nods:** who you follow, who follows you, nods you send and receive, and whether you share the events you're going to with your followers.
+- **Your calendar:** events you add with "Add to my calendar", whether you're going or interested, and who can see each one. Marking an event Going also RSVPs you if the event takes RSVPs here.
+- **Follows and nods:** who you follow, who follows you, and nods you send and receive.
 - **Member search settings:** whether you've hidden yourself from search.
 - **Notifications and preferences:** your notification choices and time zone.
 
@@ -109,7 +110,7 @@ Much of what members share here is sensitive: sexual orientation, sex life and k
 | Messages | Only you and the other member, unless one of you reports the conversation (see "Safety and moderation"). |
 | Homework and its proof photos | You and the member who set it, while your dynamic is active. When a dynamic ends, they lose access straight away. |
 | Chastity verification photos | You and your keyholder, while your dynamic is active. |
-| Events you're going to | Only your followers, and only if you turn on "Show events I'm going to". |
+| Events on your calendar | Who you choose for each event: all members, your dynamic partners (members you're in an active dynamic with), or only you. Followers are told you're going only if they're allowed to see that event. |
 | A "Locked" badge on your profile | Members, only if you turn it on. |
 | RSVPs | The event's organizers and site administrators. A public headcount may be shown, but names never are. |
 
@@ -164,6 +165,7 @@ We don't use your information for advertising, profiling for marketing, or autom
 | Accounts started but never verified | Deleted 60 days after sign-up (for accounts created from October 5, 2026 on). |
 | Event subscriptions | Until you unsubscribe. |
 | RSVPs, waitlists and event submissions | 12 months after the event. |
+| Events on your calendar | 12 months after the event, or until you remove them. |
 | Volunteer sign-ups | 2 years, or until you ask us to remove them. |
 | Reports about a member | 3 years, for community safety. |
 | Audit log | 2 years. |
@@ -183,7 +185,7 @@ From your **Account** and **Profile** tabs you can:
 - **See and change** what you share, item by item (Show switches).
 - **Download a copy of your data.** Request it from the Account tab, confirm by email, and we'll send you a copy.
 - **Delete your data.** Request it from the Account tab, confirm by email, and an administrator completes it.
-- **Hide yourself from member search,** turn off message requests, choose who sees each post, and stop sharing the events you're going to.
+- **Hide yourself from member search,** turn off message requests, choose who sees each post and each event on your calendar.
 - **Turn off any kind of notification,** and unsubscribe from event emails.
 - **Block and report** other members.
 

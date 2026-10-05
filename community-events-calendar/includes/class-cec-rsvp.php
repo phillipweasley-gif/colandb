@@ -119,6 +119,74 @@ class CEC_RSVP {
 		wp_send_json_success( array( 'message' => __( "You're on the list! See you there.", 'cec' ) ) );
 	}
 
+	/**
+	 * Whether a signed-in member can RSVP from outside the form (1.30.0):
+	 * the event takes RSVPs here, is published and scheduled.
+	 */
+	public static function accepts_member_rsvp( $event_id ) {
+		$data = CEC_Event_Helper::data( $event_id );
+		return 'cec_event' === get_post_type( $event_id ) && 'publish' === get_post_status( $event_id ) && 'internal' === $data['rsvp_mode'] && 'scheduled' === $data['event_status'];
+	}
+
+	public static function has_member_rsvp( $event_id, $user_id ) {
+		global $wpdb;
+		$table = $wpdb->prefix . CEC_TABLE_RSVP;
+		return $user_id && (bool) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE event_id = %d AND user_id = %d", $event_id, $user_id ) );
+	}
+
+	/**
+	 * RSVP a signed-in member (1.30.0), used by Community Member Planning's
+	 * "Add to my calendar". Same capacity rule as the form, no guests.
+	 * Doesn't fire cec_rsvp_created: the caller handles its own follow-up.
+	 *
+	 * @return string 'ok', 'exists', 'full' or 'closed'.
+	 */
+	public static function add_member_rsvp( $event_id, $user_id ) {
+		global $wpdb;
+		$user = get_userdata( $user_id );
+		if ( ! $user || ! self::accepts_member_rsvp( $event_id ) ) {
+			return 'closed';
+		}
+		if ( self::has_member_rsvp( $event_id, $user_id ) ) {
+			return 'exists';
+		}
+		$capacity  = (int) get_post_meta( $event_id, '_cec_rsvp_capacity', true );
+		$lock_name = 'cec_rsvp_' . $event_id;
+		if ( $capacity > 0 && ! $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 5)', $lock_name ) ) ) {
+			return 'full';
+		}
+		$result = 'ok';
+		if ( $capacity > 0 && self::count_for_event( $event_id ) + 1 > $capacity ) {
+			$result = 'full';
+		} else {
+			$wpdb->insert(
+				$wpdb->prefix . CEC_TABLE_RSVP,
+				array(
+					'event_id'   => $event_id,
+					'user_id'    => $user_id,
+					'name'       => $user->display_name,
+					'email'      => $user->user_email,
+					'guests'     => 0,
+					'created_at' => current_time( 'mysql' ),
+				),
+				array( '%d', '%d', '%s', '%s', '%d', '%s' )
+			);
+		}
+		if ( $capacity > 0 ) {
+			$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
+		}
+		return $result;
+	}
+
+	/** Remove a signed-in member's RSVP(s) for an event (1.30.0). */
+	public static function remove_member_rsvp( $event_id, $user_id ) {
+		global $wpdb;
+		if ( ! $user_id ) {
+			return 0;
+		}
+		return (int) $wpdb->delete( $wpdb->prefix . CEC_TABLE_RSVP, array( 'event_id' => $event_id, 'user_id' => $user_id ), array( '%d', '%d' ) );
+	}
+
 	public static function waitlist_count_for_event( $event_id ) {
 		global $wpdb;
 		$table = $wpdb->prefix . self::TABLE_WAITLIST;
