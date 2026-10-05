@@ -73,7 +73,7 @@ Each increment will be tested in a local WordPress 7.1.2 install, signed in as a
 | D4 | The brief's generic field builder and spreadsheet import (§4). Not listed in the Phase 2 delivery order. | Phase 2 ships the fixed profile fields with editable option lists; the full field builder and workbook import come after 2.4. |
 | D5 | HEIC photos need server support (Imagick with HEIC), which hosts often lack. | Check the host; if unsupported, convert HEIC in the browser before upload. |
 | D6 | Hosting details: web server, page cache or CDN, where private files can live outside the web root, which plugins are active, admin MFA. | Please share, or a host/admin contact. Needed before 2.1 (images). |
-| D7 | Staging site. | Strongly recommended before 2.0 goes live. Until then, testing stays in my local WordPress install. |
+| D7 | Staging site. | **Decided 2026-10-04: no staging.** A staging site was set up and then retired because it was giving problems; the owner works on colandb.com only. All pre-live testing happens in the local WordPress kit (`tests/`). See `CLAUDE.md` → "Working on the live site". |
 | D8 | Wording for the 18+ attestation and member privacy notice (brief: owner approval). | I'll use clearly marked placeholder text until you approve the final wording. |
 
 ## 7. Phase 1 items still open (for the record)
