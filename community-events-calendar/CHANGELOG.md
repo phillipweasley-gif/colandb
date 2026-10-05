@@ -6,6 +6,20 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.31.1
+
+**Signed-in quick links trimmed** (owner, 2026-10-05, screenshot of Community Events: "This all seems very redundant"). The 1.31.0 bar repeated things already on the page or in the site's account menu:
+- "Signed in as" and Sign out (already in the "Hello" menu);
+- Member area (in the top menu and the "Hello" menu);
+- Calendar dashboard (in the "Hello" menu as Calendar Admin);
+- Submit an event (the page's own Submit Event tab).
+
+It now shows only links the page doesn't already offer: **My calendar**, from Community Member Planning 0.17.3, and My submitted events where a `[cec_my_events]` page exists. Nothing to show means nothing is shown. The `note` option for signed-out visitors is unchanged.
+
+- **Verification:** `calendar-e2e.sh` 45/45; `e2e.sh` 60/60. Checked in a browser on the local test site.
+
+---
+
 ## 1.31.0
 
 **Quick links when you're signed in** (owner, 2026-10-05: should there be a "my events" quick link for personal calendar management on the Community Events page?). The login box used to say only "You're already logged in."

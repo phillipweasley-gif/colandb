@@ -4,6 +4,16 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.17.3
+
+**One My calendar link, in the right places** (owner, 2026-10-05: "This all seems very redundant").
+
+- **The site's account menu ("Hello, …") has My Calendar**, after My Profile, so it's one click from every page.
+- **The events plugin's signed-in box now gets only My calendar** from this plugin. Member area is already in the menu, and accounts not yet set up see "Finish joining the member area" there, so the box shows nothing for them. Needs Community Events Calendar 1.31.1.
+- **Verification:** `calendar-e2e.sh` 45/45, with a new check for the menu item; `profile-e2e.sh` 84/84.
+
+---
+
 ## 0.17.2
 
 **My calendar in the events plugin's quick links** (needs Community Events Calendar 1.31.0). When you're signed in, the login box on event pages such as Community Events shows **My calendar** and **Member area** first. An account that hasn't finished signing up gets "Finish setting up your account" instead.

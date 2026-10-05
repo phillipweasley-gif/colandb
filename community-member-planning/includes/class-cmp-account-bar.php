@@ -46,6 +46,7 @@ class CMP_Account_Bar {
 			$items[] = array( $member ? __( 'Member Area', 'cmp' ) : __( 'Finish joining the member area', 'cmp' ), CMP_Settings::member_page_url(), '', $unread );
 			if ( $member ) {
 				$items[] = array( __( 'My Profile', 'cmp' ), CMP_Profiles::url(), '', 0 );
+				$items[] = array( __( 'My Calendar', 'cmp' ), CMP_Calendar::url(), '', 0 ); // 0.17.3
 			}
 			$items[] = array( __( 'Account Settings', 'cmp' ), CMP_Account::url(), '', 0 );
 		}
