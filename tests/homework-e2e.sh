@@ -48,7 +48,7 @@ echo "== Who can create"
 login sir sir sirpass123456
 get sir s0 "$PAGE&cmp_tab=homework"
 ok "tab explains how to get started" $(has $T/s0.html 'Nobody has set homework for you')
-ev "global \$wpdb; \$wpdb->insert('$D_T',array('type'=>'keyholder','proposer_id'=>$SIR,'partner_id'=>$BOY,'proposer_side'=>'a','status'=>'active','proposer_show'=>1,'partner_show'=>1,'created_at'=>gmdate('Y-m-d H:i:s')));" >/dev/null
+ev "global \$wpdb; \$wpdb->insert('$D_T',array('type'=>'dom_sub','proposer_id'=>$SIR,'partner_id'=>$BOY,'proposer_side'=>'a','status'=>'active','proposer_show'=>1,'partner_show'=>1,'created_at'=>gmdate('Y-m-d H:i:s'))); CMP_Dynamics::grant('homework',$SIR,$BOY);" >/dev/null
 DYN=$(q "SELECT MAX(id) FROM $D_T")
 get sir s1 "$PAGE&cmp_tab=homework"
 ok "lead sees the member they lead + New program" $([ "$(has $T/s1.html 'Sample Boy')$(has $T/s1.html 'New program')" = 11 ] && echo 1 || echo 0)

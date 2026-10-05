@@ -329,6 +329,7 @@ class CMP_Messages {
 					do_action( 'cmp_dynamic_ended', $dyn, $user_id );
 				}
 			}
+			CMP_Dynamics::close_addons( $user_id, $them, $user_id );
 		}
 		self::go( array(), 'msg_blocked' );
 	}

@@ -40,7 +40,7 @@ class CMP_Install {
 	}
 
 	public static function table_names() {
-		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ), self::table( 'follows' ), self::table( 'nods' ) );
+		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ), self::table( 'follows' ), self::table( 'nods' ), self::table( 'dynamic_addons' ) );
 	}
 
 	private static function create_tables() {
@@ -52,6 +52,7 @@ class CMP_Install {
 		// 0.5.0: starter options for any profile list that has none yet.
 		CMP_Profile_Fields::seed_defaults();
 		CMP_Profile_Fields::upgrade_kinks();
+		CMP_Dynamics::migrate_addons(); // 0.16.0, once.
 		update_option( self::DB_VERSION_OPTION, CMP_DB_VERSION, false );
 	}
 
@@ -147,9 +148,32 @@ class CMP_Install {
 			responded_at datetime NULL,
 			ended_at datetime NULL,
 			ended_by bigint(20) unsigned NULL,
+			group_id bigint(20) unsigned NOT NULL DEFAULT 0,
 			PRIMARY KEY  (id),
 			KEY idx_proposer (proposer_id,status),
 			KEY idx_partner (partner_id,status)
+		) $charset;";
+
+		// Chastity and homework add-ons between two members (0.16.0):
+		// user_a < user_b; lead_id holds the key / sets homework. group_id
+		// links one asked for in an invitation to its dynamics (0 = asked
+		// for later on its own).
+		$addons = 'CREATE TABLE ' . self::table( 'dynamic_addons' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			kind varchar(12) NOT NULL,
+			user_a bigint(20) unsigned NOT NULL,
+			user_b bigint(20) unsigned NOT NULL,
+			lead_id bigint(20) unsigned NOT NULL,
+			status varchar(12) NOT NULL DEFAULT 'pending',
+			group_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			requested_by bigint(20) unsigned NOT NULL DEFAULT 0,
+			created_at datetime NOT NULL,
+			responded_at datetime NULL,
+			ended_at datetime NULL,
+			ended_by bigint(20) unsigned NULL,
+			PRIMARY KEY  (id),
+			KEY idx_pair (user_a,user_b,status),
+			KEY idx_group (group_id)
 		) $charset;";
 
 		// Homework programs (0.7.0): a program per lead + member, its tasks,
@@ -357,6 +381,6 @@ class CMP_Install {
 			KEY idx_to (to_id,created_at)
 		) $charset;";
 
-		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports, $follows, $nods );
+		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports, $follows, $nods, $addons );
 	}
 }
