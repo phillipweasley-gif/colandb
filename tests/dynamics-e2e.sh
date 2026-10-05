@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # End-to-end test of dynamics between members (Community Member Planning
 # 0.6.0): propose / accept / decline / withdraw / end, consent rules, who may
-# direct whom, connections, profile display, limits, privacy.
+# direct whom, connections, profile display, limits, privacy. 0.16.0: several
+# types per invitation, chastity and homework add-ons, the one-time upgrade.
 # Usage: WPTEST=<folder from tests/setup.sh> bash tests/dynamics-e2e.sh
 S=${WPTEST:?set WPTEST to the folder created by tests/setup.sh}
 REPO=$(cd "$(dirname "$0")/.." && pwd)
@@ -32,7 +33,7 @@ pkill -f "php -S 127.0.0.1:8899" 2>/dev/null; sleep 0.5
 PAGE_ID=$(ev 'echo (int) CMP_Settings::get("member_page_id");')
 PAGE="$H/?page_id=$PAGE_ID"
 for u in kh wearer third outsider; do $W user delete $u --yes >/dev/null 2>&1; done
-ev 'global $wpdb; $wpdb->query("DELETE FROM ".CMP_Install::table("dynamics"));' >/dev/null
+ev 'global $wpdb; $wpdb->query("DELETE FROM ".CMP_Install::table("dynamics")); $wpdb->query("DELETE FROM ".CMP_Install::table("dynamic_addons"));' >/dev/null
 $W user create kh kh@example.com --role=subscriber --user_pass=khpass123456 --display_name="Key Holder" >/dev/null
 $W user create wearer wearer@example.com --role=subscriber --user_pass=wearerpass12 --display_name="The Wearer" >/dev/null
 $W user create third third@example.com --role=subscriber --user_pass=thirdpass123 >/dev/null
@@ -69,7 +70,7 @@ ok "pending gives no powers yet" $(ev "echo CMP_Dynamics::lead_can_direct($KH,$W
 echo "== Answering"
 login wearer wearer wearerpass12
 get wearer w1 "$PAGE&cmp_tab=dynamics"
-ok "tab shows Dynamics (1) and the invitation with its message" $([ "$(has $T/w1.html 'Dynamics (1)')$(has $T/w1.html 'As discussed at the munch.')$(has $T/w1.html '<b>Keyholder</b>')" = 111 ] && echo 1 || echo 0)
+ok "tab shows Dynamics (1) and the invitation with its message" $([ "$(has $T/w1.html 'Dynamics (1)')$(has $T/w1.html 'As discussed at the munch.')$(has $T/w1.html 'they&#039;d be your Keyholder')" = 111 ] && echo 1 || echo 0)
 WN=$(dnonce $T/w1.html)
 r=$(post kh -d "action=cmp_dyn_respond&_cmp_nonce=$N&dynamic=$D1&answer=accept")
 ok "proposer can't accept their own invitation" $([ "$(status $D1)" = pending ] && echo 1 || echo 0)
@@ -78,7 +79,7 @@ ok "partner can't withdraw it" $([ "$(status $D1)" = pending ] && echo 1 || echo
 r=$(post wearer -d "action=cmp_dyn_respond&_cmp_nonce=$WN&dynamic=$D1&answer=accept")
 ok "partner accepts -> active" $(echo "$r" | grep -q 'dyn_accepted' && [ "$(status $D1)" = active ] && echo 1 || echo 0)
 ok "proposer notified" $(ev "global \$wpdb; echo (int)\$wpdb->get_var(\"SELECT COUNT(*) FROM \".CMP_Install::table('notifications').\" WHERE user_id=$KH AND message LIKE '%accepted%'\")>0?1:0;")
-ok "Keyholder can direct the wearer, not the other way round" $(ev "echo CMP_Dynamics::lead_can_direct($KH,$WE,'keyholder') && ! CMP_Dynamics::lead_can_direct($WE,$KH) ?1:0;")
+ok "Keyholder can direct the wearer, not the other way round" $(ev "echo CMP_Dynamics::lead_can_direct($KH,$WE,'chastity') && ! CMP_Dynamics::lead_can_direct($WE,$KH) ?1:0;")
 ok "active partners count as connections" $(ev "CMP_Profiles::save_field($WE,'pronouns','he/him','connections'); echo CMP_Profiles::can_view('pronouns',$WE,$KH) && ! CMP_Profiles::can_view('pronouns',$WE,$TH) ?1:0;")
 get third t1 "$PAGE&cmp_member=$WE"; login third third thirdpass123; get third t1 "$PAGE&cmp_member=$WE"
 ok "profile shows the dynamic to other members" $(grep -q 'cmp-prof-dyn' $T/t1.html && grep -q 'chastity wearer of' $T/t1.html && echo 1 || echo 0)
@@ -106,6 +107,60 @@ ok "audit trail: proposed, accepted, ended" $(ev "\$a=wp_list_pluck(CMP_Audit::f
 r=$(post kh -d "action=cmp_dyn_propose&_cmp_nonce=$N&partner=$WE&type=keyholder&side=a")
 ok "after ending, a new invitation of the same type is allowed" $(echo "$r" | grep -q 'dyn_sent' && echo 1 || echo 0)
 
+echo "== Several types and add-ons (0.16.0)"
+AD="CMP_Install::table('dynamic_addons')"
+can(){ ev "echo CMP_Dynamics::lead_can_direct($1,$2,'$3')?1:0;"; }
+adid(){ ev "global \$wpdb; echo (int)\$wpdb->get_var(\"SELECT id FROM \".$AD.\" WHERE kind='$1' AND lead_id=$2 AND status='$3' ORDER BY id DESC\");"; }
+r=$(post kh --data-urlencode "action=cmp_dyn_propose" --data-urlencode "_cmp_nonce=$N" --data-urlencode "partner=$TH" --data-urlencode "types[]=dom_sub")
+ok "a type with sides needs your side" $(echo "$r" | grep -q 'dyn_invalid' && echo 1 || echo 0)
+r=$(post kh --data-urlencode "action=cmp_dyn_propose" --data-urlencode "_cmp_nonce=$N" --data-urlencode "partner=$TH" --data-urlencode "message=Several at once")
+ok "at least one type is needed" $(echo "$r" | grep -q 'dyn_invalid' && echo 1 || echo 0)
+r=$(post kh --data-urlencode "action=cmp_dyn_propose" --data-urlencode "_cmp_nonce=$N" --data-urlencode "partner=$TH" --data-urlencode "types[]=dom_sub" --data-urlencode "side[dom_sub]=a" --data-urlencode "types[]=daddy_boy" --data-urlencode "side[daddy_boy]=b" --data-urlencode "types[]=partners" --data-urlencode "addon[chastity]=1" --data-urlencode "addon_lead[chastity]=me" --data-urlencode "addon[homework]=1" --data-urlencode "addon_lead[homework]=them" --data-urlencode "message=Several at once")
+G=$(ev "global \$wpdb; echo (int)\$wpdb->get_var(\"SELECT MIN(id) FROM \".CMP_Install::table('dynamics').\" WHERE partner_id=$TH AND status='pending'\");")
+ok "one invitation, three types, two add-ons asked for" $(echo "$r" | grep -q 'dyn_sent' && [ "$(ev "global \$wpdb; echo \$wpdb->get_var(\"SELECT COUNT(*) FROM \".CMP_Install::table('dynamics').\" WHERE group_id=$G AND status='pending'\").'/'.\$wpdb->get_var(\"SELECT COUNT(*) FROM \".$AD.\" WHERE group_id=$G AND status='pending'\");")" = 3/2 ] && echo 1 || echo 0)
+login third third thirdpass123
+get third t1 "$PAGE&cmp_tab=dynamics"
+TN=$(dnonce $T/t1.html)
+ok "the partner sees it all as one invitation (counted once)" $([ "$(has $T/t1.html 'Dynamics (1)')$(has $T/t1.html 'Dominant / submissive: they&#039;d be your Dominant')$(has $T/t1.html 'Daddy / boy: you&#039;d be the Daddy')$(has $T/t1.html 'Chastity, with them holding the key')$(has $T/t1.html 'Homework, set by you')$(has $T/t1.html 'Several at once')" = 111111 ] && echo 1 || echo 0)
+ok "nothing allowed while it's pending" $([ "$(can $KH $TH chastity)$(can $TH $KH homework)" = 00 ] && echo 1 || echo 0)
+r=$(post third -d "action=cmp_dyn_respond&_cmp_nonce=$TN&dynamic=$G&answer=accept")
+ok "accepting starts every type and add-on together" $(echo "$r" | grep -q 'dyn_accepted' && [ "$(ev "global \$wpdb; echo \$wpdb->get_var(\"SELECT COUNT(*) FROM \".CMP_Install::table('dynamics').\" WHERE group_id=$G AND status='active'\").'/'.\$wpdb->get_var(\"SELECT COUNT(*) FROM \".$AD.\" WHERE group_id=$G AND status='active'\");")" = 3/2 ] && echo 1 || echo 0)
+ok "each add-on goes the way it was asked: KH holds the key, Third sets homework" $([ "$(can $KH $TH chastity)$(can $TH $KH homework)$(can $KH $TH homework)$(can $TH $KH chastity)" = 1100 ] && echo 1 || echo 0)
+ok "proposer told what was accepted" $(ev "global \$wpdb; echo (int)\$wpdb->get_var(\"SELECT COUNT(*) FROM \".CMP_Install::table('notifications').\" WHERE user_id=$KH AND message LIKE '%accepted your invitation%Chastity%'\")>0?1:0;")
+get third t2 "$PAGE&cmp_tab=dynamics"
+ok "Active shows the pair once, with types, add-ons, Turn off and Ask to add" $([ "$(has $T/t2.html 'Chastity · Key Holder holds the key')$(has $T/t2.html 'Homework · you set it')$(has $T/t2.html 'Turn off')$(has $T/t2.html 'Ask to add')$(grep -c 'cmp-dyn-pair' $T/t2.html)" = 11111 ] && echo 1 || echo 0)
+CH=$(adid chastity $KH active)
+r=$(post third -d "action=cmp_dyn_addon&_cmp_nonce=$TN&do=off&addon=$CH")
+ok "either member turns an add-on off at once; the dynamics carry on" $(echo "$r" | grep -q 'dyn_addon_off' && [ "$(can $KH $TH chastity)" = 0 ] && [ "$(ev "echo count(CMP_Dynamics::active_between($KH,$TH));")" = 3 ] && echo 1 || echo 0)
+ok "the other is told" $(ev "global \$wpdb; echo (int)\$wpdb->get_var(\"SELECT COUNT(*) FROM \".CMP_Install::table('notifications').\" WHERE user_id=$KH AND message LIKE '%turned off chastity%'\")>0?1:0;")
+r=$(post kh -d "action=cmp_dyn_addon&_cmp_nonce=$N&do=ask&partner=$TH&choice=chastity:me")
+CA=$(adid chastity $KH pending)
+ok "asking to add it again later goes as a request" $(echo "$r" | grep -q 'dyn_addon_sent' && [ "$CA" -gt 0 ] && [ "$(can $KH $TH chastity)" = 0 ] && echo 1 || echo 0)
+r=$(post kh -d "action=cmp_dyn_addon&_cmp_nonce=$N&do=ask&partner=$TH&kind=chastity&lead=me")
+ok "asking twice is refused" $(echo "$r" | grep -q 'dyn_addon_taken' && echo 1 || echo 0)
+r=$(post kh -d "action=cmp_dyn_addon&_cmp_nonce=$N&do=accept&addon=$CA")
+ok "the asker can't accept their own request" $(echo "$r" | grep -q 'dyn_gone' && [ "$(can $KH $TH chastity)" = 0 ] && echo 1 || echo 0)
+get third t3 "$PAGE&cmp_tab=dynamics"
+ok "the other sees it waiting (counted)" $([ "$(has $T/t3.html 'asks to add:')$(has $T/t3.html 'Dynamics (1)')" = 11 ] && echo 1 || echo 0)
+r=$(post third -d "action=cmp_dyn_addon&_cmp_nonce=$TN&do=accept&addon=$CA")
+ok "accepted: on again" $(echo "$r" | grep -q 'dyn_addon_on' && [ "$(can $KH $TH chastity)" = 1 ] && echo 1 || echo 0)
+r=$(post outsider -d "action=cmp_dyn_addon&_cmp_nonce=$N&do=ask&partner=$TH&choice=homework:me")
+ok "can't ask without an active dynamic between you" $(echo "$r" | grep -q 'dyn_addon_sent' && echo 0 || echo 1)
+for id in $(ev "global \$wpdb; echo implode(' ',\$wpdb->get_col(\"SELECT id FROM \".CMP_Install::table('dynamics').\" WHERE group_id=$G AND status='active' ORDER BY id\"));"); do LAST=$id; done
+FIRST=$(echo $(ev "global \$wpdb; echo implode(' ',\$wpdb->get_col(\"SELECT id FROM \".CMP_Install::table('dynamics').\" WHERE group_id=$G AND status='active' ORDER BY id\"));") | cut -d' ' -f1)
+post third -d "action=cmp_dyn_end&_cmp_nonce=$TN&dynamic=$FIRST" >/dev/null
+ok "ending one type leaves the add-ons on" $([ "$(can $KH $TH chastity)$(can $TH $KH homework)" = 11 ] && echo 1 || echo 0)
+for id in $(ev "global \$wpdb; echo implode(' ',\$wpdb->get_col(\"SELECT id FROM \".CMP_Install::table('dynamics').\" WHERE group_id=$G AND status='active' ORDER BY id\"));"); do post third -d "action=cmp_dyn_end&_cmp_nonce=$TN&dynamic=$id" >/dev/null; done
+ok "ending the last one ends the add-ons too" $([ "$(can $KH $TH chastity)$(can $TH $KH homework)" = 00 ] && [ "$(ev "global \$wpdb; echo \$wpdb->get_var(\"SELECT COUNT(*) FROM \".$AD.\" WHERE user_a IN ($KH,$TH) AND user_b IN ($KH,$TH) AND status='active'\");")" = 0 ] && echo 1 || echo 0)
+r=$(post third --data-urlencode "action=cmp_dyn_propose" --data-urlencode "_cmp_nonce=$TN" --data-urlencode "partner=$KH" --data-urlencode "types[]=keyholder" --data-urlencode "side[keyholder]=b")
+ok "Keyholder / chastity wearer always asks for chastity, the Keyholder holding the key" $(echo "$r" | grep -q 'dyn_sent' && [ "$(adid chastity $KH pending)" -gt 0 ] && echo 1 || echo 0)
+KG=$(lastid)
+post third -d "action=cmp_dyn_withdraw&_cmp_nonce=$TN&dynamic=$KG" >/dev/null
+ok "withdrawing the invitation withdraws its add-ons" $([ "$(status $KG)" = withdrawn ] && [ "$(ev "global \$wpdb; echo \$wpdb->get_var(\"SELECT status FROM \".$AD.\" WHERE group_id=$KG\");")" = withdrawn ] && echo 1 || echo 0)
+ev "global \$wpdb; \$d=CMP_Install::table('dynamics'); \$n=gmdate('Y-m-d H:i:s'); \$wpdb->insert(\$d,array('type'=>'keyholder','proposer_id'=>$TH,'partner_id'=>$OUT,'proposer_side'=>'a','status'=>'active','created_at'=>\$n)); \$wpdb->insert(\$d,array('type'=>'dom_sub','proposer_id'=>$OUT,'partner_id'=>$KH,'proposer_side'=>'b','status'=>'active','created_at'=>\$n)); \$wpdb->insert(CMP_Install::table('programs'),array('lead_id'=>$KH,'member_id'=>$OUT,'title'=>'ZZ','status'=>'active','created_at'=>\$n,'updated_at'=>\$n)); delete_option(CMP_Dynamics::MIGRATED); CMP_Dynamics::migrate_addons();" >/dev/null
+ok "upgrade keeps what pairs use: Keyholder -> chastity; running homework -> homework only" $([ "$(can $TH $OUT chastity)$(can $TH $OUT homework)$(can $KH $OUT homework)$(can $KH $OUT chastity)" = 1010 ] && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->query(\"DELETE FROM \".CMP_Install::table('dynamics').\" WHERE proposer_id=$OUT OR partner_id=$OUT\"); \$wpdb->query(\"DELETE FROM \".$AD.\" WHERE user_a=$OUT OR user_b=$OUT\"); \$wpdb->query(\"DELETE FROM \".CMP_Install::table('programs').\" WHERE title='ZZ'\");" >/dev/null
+
 echo "== Limits and access"
 ev "global \$wpdb; for(\$i=0;\$i<9;\$i++){ \$wpdb->insert(CMP_Install::table('dynamics'),array('type'=>'friends','proposer_id'=>$KH,'partner_id'=>$TH+1000+\$i,'status'=>'pending','created_at'=>gmdate('Y-m-d H:i:s'))); }" >/dev/null
 r=$(post kh -d "action=cmp_dyn_propose&_cmp_nonce=$N&partner=$TH&type=play")
@@ -121,7 +176,7 @@ ok "export lists the dynamics" $(ev "echo false!==strpos(wp_json_encode(CMP_Acco
 ok "erase removes them" $(ev "CMP_Account::erase('wearer@example.com'); global \$wpdb; echo 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM \".CMP_Install::table('dynamics').\" WHERE proposer_id=$WE OR partner_id=$WE\")?1:0;")
 
 pkill -f "php -S 127.0.0.1:8899" 2>/dev/null
-ev 'global $wpdb; $wpdb->query("DELETE FROM ".CMP_Install::table("dynamics"));' >/dev/null
+ev 'global $wpdb; $wpdb->query("DELETE FROM ".CMP_Install::table("dynamics")); $wpdb->query("DELETE FROM ".CMP_Install::table("dynamic_addons"));' >/dev/null
 for u in kh wearer third outsider; do $W user delete $u --yes >/dev/null 2>&1; done
 echo; echo "debug.log (plugin-related):"; grep -i 'cmp\|member-planning' wp-content/debug.log 2>/dev/null | grep -v 'Upgrad\|upgraded' | tail -5
 echo "RESULT: $PASS passed, $FAIL failed"

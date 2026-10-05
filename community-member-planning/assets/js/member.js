@@ -523,30 +523,82 @@
 	} );
 }() );
 
-/* Propose a dynamic (0.6.0): the "Your side" labels follow the chosen type;
-   equal types (Partners, Friends …) have no sides. */
+/* Propose a dynamic (0.16.0): pick any number of types; each type with
+   sides asks for your side once it's ticked. Chastity and homework are
+   add-ons with a "who leads" choice; Keyholder / chastity wearer turns
+   chastity on with the Keyholder holding the key. Without JavaScript every
+   side question shows and the server checks the same rules. */
 ( function () {
 	'use strict';
-	var type = document.querySelector( '[data-cmp-dyn-type]' );
-	if ( ! type ) {
+	var form = document.querySelector( '[data-cmp-dyn-form]' );
+	if ( ! form ) {
 		return;
 	}
-	var sides = document.querySelector( '[data-cmp-dyn-side]' );
-	var la = document.querySelector( '[data-cmp-side-a]' );
-	var lb = document.querySelector( '[data-cmp-side-b]' );
-	var tpl = sides ? sides.getAttribute( 'data-tpl' ) : '%s';
-	var sync = function () {
-		var o = type.options[ type.selectedIndex ];
-		var a = o.getAttribute( 'data-a' ), b = o.getAttribute( 'data-b' );
-		if ( sides ) {
-			sides.hidden = ! b;
-		}
-		if ( b && la && lb ) {
-			la.textContent = tpl.replace( '%s', a );
-			lb.textContent = tpl.replace( '%s', b );
-		}
+	var boxes = form.querySelectorAll( '[data-cmp-dyn-t]' );
+	var error = form.querySelector( '[data-cmp-dyn-error]' );
+	var chastity = form.querySelector( '#cmp_dyn_a_chastity' );
+	var note = form.querySelector( '[data-cmp-dyn-kh-note]' );
+	var keyholder = form.querySelector( '#cmp_dyn_t_keyholder' );
+	var sideOf = function ( key ) {
+		var picked = form.querySelector( 'input[name="side[' + key + ']"]:checked' );
+		return picked ? picked.value : '';
 	};
-	type.addEventListener( 'change', sync );
+	var sync = function () {
+		Array.prototype.forEach.call( boxes, function ( box ) {
+			var key = box.getAttribute( 'data-cmp-dyn-t' );
+			var side = form.querySelector( '[data-cmp-dyn-side="' + key + '"]' );
+			if ( side ) {
+				side.hidden = ! box.checked;
+				Array.prototype.forEach.call( side.querySelectorAll( 'input' ), function ( r ) {
+					r.required = box.checked;
+				} );
+			}
+		} );
+		var kh = keyholder && keyholder.checked;
+		if ( chastity ) {
+			if ( kh ) {
+				chastity.checked = true;
+				var lead = 'b' === sideOf( 'keyholder' ) ? 'them' : 'me';
+				var pick = form.querySelector( '#cmp_dyn_l_chastity_' + lead );
+				if ( pick && sideOf( 'keyholder' ) ) {
+					pick.checked = true;
+				}
+			}
+			chastity.setAttribute( 'aria-disabled', kh ? 'true' : 'false' );
+			if ( note ) {
+				note.hidden = ! kh;
+			}
+		}
+		Array.prototype.forEach.call( form.querySelectorAll( '[data-cmp-dyn-addon]' ), function ( row ) {
+			var on = row.querySelector( 'input[type="checkbox"]' ).checked;
+			var leads = row.querySelector( '.cmp-dyn-addon-lead' );
+			leads.hidden = ! on;
+			leads.classList.toggle( 'is-locked', 'chastity' === row.getAttribute( 'data-cmp-dyn-addon' ) && !! kh );
+		} );
+	};
+	form.addEventListener( 'change', function ( e ) {
+		if ( error && e.target.matches( '[data-cmp-dyn-t]' ) ) {
+			error.hidden = true;
+		}
+		sync();
+	} );
+	// With Keyholder ticked, chastity stays on and follows the Keyholder side.
+	form.addEventListener( 'click', function ( e ) {
+		if ( keyholder && keyholder.checked && ( e.target === chastity || ( e.target.closest && e.target.closest( '.cmp-dyn-addon-lead.is-locked' ) ) ) ) {
+			e.preventDefault();
+		}
+	} );
+	form.addEventListener( 'submit', function ( e ) {
+		var any = Array.prototype.some.call( boxes, function ( b ) {
+			return b.checked;
+		} );
+		if ( ! any && error ) {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			error.hidden = false;
+			error.scrollIntoView( { block: 'center' } );
+		}
+	}, true );
 	sync();
 }() );
 

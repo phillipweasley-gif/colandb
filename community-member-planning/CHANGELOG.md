@@ -4,6 +4,41 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.16.0
+
+**Dynamics: several types at once, and chastity and homework as add-ons with any dynamic** (owner, 2026-10-05: "I should be able to select multiple. I should also be able to have the chastity option regardless of what the dynamic is providing the other party agrees to it. Same with Homework."). Owner's choices: the proposer picks who leads each add-on; add-ons can be added later with agreement; Keyholder / chastity wearer keeps chastity on automatically; existing dynamics keep only what they use.
+
+- **Several types in one invitation.**
+  - Types are tappable chips; each type with sides asks for your side once it's ticked.
+  - The other member accepts or declines the whole invitation at once. It counts as one invitation in the tab badge and in the 10-pending limit.
+  - Each type can still be ended on its own.
+- **Chastity and homework are add-ons.**
+  - They work with any type, including equal ones such as Partners.
+  - Each has its own direction: "I hold the key / They hold the key", "I set it / They set it".
+  - They're asked for in the invitation and start only when it's accepted.
+- **On an active dynamic:**
+  - **Ask to add** chastity or homework, either direction. The other member accepts or declines, and the asker can withdraw.
+  - **Turn off** any add-on: either member, at any time, straight away. The other member is told.
+  - **Add a type** links to the proposal form on their profile.
+- **Keyholder / chastity wearer** always comes with chastity, the Keyholder holding the key. The form ticks it and locks the direction.
+- **What homework and chastity check now:** only an agreed add-on, while at least one dynamic between the two is active.
+  - Being the "leading side" no longer gives anything by itself.
+  - When the last dynamic ends, add-ons end with it.
+  - Blocking ends them too.
+  - Homework is archived and locks become self-locks, as before.
+- **Upgrade (database version 12), run once:**
+  - Adds the `dynamic_addons` table and `dynamics.group_id`.
+  - Each active pair keeps only what it uses: chastity for Keyholder dynamics or a lock in place, homework if a program is running.
+  - Pending Keyholder invitations get their chastity request.
+- Homework and Chastity tab wording follows the new rules. The data export lists add-ons, and erasing an account removes them.
+- **Verification:**
+  - `dynamics-e2e.sh` 56/56, with 22 new checks: several types and add-ons in one invitation, sides required, nothing allowed while pending, accepting starts everything, directions respected, turn off, ask again, duplicate and self-accept refused, no asking without a dynamic, ending one type versus the last, the Keyholder rule, withdrawing, and the upgrade.
+  - Homework and chastity tests now create their add-on explicitly.
+  - All 15 suites pass.
+  - In a browser on the local test site: the chips, side questions, add-on rows, the Keyholder lock-in, sending an invitation, and the Dynamics tab with an active pair, an add-on request and Ask to add.
+
+---
+
 ## 0.15.2
 
 **"Leave site?" when sending a message or posting to the feed, and the dynamic proposal layout** (owner, 2026-10-05: "it shouldn't have the 'leave' that's confusing for users"; "I get the same leave message when I post to the feed as well"; screenshot of "Your side" with stretched buttons).

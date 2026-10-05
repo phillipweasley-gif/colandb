@@ -141,7 +141,7 @@ class CMP_Homework {
 
 	/** The lead, while the program is active and the dynamic still allows it. */
 	public static function can_lead( $program, $user_id ) {
-		return $program && 'active' === $program->status && (int) $program->lead_id === (int) $user_id && CMP_Dynamics::lead_can_direct( $user_id, $program->member_id );
+		return $program && 'active' === $program->status && (int) $program->lead_id === (int) $user_id && CMP_Dynamics::lead_can_direct( $user_id, $program->member_id, 'homework' );
 	}
 
 	/** The member, always (their own history), but logging only while active. */
@@ -345,7 +345,7 @@ class CMP_Homework {
 			self::go( array( 'program' => $program->id ), 'hw_saved' );
 		}
 		$member = isset( $_POST['member'] ) ? absint( $_POST['member'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing
-		if ( ! $member || ! CMP_Dynamics::lead_can_direct( $user_id, $member ) ) {
+		if ( ! $member || ! CMP_Dynamics::lead_can_direct( $user_id, $member, 'homework' ) ) {
 			self::go( array(), 'hw_gone' );
 		}
 		$wpdb->insert(
@@ -505,12 +505,12 @@ class CMP_Homework {
 		self::go( $back, 'hw_reviewed' );
 	}
 
-	/** Archive programs once no directed dynamic remains between the two members. */
+	/** Archive programs once the lead may no longer set homework (add-on off or last dynamic ended). */
 	public static function on_dynamic_ended( $dyn ) {
 		global $wpdb;
 		foreach ( array( array( $dyn->proposer_id, $dyn->partner_id ), array( $dyn->partner_id, $dyn->proposer_id ) ) as list( $lead, $member ) ) {
 			// The ended dynamic is already 'ended' in the table when this runs from handle_end().
-			if ( CMP_Dynamics::lead_can_direct( $lead, $member ) ) {
+			if ( CMP_Dynamics::lead_can_direct( $lead, $member, 'homework' ) ) {
 				continue;
 			}
 			$ids = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM ' . self::t( 'programs' ) . " WHERE lead_id = %d AND member_id = %d AND status = 'active'", $lead, $member ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -545,12 +545,12 @@ class CMP_Homework {
 			return self::render_program( $program, $user_id );
 		}
 		$mine = self::programs_for( $user_id, 'member' );
-		$led  = CMP_Dynamics::led_by( $user_id );
+		$led  = CMP_Dynamics::led_by( $user_id, 'homework' );
 		ob_start();
 		?>
 		<section class="cmp-step" aria-labelledby="cmp-hw-title">
 			<h2 id="cmp-hw-title" class="cmp-title"><?php esc_html_e( 'Homework', 'cmp' ); ?></h2>
-			<p><?php esc_html_e( 'Weekly programs within a dynamic: the leading side sets tasks, the other logs them day by day with the proof each asks for.', 'cmp' ); ?></p>
+			<p><?php esc_html_e( 'Weekly programs within a dynamic: whoever you\'ve agreed sets homework sets the tasks, the other logs them day by day with the proof each asks for.', 'cmp' ); ?></p>
 		</section>
 		<section class="cmp-panel">
 			<h3 class="cmp-panel-title"><?php esc_html_e( 'Your homework', 'cmp' ); ?></h3>
@@ -571,7 +571,7 @@ class CMP_Homework {
 		<section class="cmp-panel">
 			<h3 class="cmp-panel-title"><?php esc_html_e( 'Homework you set', 'cmp' ); ?></h3>
 			<?php if ( ! $led ) : ?>
-				<p class="cmp-empty"><?php esc_html_e( 'You can set homework for members you lead in an active dynamic (for example as their Keyholder or Dominant). See the Dynamics tab.', 'cmp' ); ?></p>
+				<p class="cmp-empty"><?php esc_html_e( 'You can set homework for members who\'ve agreed to homework with you setting it, in any active dynamic. See the Dynamics tab.', 'cmp' ); ?></p>
 			<?php endif; ?>
 			<?php foreach ( $led as $member_id => $labels ) : ?>
 				<div class="cmp-hw-led">
@@ -622,7 +622,7 @@ class CMP_Homework {
 				<?php
 				echo esc_html( $is_lead ? sprintf( /* translators: %s: member */ __( 'Homework you set for %s', 'cmp' ), self::name( $other ) ) : sprintf( /* translators: %s: lead */ __( 'Homework from %s', 'cmp' ), self::name( $other ) ) );
 				if ( ! $active ) {
-					echo ' · ' . esc_html__( 'Archived: the dynamic ended. Your history stays here; nothing new can be logged.', 'cmp' );
+					echo ' · ' . esc_html__( 'Archived: homework was turned off or the dynamic ended. Your history stays here; nothing new can be logged.', 'cmp' );
 				}
 				?>
 			</p>

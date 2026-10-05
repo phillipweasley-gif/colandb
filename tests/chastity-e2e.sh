@@ -50,11 +50,11 @@ echo "not an image" > $T/fake.jpg
 echo "== Starting a lock"
 login pup pup puppass123456
 get pup p0 "$PAGE&cmp_tab=chastity"
-ok "Chastity tab with the start form; no keyholder yet" $([ "$(has $T/p0.html 'Start a lock')$(has $T/p0.html 'No one (self-lock)')$(has $T/p0.html 'start a dynamic')" = 111 ] && echo 1 || echo 0)
+ok "Chastity tab with the start form; no keyholder yet" $([ "$(has $T/p0.html 'Start a lock')$(has $T/p0.html 'No one (self-lock)')$(has $T/p0.html 'agree chastity with them')" = 111 ] && echo 1 || echo 0)
 PN=$(hnonce $T/p0.html)
 r=$(act pup $PN start -F "keyholder=$KH" -F "option=a" -F "length=10080")
 ok "can't pick a keyholder without a dynamic" $(echo "$r" | grep -q 'cl_invalid' && [ "$(q "SELECT COUNT(*) FROM $L_T")" = 0 ] && echo 1 || echo 0)
-ev "global \$wpdb; \$wpdb->insert('$D_T',array('type'=>'keyholder','proposer_id'=>$KH,'partner_id'=>$PUP,'proposer_side'=>'a','status'=>'active','proposer_show'=>1,'partner_show'=>1,'created_at'=>gmdate('Y-m-d H:i:s')));" >/dev/null
+ev "global \$wpdb; \$wpdb->insert('$D_T',array('type'=>'keyholder','proposer_id'=>$KH,'partner_id'=>$PUP,'proposer_side'=>'a','status'=>'active','proposer_show'=>1,'partner_show'=>1,'created_at'=>gmdate('Y-m-d H:i:s'))); CMP_Dynamics::grant('chastity',$KH,$PUP);" >/dev/null
 DYN=$(q "SELECT MAX(id) FROM $D_T")
 get pup p1 "$PAGE&cmp_tab=chastity"
 ok "the lead in a dynamic is offered as keyholder" $(has $T/p1.html "<option value=\"$KH\">Sample Keyholder")

@@ -144,19 +144,19 @@ class CMP_Chastity {
 
 	/** The keyholder, while the lock is active and the dynamic still allows it. */
 	public static function is_keyholder( $lock, $user_id ) {
-		return $lock && 'locked' === $lock->status && $lock->keyholder_id && (int) $lock->keyholder_id === (int) $user_id && CMP_Dynamics::lead_can_direct( $user_id, $lock->wearer_id );
+		return $lock && 'locked' === $lock->status && $lock->keyholder_id && (int) $lock->keyholder_id === (int) $user_id && CMP_Dynamics::lead_can_direct( $user_id, $lock->wearer_id, 'chastity' );
 	}
 
 	public static function is_wearer( $lock, $user_id ) {
 		return $lock && (int) $lock->wearer_id === (int) $user_id;
 	}
 
-	/** Who the wearer may choose as keyholder: members who lead them in an active directed dynamic. */
+	/** Who the wearer may choose as keyholder: members holding their key through a chastity add-on (0.16.0). */
 	public static function keyholder_choices( $wearer_id ) {
 		$out = array();
-		foreach ( CMP_Dynamics::for_user( $wearer_id, array( 'active' ) ) as $dyn ) {
-			$lead = CMP_Dynamics::lead_id( $dyn );
-			if ( $lead && $lead !== (int) $wearer_id ) {
+		foreach ( CMP_Dynamics::addons_for_user( $wearer_id, array( 'active' ) ) as $ad ) {
+			$lead = (int) $ad->lead_id;
+			if ( 'chastity' === $ad->kind && $lead !== (int) $wearer_id && CMP_Dynamics::lead_can_direct( $lead, $wearer_id, 'chastity' ) ) {
 				$u = get_userdata( $lead );
 				if ( $u ) {
 					$out[ $lead ] = $u->display_name;
@@ -568,7 +568,7 @@ class CMP_Chastity {
 	public static function on_dynamic_ended( $dyn ) {
 		global $wpdb;
 		foreach ( array( array( $dyn->proposer_id, $dyn->partner_id ), array( $dyn->partner_id, $dyn->proposer_id ) ) as list( $kh, $wearer ) ) {
-			if ( CMP_Dynamics::lead_can_direct( $kh, $wearer ) ) {
+			if ( CMP_Dynamics::lead_can_direct( $kh, $wearer, 'chastity' ) ) {
 				continue;
 			}
 			$ids = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM ' . self::t( 'locks' ) . " WHERE keyholder_id = %d AND wearer_id = %d AND status = 'locked'", $kh, $wearer ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -576,7 +576,7 @@ class CMP_Chastity {
 				self::update_lock( (int) $id, array( 'keyholder_id' => 0, 'hide_timer' => 0, 'release_allowed' => 0 ) );
 				self::add_event( (int) $id, 0, 'keyholder_left' );
 				CMP_Audit::log( 'lock_keyholder_left', 'lock', (int) $id, null, null, 'Dynamic ended' );
-				CMP_Notifications::add( (int) $wearer, 'lock', __( 'Your dynamic ended, so your lock is now a self-lock. You can end it whenever you choose.', 'cmp' ), self::url() );
+				CMP_Notifications::add( (int) $wearer, 'lock', __( 'Your keyholder can no longer manage your lock (chastity was turned off or your dynamic ended), so it\'s now a self-lock. You can end it whenever you choose.', 'cmp' ), self::url() );
 			}
 		}
 	}
@@ -625,7 +625,7 @@ class CMP_Chastity {
 			<?php if ( $lock ) : ?>
 				<p class="cmp-muted"><?php echo esc_html( ( $lock->keyholder_id ? sprintf( /* translators: %s: keyholder */ __( 'Keyholder: %s', 'cmp' ), self::name( $lock->keyholder_id ) ) : __( 'Self-lock', 'cmp' ) ) . ' · ' . sprintf( /* translators: %s: date */ __( 'started %s', 'cmp' ), wp_date( 'M j, g:i A', self::ts( $lock->started_at ) ) ) ); ?></p>
 			<?php else : ?>
-				<p><?php esc_html_e( 'Track a chastity lock: on your own, or with a keyholder who leads you in a dynamic. This keeps the record; it doesn\'t control any device, and you can always end a lock yourself.', 'cmp' ); ?></p>
+				<p><?php esc_html_e( 'Track a chastity lock: on your own, or with a keyholder you\'ve agreed chastity with in a dynamic. This keeps the record; it doesn\'t control any device, and you can always end a lock yourself.', 'cmp' ); ?></p>
 			<?php endif; ?>
 		</section>
 		<?php
@@ -639,7 +639,7 @@ class CMP_Chastity {
 		<section class="cmp-panel">
 			<h3 class="cmp-panel-title"><?php esc_html_e( 'Locks you hold', 'cmp' ); ?></h3>
 			<?php if ( ! $held ) : ?>
-				<p class="cmp-empty"><?php esc_html_e( 'When a member you lead in a dynamic locks up with you as keyholder, their lock appears here.', 'cmp' ); ?></p>
+				<p class="cmp-empty"><?php esc_html_e( 'When a member whose key you hold (chastity in a dynamic) locks up with you as keyholder, their lock appears here.', 'cmp' ); ?></p>
 			<?php endif; ?>
 			<?php foreach ( $held as $h ) : ?>
 				<p class="cmp-hw-item"><a href="<?php echo esc_url( self::url( array( 'lock' => $h->id ) ) ); ?>"><b><?php echo esc_html( self::name( $h->wearer_id ) ); ?></b></a> · <?php echo esc_html( $h->option_name ); ?> · <?php echo esc_html( sprintf( /* translators: %s: duration */ __( 'locked %s', 'cmp' ), self::duration( self::locked_seconds( $h ) ) ) ); ?></p>
@@ -680,7 +680,7 @@ class CMP_Chastity {
 		$html .= self::check( 'show_profile', 'cmp_cl_show', __( 'Show "Locked · N days" on my profile', 'cmp' ), false );
 		$html .= '<button type="submit" class="cmp-btn">' . esc_html__( 'Lock', 'cmp' ) . '</button></form>';
 		if ( count( $keyholders ) < 2 ) {
-			$html .= '<p class="cmp-muted">' . esc_html__( 'To have a keyholder, start a dynamic (for example Keyholder / chastity wearer) on the Dynamics tab.', 'cmp' ) . '</p>';
+			$html .= '<p class="cmp-muted">' . esc_html__( 'To have a keyholder, agree chastity with them in a dynamic, with them holding the key (any type, or Keyholder / chastity wearer). See the Dynamics tab.', 'cmp' ) . '</p>';
 		}
 		return $html . '</section>';
 	}
