@@ -414,12 +414,83 @@ body.cec-plugin-page {
 a.cec-cal-day-detail-title { color: var(--cec-text) !important; text-decoration: none !important; font-weight: 700; }
 a.cec-cal-day-detail-title:hover, a.cec-cal-day-detail-title:focus-visible { color: var(--cec-primary) !important; }
 
-/* ---------- Small-screen agenda (replaces the month grid below 700px) ---------- */
-.cec-cal-agenda { display: none; }
-.cec-cal-agenda-day { margin-bottom: 22px; }
-.cec-cal-agenda-day:last-child { margin-bottom: 0; }
-.cec-cal-agenda-date { font-family: 'Archivo Black', sans-serif; font-size: 16px; text-transform: none; margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--cec-border-soft); }
-.cec-cal-agenda .cec-cal-day-detail-list { margin-bottom: 0; }
+/* ---------- Phone month grid (replaces the desktop grid below 700px) ----------
+   Every interactive element is scoped under .cec-calendar-wrap with
+   !important on its visual identity: Hello Elementor's reset.css styles
+   every button (pink border/text, hover fill), which would otherwise
+   repaint these day cells — the same collision 1.24.1 fixed on the
+   filter bar. */
+.cec-cal-phone { display: none; }
+.cec-calendar-wrap .cec-cal-pdow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); text-align: center; font-size: 11px; font-weight: 700; color: var(--cec-secondary); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.cec-calendar-wrap .cec-cal-pweek { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); position: relative; border-top: 1px solid var(--cec-border-soft); }
+.cec-calendar-wrap .cec-cal-pday {
+	all: unset;
+	box-sizing: border-box !important;
+	display: flex !important;
+	flex-direction: column !important;
+	align-items: center !important;
+	min-height: 74px !important;
+	min-width: 0 !important;
+	padding: 4px 0 !important;
+	margin: 0 !important;
+	background: transparent !important;
+	border: none !important;
+	border-radius: 0 !important;
+	box-shadow: none !important;
+	color: var(--cec-text) !important;
+	font: inherit !important;
+	text-transform: none !important;
+	letter-spacing: normal !important;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+.cec-calendar-wrap .cec-cal-pday:hover, .cec-calendar-wrap .cec-cal-pday:focus, .cec-calendar-wrap .cec-cal-pday:active { background: transparent !important; color: var(--cec-text) !important; border: none !important; box-shadow: none !important; }
+.cec-calendar-wrap .cec-cal-pday:focus-visible { outline: 2px solid var(--cec-primary) !important; outline-offset: -2px; }
+.cec-calendar-wrap .cec-cal-pday-empty { cursor: default; }
+.cec-calendar-wrap .cec-cal-pday-num { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; font-size: 13px; font-weight: 600; line-height: 1; }
+.cec-calendar-wrap .cec-cal-pday-today .cec-cal-pday-num { box-shadow: inset 0 0 0 1.5px var(--cec-primary); color: var(--cec-primary); }
+.cec-calendar-wrap .cec-cal-pday-selected .cec-cal-pday-num { background: var(--cec-secondary); color: #0b0a12; font-weight: 800; box-shadow: none; }
+/* Dots sit below the bar band (bars occupy ~34–48px from the top). */
+.cec-calendar-wrap .cec-cal-pday-dots { display: flex; gap: 3px; margin-top: 20px; height: 6px; align-items: center; }
+.cec-calendar-wrap .cec-cal-pdot { width: 6px; height: 6px; border-radius: 50%; background: var(--cec-primary); }
+.cec-calendar-wrap .cec-cal-pdot-cancelled, .cec-calendar-wrap .cec-cal-pdot-postponed { background: var(--cec-muted); }
+.cec-calendar-wrap .cec-cal-pday-more { font-size: 9px; font-weight: 700; color: var(--cec-muted); line-height: 1; margin-top: 3px; height: 10px; }
+.cec-calendar-wrap .cec-cal-pbars { position: absolute; left: 0; right: 0; top: 34px; height: 14px; pointer-events: none; }
+.cec-calendar-wrap .cec-cal-pbar {
+	position: absolute; height: 5px; border-radius: 3px; background: var(--cec-secondary); top: 0;
+	left: calc(var(--cec-col-start) / 7 * 100% + 4px);
+	width: calc(var(--cec-col-span) / 7 * 100% - 8px);
+}
+.cec-calendar-wrap .cec-cal-pbar-lane1 { top: 7px; opacity: .65; }
+.cec-calendar-wrap .cec-cal-pbar-cont-from { left: calc(var(--cec-col-start) / 7 * 100%); width: calc(var(--cec-col-span) / 7 * 100% - 4px); border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.cec-calendar-wrap .cec-cal-pbar-cont-to { width: calc(var(--cec-col-span) / 7 * 100% - 4px); border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.cec-calendar-wrap .cec-cal-pbar-cont-from.cec-cal-pbar-cont-to { width: calc(var(--cec-col-span) / 7 * 100%); }
+.cec-calendar-wrap .cec-cal-pbar-cancelled, .cec-calendar-wrap .cec-cal-pbar-postponed { background: var(--cec-muted); }
+
+.cec-calendar-wrap .cec-cal-pday-list { margin-top: 16px; }
+.cec-calendar-wrap .cec-cal-pday-heading { font-family: 'Archivo Black', sans-serif; font-size: 16px; text-transform: none; margin: 0 0 2px; color: var(--cec-text); }
+.cec-calendar-wrap .cec-cal-pday-count, .cec-calendar-wrap .cec-cal-pday-empty-note { font-size: 12px; color: var(--cec-muted); margin: 0 0 10px; }
+.cec-calendar-wrap .cec-cal-pday-empty-note { font-size: 14px; font-style: italic; }
+.cec-calendar-wrap .cec-cal-pday-sub { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--cec-muted); margin: 14px 0 8px; }
+.cec-calendar-wrap a.cec-cal-pcard {
+	display: flex !important; gap: 12px; position: relative; min-height: 44px;
+	background: var(--cec-card) !important; border: 1px solid var(--cec-border-soft) !important; border-radius: var(--cec-radius) !important;
+	padding: 12px 34px 12px 0 !important; margin: 0 0 8px !important;
+	color: var(--cec-text) !important; text-decoration: none !important; box-shadow: none !important;
+}
+.cec-calendar-wrap a.cec-cal-pcard:hover, .cec-calendar-wrap a.cec-cal-pcard:focus { color: var(--cec-text) !important; border-color: var(--cec-secondary) !important; background: var(--cec-card) !important; text-decoration: none !important; }
+.cec-calendar-wrap a.cec-cal-pcard:focus-visible { outline: 2px solid var(--cec-primary) !important; outline-offset: 2px; }
+.cec-calendar-wrap .cec-cal-pcard-bar { width: 4px; border-radius: 0 3px 3px 0; background: var(--cec-secondary); flex-shrink: 0; }
+.cec-calendar-wrap .cec-cal-pcard-single .cec-cal-pcard-bar { background: var(--cec-primary); }
+.cec-calendar-wrap .cec-cal-pcard-body { flex: 1; min-width: 0; }
+.cec-calendar-wrap .cec-cal-pcard-title { display: block; font-weight: 700; font-size: 15px; line-height: 1.3; }
+.cec-calendar-wrap .cec-cal-pcard-cancelled .cec-cal-pcard-title, .cec-calendar-wrap .cec-cal-pcard-postponed .cec-cal-pcard-title { text-decoration: line-through; opacity: .7; }
+.cec-calendar-wrap .cec-cal-pcard-when { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 5px; font-size: 12px; font-weight: 600; }
+.cec-calendar-wrap .cec-cal-pcard-chip { background: rgba(255, 80, 215, .14); color: #ff8fe4; border-radius: var(--cec-pill); padding: 2px 8px; }
+.cec-calendar-wrap .cec-cal-pcard-single .cec-cal-pcard-chip { background: rgba(225, 245, 119, .14); color: var(--cec-primary); }
+.cec-calendar-wrap .cec-cal-pcard-of { color: var(--cec-muted); font-weight: 500; }
+.cec-calendar-wrap .cec-cal-pcard-where { display: block; font-size: 12px; color: var(--cec-muted); margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cec-calendar-wrap .cec-cal-pcard-chev { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--cec-muted); font-size: 18px; }
 
 .cec-subscribe-links { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
 
@@ -433,7 +504,9 @@ a.cec-cal-day-detail-title:hover, a.cec-cal-day-detail-title:focus-visible { col
 	   redundant once every event for the month is already listed in the
 	   agenda) is replaced outright below this breakpoint, not shrunk. */
 	.cec-cal-grid-wrap, .cec-cal-day-detail { display: none; }
-	.cec-cal-agenda { display: block; }
+	.cec-cal-phone { display: block; }
+	/* The phone grid has no week-continuation arrows. */
+	.cec-cal-legend-note { display: none; }
 }
 
 /* ---------- Filters ----------

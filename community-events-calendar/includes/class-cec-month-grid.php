@@ -47,6 +47,12 @@ class CEC_Month_Grid {
 			'status'    => $data['event_status'],
 			'highlight' => (bool) $highlight,
 			'detail'    => array(
+				// Start time alone ("7:00 pm EDT"), for the phone day list's
+				// chip; empty when the event shows no time (all-day, varies,
+				// midnight-to-11:59 pm). date_range carries the full date.
+				'time'       => in_array( $data['display_time_mode'], array( 'exact', 'start_only' ), true ) && $data['start_ts']
+					? trim( date_i18n( 'g:i a', $data['start_ts'] ) . ' ' . $data['timezone_abbr'] )
+					: '',
 				'date_range' => $data['date_range_display'],
 				'location'   => $where['label'],
 				'host'       => $data['host_org_name'],
@@ -102,6 +108,7 @@ class CEC_Month_Grid {
 
 		$add_to_date = function ( $date, $item, $true_start_date ) use ( &$events_by_date ) {
 			$events_by_date[ $date ][] = array(
+				'id'         => $item['id'],
 				'title'      => $item['title'],
 				'permalink'  => $item['url'],
 				'date_range' => $item['detail']['date_range'],
@@ -110,6 +117,9 @@ class CEC_Month_Grid {
 				'badge'      => $item['detail']['badge'],
 				'badgeClass' => $item['detail']['badgeClass'],
 				'startDate'  => $true_start_date,
+				'endDate'    => $item['end_ts'] ? date_i18n( 'Y-m-d', max( $item['end_ts'], $item['start_ts'] ) ) : $true_start_date,
+				'time'       => isset( $item['detail']['time'] ) ? $item['detail']['time'] : '',
+				'status'     => $item['status'],
 			);
 		};
 
@@ -354,61 +364,14 @@ class CEC_Month_Grid {
 		<?php endforeach; ?>
 		</div>
 		<?php
-		// Small screens get a chronological agenda instead of the grid above
-		// (hidden/shown purely via CSS at the same breakpoint the rest of
-		// this plugin already uses) — every date in the month that has at
-		// least one item, each showing its complete date range (never just
-		// "today's slice" of a multi-day span), reusing the exact same
-		// day-detail item markup/classes the click-a-date panel already
-		// builds in JS, so no new visual language is needed.
+		// Small screens (below 700px, CSS only) get a compact month grid
+		// with a tapped-day list instead of the grid above: the whole month
+		// on one screen, rather than the 1.24.0 day-by-day agenda, which ran
+		// to ~22 phone screens for October 2026's overlapping weekends.
 		ksort( $events_by_date );
+		$selected_date = $is_current_month ? date_i18n( 'Y-m-d' ) : ( $events_by_date ? key( $events_by_date ) : date_i18n( 'Y-m-d', $first_of_month ) );
+		echo self::render_phone( $weeks, $month, $year, $multi_day_events, $events_by_date, $selected_date, $is_current_month ? date_i18n( 'Y-m-d' ) : '', $first_weekday ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside.
 		?>
-		<div class="cec-cal-agenda">
-			<?php
-			$agenda_has_events = false;
-			foreach ( $events_by_date as $date => $day_events ) :
-				if ( empty( $day_events ) ) {
-					continue;
-				}
-				$agenda_has_events = true;
-				?>
-				<div class="cec-cal-agenda-day">
-					<h4 class="cec-cal-agenda-date"><?php echo esc_html( date_i18n( 'l, F j', strtotime( $date ) ) ); ?></h4>
-					<ul class="cec-cal-day-detail-list">
-						<?php foreach ( $day_events as $ev ) : ?>
-							<li class="cec-cal-day-detail-item">
-								<span class="cec-cal-day-detail-bar"></span>
-								<div class="cec-cal-day-detail-body">
-									<a class="cec-cal-day-detail-title" href="<?php echo esc_url( $ev['permalink'] ); ?>"><?php echo esc_html( $ev['title'] ); ?></a>
-									<span class="cec-cal-day-detail-meta">
-										<?php
-										$meta = array( $ev['date_range'] );
-										if ( $ev['startDate'] < $date ) {
-											/* translators: %s: a date range, e.g. "Oct 9–13" */
-											$meta[0] = sprintf( __( '%s (in progress)', 'cec' ), $ev['date_range'] );
-										}
-										if ( $ev['location'] ) {
-											$meta[] = $ev['location'];
-										}
-										if ( $ev['host'] ) {
-											/* translators: %s: host organization name */
-											$meta[] = sprintf( __( 'Hosted by %s', 'cec' ), $ev['host'] );
-										}
-										echo esc_html( implode( ' · ', $meta ) );
-										?>
-									</span>
-								</div>
-								<?php if ( $ev['badge'] ) : ?><span class="cec-badge <?php echo esc_attr( $ev['badgeClass'] ); ?>"><?php echo esc_html( $ev['badge'] ); ?></span><?php endif; ?>
-								<a class="cec-btn cec-btn-small" href="<?php echo esc_url( $ev['permalink'] ); ?>"><?php esc_html_e( 'Event details', 'cec' ); ?></a>
-							</li>
-						<?php endforeach; ?>
-					</ul>
-				</div>
-			<?php endforeach; ?>
-			<?php if ( ! $agenda_has_events ) : ?>
-				<p class="cec-no-events"><?php esc_html_e( 'No events this month.', 'cec' ); ?></p>
-			<?php endif; ?>
-		</div>
 		<script type="application/json" class="cec-cal-data"><?php echo wp_json_encode( self::plain_payload( $events_by_date ) ); // phpcs:ignore ?></script>
 		<div class="cec-cal-day-detail" hidden>
 			<h3 class="cec-cal-day-detail-heading"></h3>
@@ -436,5 +399,200 @@ class CEC_Month_Grid {
 			}
 		}
 		return $events_by_date;
+	}
+
+	/**
+	 * Phone month grid: day buttons with up to 3 dots for single-day
+	 * items, thin bars for multi-day items (max PHONE_MAX_LANES per week
+	 * row), "+N" for the rest, and the selected day's list below. Shown
+	 * below 700px by CSS. frontend.js re-renders the list on tap from the
+	 * same .cec-cal-data payload; this server copy is the no-JS state.
+	 */
+	const PHONE_MAX_LANES = 2;
+	const PHONE_MAX_DOTS  = 3;
+
+	private static function render_phone( $weeks, $month, $year, $multi_day_events, $events_by_date, $selected_date, $today_date, $first_weekday ) {
+		$ref_sunday = strtotime( '2023-01-01' ); // a known Sunday, as in render().
+		ob_start();
+		?>
+		<div class="cec-cal-phone">
+			<div class="cec-cal-pdow" aria-hidden="true">
+				<?php for ( $i = 0; $i < 7; $i++ ) : ?>
+					<span><?php echo esc_html( date_i18n( 'D', $ref_sunday + ( ( $first_weekday + $i ) % 7 ) * DAY_IN_SECONDS ) ); ?></span>
+				<?php endfor; ?>
+			</div>
+			<?php
+			foreach ( $weeks as $week_slots ) :
+				$week_dates = array();
+				foreach ( $week_slots as $col => $day_num ) {
+					$week_dates[ $col ] = $day_num ? date_i18n( 'Y-m-d', mktime( 0, 0, 0, $month, $day_num, $year ) ) : null;
+				}
+
+				// Same greedy lane packing as the desktop grid, capped lower.
+				$bars       = array();
+				$lane_ends  = array();
+				$barred_ids = array();
+				foreach ( $multi_day_events as $ev ) {
+					$col_start = null;
+					$col_end   = null;
+					foreach ( $week_dates as $col => $date ) {
+						if ( null === $date || $date < $ev['span_start_date'] || $date > $ev['span_end_date'] ) {
+							continue;
+						}
+						if ( null === $col_start ) {
+							$col_start = $col;
+						}
+						$col_end = $col;
+					}
+					if ( null === $col_start ) {
+						continue;
+					}
+					$lane = 0;
+					while ( isset( $lane_ends[ $lane ] ) && $lane_ends[ $lane ] >= $col_start ) {
+						$lane++;
+					}
+					if ( $lane >= self::PHONE_MAX_LANES ) {
+						continue;
+					}
+					$lane_ends[ $lane ] = $col_end;
+					$barred_ids[]       = $ev['id'];
+					$bars[]             = array(
+						'ev'        => $ev,
+						'lane'      => $lane,
+						'col_start' => $col_start,
+						'col_end'   => $col_end,
+						'cont_from' => $week_dates[ $col_start ] !== $ev['span_start_date'],
+						'cont_to'   => $week_dates[ $col_end ] !== $ev['span_end_date'],
+					);
+				}
+				?>
+				<div class="cec-cal-pweek">
+					<?php
+					foreach ( $week_slots as $col => $day_num ) :
+						if ( ! $day_num ) :
+							?>
+							<span class="cec-cal-pday cec-cal-pday-empty" aria-hidden="true"></span>
+							<?php
+							continue;
+						endif;
+						$date    = $week_dates[ $col ];
+						$day_evs = isset( $events_by_date[ $date ] ) ? $events_by_date[ $date ] : array();
+						$singles = array();
+						$hidden  = 0;
+						foreach ( $day_evs as $dev ) {
+							if ( $dev['startDate'] === $dev['endDate'] ) {
+								$singles[] = $dev;
+							} elseif ( ! in_array( $dev['id'], $barred_ids, true ) ) {
+								$hidden++;
+							}
+						}
+						$more  = $hidden + max( 0, count( $singles ) - self::PHONE_MAX_DOTS );
+						$class = 'cec-cal-pday';
+						$class .= $date === $today_date ? ' cec-cal-pday-today' : '';
+						$class .= $date === $selected_date ? ' cec-cal-pday-selected' : '';
+						/* translators: 1: date, e.g. "Friday, October 9", 2: number of events */
+						$label = sprintf( _n( '%1$s, %2$d event', '%1$s, %2$d events', count( $day_evs ), 'cec' ), date_i18n( 'l, F j', strtotime( $date ) ), count( $day_evs ) );
+						?>
+						<button type="button" class="<?php echo esc_attr( $class ); ?>" data-date="<?php echo esc_attr( $date ); ?>" aria-label="<?php echo esc_attr( $label ); ?>" aria-pressed="<?php echo $date === $selected_date ? 'true' : 'false'; ?>">
+							<span class="cec-cal-pday-num"><?php echo esc_html( $day_num ); ?></span>
+							<span class="cec-cal-pday-dots">
+								<?php foreach ( array_slice( $singles, 0, self::PHONE_MAX_DOTS ) as $dev ) : ?>
+									<span class="cec-cal-pdot<?php echo 'scheduled' !== $dev['status'] ? ' cec-cal-pdot-' . esc_attr( $dev['status'] ) : ''; ?>"></span>
+								<?php endforeach; ?>
+							</span>
+							<span class="cec-cal-pday-more"><?php echo $more ? esc_html( '+' . $more ) : ''; ?></span>
+						</button>
+					<?php endforeach; ?>
+					<span class="cec-cal-pbars" aria-hidden="true">
+						<?php
+						foreach ( $bars as $bar ) :
+							$class  = 'cec-cal-pbar cec-cal-pbar-lane' . (int) $bar['lane'];
+							$class .= $bar['cont_from'] ? ' cec-cal-pbar-cont-from' : '';
+							$class .= $bar['cont_to'] ? ' cec-cal-pbar-cont-to' : '';
+							$class .= 'scheduled' !== $bar['ev']['status'] ? ' cec-cal-pbar-' . $bar['ev']['status'] : '';
+							$class .= $bar['ev']['highlight'] ? ' cec-cal-preview-highlight' : '';
+							?>
+							<span class="<?php echo esc_attr( $class ); ?>" style="--cec-col-start:<?php echo (int) $bar['col_start']; ?>;--cec-col-span:<?php echo (int) ( $bar['col_end'] - $bar['col_start'] + 1 ); ?>;"></span>
+						<?php endforeach; ?>
+					</span>
+				</div>
+			<?php endforeach; ?>
+			<div class="cec-cal-pday-list" aria-live="polite">
+				<?php echo self::render_phone_day_list( $events_by_date, $selected_date ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside. ?>
+			</div>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	/**
+	 * The tapped day's events: what starts that day first, then what's
+	 * still running ("day 3 of 12"), so a one-night event isn't buried
+	 * under a long festival. Markup mirrored by phoneDayList() in
+	 * frontend.js; keep the two in step.
+	 */
+	private static function render_phone_day_list( $events_by_date, $date ) {
+		$day_evs = isset( $events_by_date[ $date ] ) ? $events_by_date[ $date ] : array();
+		$starts  = array();
+		$running = array();
+		foreach ( $day_evs as $ev ) {
+			if ( $ev['startDate'] < $date ) {
+				$running[] = $ev;
+			} else {
+				$starts[] = $ev;
+			}
+		}
+		ob_start();
+		?>
+		<h4 class="cec-cal-pday-heading"><?php echo esc_html( date_i18n( 'l, F j', strtotime( $date ) ) ); ?></h4>
+		<?php if ( ! $day_evs ) : ?>
+			<p class="cec-cal-pday-empty-note"><?php esc_html_e( 'Nothing on this day. Tap another day, or use the arrows for other months.', 'cec' ); ?></p>
+		<?php else : ?>
+			<p class="cec-cal-pday-count"><?php echo esc_html( sprintf( _n( '%d event', '%d events', count( $day_evs ), 'cec' ), count( $day_evs ) ) ); ?></p>
+			<?php if ( $starts && $running ) : ?>
+				<p class="cec-cal-pday-sub"><?php esc_html_e( 'Starting this day', 'cec' ); ?></p>
+			<?php endif; ?>
+			<?php
+			foreach ( $starts as $ev ) {
+				echo self::render_phone_card( $ev, $date ); // phpcs:ignore WordPress.Security.EscapeOutput
+			}
+			?>
+			<?php if ( $running ) : ?>
+				<p class="cec-cal-pday-sub"><?php esc_html_e( 'Still running', 'cec' ); ?></p>
+				<?php
+				foreach ( $running as $ev ) {
+					echo self::render_phone_card( $ev, $date ); // phpcs:ignore WordPress.Security.EscapeOutput
+				}
+				?>
+			<?php endif; ?>
+		<?php endif; ?>
+		<?php
+		return ob_get_clean();
+	}
+
+	private static function render_phone_card( $ev, $date ) {
+		$single = $ev['startDate'] === $ev['endDate'];
+		$chip   = $single ? ( $ev['time'] ? $ev['time'] : __( 'All day', 'cec' ) ) : $ev['date_range'];
+		$of     = '';
+		if ( ! $single && $ev['startDate'] < $date ) {
+			$day_n = (int) round( ( strtotime( $date ) - strtotime( $ev['startDate'] ) ) / DAY_IN_SECONDS ) + 1;
+			$total = (int) round( ( strtotime( $ev['endDate'] ) - strtotime( $ev['startDate'] ) ) / DAY_IN_SECONDS ) + 1;
+			/* translators: 1: day number within the event, 2: total days */
+			$of = sprintf( __( 'day %1$d of %2$d', 'cec' ), $day_n, $total );
+		}
+		$where = array_filter( array( $ev['location'], $ev['badge'] ) );
+		ob_start();
+		?>
+		<a class="cec-cal-pcard<?php echo $single ? ' cec-cal-pcard-single' : ''; ?><?php echo 'scheduled' !== $ev['status'] ? ' cec-cal-pcard-' . esc_attr( $ev['status'] ) : ''; ?>" href="<?php echo esc_url( $ev['permalink'] ); ?>">
+			<span class="cec-cal-pcard-bar"></span>
+			<span class="cec-cal-pcard-body">
+				<span class="cec-cal-pcard-title"><?php echo esc_html( $ev['title'] ); ?></span>
+				<span class="cec-cal-pcard-when"><span class="cec-cal-pcard-chip"><?php echo esc_html( $chip ); ?></span><?php echo $of ? '<span class="cec-cal-pcard-of">' . esc_html( $of ) . '</span>' : ''; ?></span>
+				<?php if ( $where ) : ?><span class="cec-cal-pcard-where"><?php echo esc_html( implode( ' · ', $where ) ); ?></span><?php endif; ?>
+			</span>
+			<span class="cec-cal-pcard-chev" aria-hidden="true">&rsaquo;</span>
+		</a>
+		<?php
+		return ob_get_clean();
 	}
 }

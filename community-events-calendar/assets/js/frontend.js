@@ -327,7 +327,76 @@
 			} );
 		}
 		$detail.prop( 'hidden', false );
+		selectPhoneDate( $wrap, dateStr, byDate );
 	}
+
+	// Phone month grid (below 700px): highlight the tapped day and rebuild
+	// its list. Mirrors CEC_Month_Grid::render_phone_day_list() and
+	// render_phone_card(); keep the two in step.
+	function cecText( key, fallback ) {
+		return ( window.CEC && CEC.i18n && CEC.i18n[ key ] ) ? CEC.i18n[ key ] : fallback;
+	}
+
+	function daysBetween( a, b ) {
+		return Math.round( ( new Date( b + 'T12:00:00' ) - new Date( a + 'T12:00:00' ) ) / 864e5 );
+	}
+
+	function phoneCard( item, dateStr ) {
+		var single = item.startDate === item.endDate;
+		var $a = $( '<a class="cec-cal-pcard"></a>' ).attr( 'href', item.permalink );
+		if ( single ) { $a.addClass( 'cec-cal-pcard-single' ); }
+		if ( item.status && 'scheduled' !== item.status ) { $a.addClass( 'cec-cal-pcard-' + item.status ); }
+		$( '<span class="cec-cal-pcard-bar"></span>' ).appendTo( $a );
+		var $body = $( '<span class="cec-cal-pcard-body"></span>' ).appendTo( $a );
+		$( '<span class="cec-cal-pcard-title"></span>' ).text( item.title ).appendTo( $body );
+		var $when = $( '<span class="cec-cal-pcard-when"></span>' ).appendTo( $body );
+		$( '<span class="cec-cal-pcard-chip"></span>' ).text( single ? ( item.time || cecText( 'allDay', 'All day' ) ) : item.date_range ).appendTo( $when );
+		if ( ! single && item.startDate < dateStr ) {
+			var of = cecText( 'dayOf', 'day %1$d of %2$d' )
+				.replace( '%1$d', daysBetween( item.startDate, dateStr ) + 1 )
+				.replace( '%2$d', daysBetween( item.startDate, item.endDate ) + 1 );
+			$( '<span class="cec-cal-pcard-of"></span>' ).text( of ).appendTo( $when );
+		}
+		var where = [ item.location, item.badge ].filter( Boolean );
+		if ( where.length ) {
+			$( '<span class="cec-cal-pcard-where"></span>' ).text( where.join( ' · ' ) ).appendTo( $body );
+		}
+		$( '<span class="cec-cal-pcard-chev" aria-hidden="true">›</span>' ).appendTo( $a );
+		return $a;
+	}
+
+	function selectPhoneDate( $wrap, dateStr, byDate ) {
+		var $phone = $wrap.find( '.cec-cal-phone' );
+		if ( ! $phone.length ) { return; }
+		$phone.find( '.cec-cal-pday[data-date]' ).each( function () {
+			var on = $( this ).data( 'date' ) === dateStr;
+			$( this ).toggleClass( 'cec-cal-pday-selected', on ).attr( 'aria-pressed', on ? 'true' : 'false' );
+		} );
+		var items = byDate[ dateStr ] || [];
+		var starts = items.filter( function ( i ) { return ! ( i.startDate < dateStr ); } );
+		var running = items.filter( function ( i ) { return i.startDate < dateStr; } );
+		var $list = $phone.find( '.cec-cal-pday-list' ).empty();
+		var heading = new Date( dateStr + 'T00:00:00' ).toLocaleDateString( undefined, { weekday: 'long', month: 'long', day: 'numeric' } );
+		$( '<h4 class="cec-cal-pday-heading"></h4>' ).text( heading ).appendTo( $list );
+		if ( ! items.length ) {
+			$( '<p class="cec-cal-pday-empty-note"></p>' ).text( cecText( 'nothingDay', 'Nothing on this day.' ) ).appendTo( $list );
+			return;
+		}
+		var count = ( 1 === items.length ? cecText( 'oneEvent', '%d event' ) : cecText( 'manyEvents', '%d events' ) ).replace( '%d', items.length );
+		$( '<p class="cec-cal-pday-count"></p>' ).text( count ).appendTo( $list );
+		if ( starts.length && running.length ) {
+			$( '<p class="cec-cal-pday-sub"></p>' ).text( cecText( 'startingDay', 'Starting this day' ) ).appendTo( $list );
+		}
+		starts.forEach( function ( i ) { $list.append( phoneCard( i, dateStr ) ); } );
+		if ( running.length ) {
+			$( '<p class="cec-cal-pday-sub"></p>' ).text( cecText( 'stillRunning', 'Still running' ) ).appendTo( $list );
+			running.forEach( function ( i ) { $list.append( phoneCard( i, dateStr ) ); } );
+		}
+	}
+
+	$( document ).on( 'click', '.cec-cal-pday[data-date]', function () {
+		selectCalendarDate( $( this ).closest( '.cec-calendar-wrap' ), $( this ).data( 'date' ) );
+	} );
 
 	$( document ).on( 'click', '.cec-cal-daynum, .cec-cal-daymore', function () {
 		selectCalendarDate( $( this ).closest( '.cec-calendar-wrap' ), $( this ).data( 'date' ) );
