@@ -74,7 +74,7 @@ You choose what to fill in, and each item has its own **Show** switch:
 - **Chastity tracking:** locks you start, your keyholder's settings, verification photos and their daily codes, hygiene openings, releases and unlocks.
 - **Feed:** your posts and photos, the event you tag, likes, and reports you make.
 - **Messages:** your conversations, message requests, the members you block, and reports you make.
-- **Your calendar:** events you add with "Add to my calendar", whether you're going or interested, and who can see each one. Marking an event Going also RSVPs you if the event takes RSVPs here.
+- **Your calendar:** events you add with "Add to my calendar", whether you're going or interested, and who can see each one. Marking an event Going also RSVPs you if the event takes RSVPs here. If you turn on a private calendar link (to see your calendar in your phone's calendar app), we keep that link's secret key; anyone who has the link can see the events on your calendar, so keep it to yourself. You can make a new link (the old one stops working) or turn it off at any time.
 - **Follows and nods:** who you follow, who follows you, and nods you send and receive.
 - **Member search settings:** whether you've hidden yourself from search.
 - **Notifications and preferences:** your notification choices and time zone.

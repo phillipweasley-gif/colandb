@@ -76,13 +76,31 @@ class CEC_Ical {
 		exit;
 	}
 
-	private static function build_ics( $events, $calname ) {
+	/**
+	 * An .ics calendar for these events (1.32.0, public for Community
+	 * Member Planning's private calendar feed). $tentative: event ids to mark
+	 * TENTATIVE (a member who's only "Interested"). A subscribed calendar is
+	 * asked to refresh every few hours.
+	 *
+	 * @param array  $events    CEC_Event_Helper::data() arrays.
+	 * @param string $calname   Calendar name shown in calendar apps.
+	 * @param int[]  $tentative Event ids to mark tentative.
+	 */
+	public static function calendar( $events, $calname, $tentative = array() ) {
+		return self::build_ics( $events, $calname, array_map( 'intval', (array) $tentative ), true );
+	}
+
+	private static function build_ics( $events, $calname, $tentative = array(), $subscribed = false ) {
 		$lines   = array();
 		$lines[] = 'BEGIN:VCALENDAR';
 		$lines[] = 'VERSION:2.0';
 		$lines[] = 'PRODID:-//' . self::escape( CEC_Event_Helper::site_name() ) . '//Community Events Calendar//EN';
 		$lines[] = 'CALSCALE:GREGORIAN';
 		$lines[] = 'X-WR-CALNAME:' . self::escape( $calname );
+		if ( $subscribed ) {
+			$lines[] = 'REFRESH-INTERVAL;VALUE=DURATION:PT4H';
+			$lines[] = 'X-PUBLISHED-TTL:PT4H';
+		}
 
 		foreach ( $events as $data ) {
 			if ( ! $data['start_ts'] || ! $data['start_raw'] ) {
@@ -125,7 +143,7 @@ class CEC_Ical {
 
 			if ( 'cancelled' === $data['event_status'] ) {
 				$lines[] = 'STATUS:CANCELLED';
-			} elseif ( 'postponed' === $data['event_status'] ) {
+			} elseif ( 'postponed' === $data['event_status'] || in_array( (int) $data['id'], $tentative, true ) ) {
 				$lines[] = 'STATUS:TENTATIVE';
 			} else {
 				$lines[] = 'STATUS:CONFIRMED';

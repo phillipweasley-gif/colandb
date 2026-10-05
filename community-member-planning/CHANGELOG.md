@@ -4,6 +4,32 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.18.0
+
+**Private calendar feed: your COL&B calendar in your phone's calendar app** (owner, 2026-10-05: "build the private calendar feed next"; the second calendar release, the roadmap's "private, revocable ICS"). Needs Community Events Calendar 1.32.0.
+
+- **Calendar tab → "Add to your phone's calendar".** It's off until you choose **Get my calendar link**. Then you get:
+  - **Subscribe (iPhone, Mac, Outlook):** a `webcal://` link the device's calendar opens directly;
+  - **your private link** with **Copy link**, plus how to add it in Google Calendar (Other calendars → + → From URL);
+  - **Get a new link** (the old one stops working) and **Turn off**, each with a confirmation.
+- **What's in it:** everything on your calendar, including events only you can see (it's your own feed), upcoming plus the last 30 days. Interested events are marked tentative, and times, places and cancellations come from the event. Calendar apps are asked to refresh every 4 hours.
+- **Privacy and safety:**
+  - The link is a random 40-character key; the panel says anyone with it can see those events.
+  - It works only while the account is a member. Unknown, reset or turned-off links, and non-members, get "Not found".
+  - It's sent with private, no-store, no-index headers and marked as not for page caches.
+  - Turning it on, resetting it and turning it off are audit-logged.
+  - The export says whether it's on (never the link itself), and erasing an account removes it.
+- **Copy link** uses the clipboard. Where a browser blocks that, the link is left selected and the button says "Link selected, copy it".
+- **Privacy statement:** the private calendar link is now described (`docs/privacy-statement.md`).
+- **Verification:** `calendar-e2e.sh` 56/56, with 11 new feed checks:
+  - off by default; turning it on; the Subscribe and Copy controls;
+  - headers; contents (everything on your calendar, nothing else, tentative and confirmed);
+  - a new link kills the old one; Turn off; non-members refused;
+  - audit entries; export without the link; erase.
+  - In a browser on the local test site: the panel off and on, Copy link, and the link returning the calendar file without being signed in.
+
+---
+
 ## 0.17.3
 
 **One My calendar link, in the right places** (owner, 2026-10-05: "This all seems very redundant").

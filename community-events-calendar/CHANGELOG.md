@@ -6,6 +6,18 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.32.0
+
+**Calendar files for subscribed calendars** (for Community Member Planning 0.18.0's private calendar feed).
+
+- **New public `CEC_Ical::calendar( $events, $name, $tentative_ids )`:** builds an .ics for any list of events with the same code as the site feed and single-event downloads, so times, time zones, all-day events, locations and cancelled/postponed statuses come out the same.
+  - Events listed in `$tentative_ids` are marked TENTATIVE (a member who's only "Interested").
+  - The file asks calendar apps to refresh every 4 hours (`REFRESH-INTERVAL`, `X-PUBLISHED-TTL`).
+- **Nothing changes** for the existing site feed or .ics downloads.
+- **Verification:** `calendar-e2e.sh` 56/56 (the private feed checks use it); `e2e.sh` passes.
+
+---
+
 ## 1.31.1
 
 **Signed-in quick links trimmed** (owner, 2026-10-05, screenshot of Community Events: "This all seems very redundant"). The 1.31.0 bar repeated things already on the page or in the site's account menu:
