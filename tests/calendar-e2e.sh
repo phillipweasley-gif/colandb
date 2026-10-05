@@ -135,6 +135,28 @@ OLDFRONT=$(ev "echo (int) get_option('page_on_front');"); ev "update_option('pag
 ok "Browse events goes to the calendar page, not the home page with upcoming events (0.17.1)" $([ "$(ev "echo CMP_Calendar::events_url();")" = "$(ev "echo get_permalink($CALP);")" ] && echo 1 || echo 0)
 ev "update_option('page_on_front',$OLDFRONT);" >/dev/null; $W post delete $HOME_ID $CALP --force >/dev/null 2>&1
 
+echo "== Private calendar feed (Member Planning 0.18.0, Events Calendar 1.32.0)"
+feed(){ curl -s -D $T/feed.h -o $T/feed.ics -w '%{http_code}' "$H/?cmp_cal_feed=$1"; }
+ok "off until turned on: the tab offers it, a made-up link is not found" $([ "$(has $T/m1.html 'Get my calendar link')$(feed AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA)" = 1404 ] && echo 1 || echo 0)
+r=$(post calann --data-urlencode "action=cmp_cal" --data-urlencode "_cmp_nonce=$MN" --data-urlencode "do=feed_on")
+TOK=$(ev "echo CMP_Calendar::feed_token($ANN);")
+get calann m2 "$PAGE&cmp_tab=calendar"
+ok "turned on: a 40-character private link, Subscribe (webcal) and Copy link on the tab" $(echo "$r" | grep -q 'cal_feed_on' && [ ${#TOK} = 40 ] && [ "$(has $T/m2.html "webcal://")$(has $T/m2.html "cmp_cal_feed=$TOK")$(has $T/m2.html 'Copy link')$(has $T/m2.html 'Get a new link')" = 1111 ] && echo 1 || echo 0)
+ok "the feed is a calendar file, private and never cached or indexed" $([ "$(feed $TOK)" = 200 ] && grep -qi 'content-type: text/calendar' $T/feed.h && grep -qi 'cache-control:.*no-store' $T/feed.h && grep -qi 'x-robots-tag: noindex' $T/feed.h && grep -q 'BEGIN:VCALENDAR' $T/feed.ics && grep -q 'REFRESH-INTERVAL' $T/feed.ics && echo 1 || echo 0)
+ok "it holds everything on Ann's calendar, whoever it's shown to (partners-only Rope Jam too)" $([ "$(grep -c 'SUMMARY:ZZ Rope Jam' $T/feed.ics)$(grep -c 'SUMMARY:ZZ Leather Night' $T/feed.ics)" = 11 ] && echo 1 || echo 0)
+ok "...and nothing else (Kink 101 was removed)" $(grep -q 'SUMMARY:ZZ Kink 101' $T/feed.ics && echo 0 || echo 1)
+ok "Interested is marked tentative, Going confirmed" $(php -r '$t=file_get_contents($argv[1]); preg_match_all("~BEGIN:VEVENT.*?END:VEVENT~s",$t,$m); $ok=0; foreach($m[0] as $e){ if(false!==strpos($e,"ZZ Tiny Workshop")&&false!==strpos($e,"STATUS:TENTATIVE")) $ok++; if(false!==strpos($e,"ZZ Rope Jam")&&false!==strpos($e,"STATUS:CONFIRMED")) $ok++; } echo 2===$ok?1:0;' $T/feed.ics)
+post calann --data-urlencode "action=cmp_cal" --data-urlencode "_cmp_nonce=$MN" --data-urlencode "do=feed_new" >/dev/null
+TOK2=$(ev "echo CMP_Calendar::feed_token($ANN);")
+ok "Get a new link: the old one stops working, the new one works" $([ "$TOK2" != "$TOK" ] && [ "$(feed $TOK)$(feed $TOK2)" = 404200 ] && echo 1 || echo 0)
+ev "update_user_meta($DEE,'cmp_cal_feed_token','DEEdeeDEEdeeDEEdeeDEEdeeDEEdeeDEEdee1234');" >/dev/null
+ok "an account that isn't a member gets nothing" $([ "$(feed DEEdeeDEEdeeDEEdeeDEEdeeDEEdeeDEEdee1234)" = 404 ] && echo 1 || echo 0)
+ok "export says whether the link is on (never the link itself)" $(ev "\$j=wp_json_encode(CMP_Account::export('calann@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'Private calendar link')&&false===strpos(\$j,'$TOK2')?1:0;")
+post calann --data-urlencode "action=cmp_cal" --data-urlencode "_cmp_nonce=$MN" --data-urlencode "do=feed_off" >/dev/null
+ok "Turn off: the link is gone" $([ "$(feed $TOK2)" = 404 ] && [ -z "$(ev "echo CMP_Calendar::feed_token($ANN);")" ] && echo 1 || echo 0)
+ok "turning it on, off and resetting is audit-logged" $([ "$(q "SELECT COUNT(*) FROM $(ev 'echo CMP_Install::table("audit_log");') WHERE object_id=$ANN AND action LIKE 'calendar_feed_%'")" = 3 ] && echo 1 || echo 0)
+post calann --data-urlencode "action=cmp_cal" --data-urlencode "_cmp_nonce=$MN" --data-urlencode "do=feed_on" >/dev/null
+
 echo "== Signed-in quick link (Events Calendar 1.31.1, Member Planning 0.17.3)"
 LP=$($W post create --post_type=page --post_status=publish --post_title="ZZ Log In" --post_content='[cec_login note="Log in or register to keep track of your events and RSVPs."]' --porcelain 2>/dev/null)
 RP=$($W post create --post_type=page --post_status=publish --post_title="ZZ Register" --post_content='[cec_register]' --porcelain 2>/dev/null)
@@ -159,7 +181,7 @@ OLD=$(event "ZZ Long Ago" -400)
 ev "global \$wpdb; \$wpdb->insert('$CAL',array('user_id'=>$ANN,'event_id'=>$OLD,'response'=>'going','audience'=>'members','created_at'=>gmdate('Y-m-d H:i:s'),'updated_at'=>gmdate('Y-m-d H:i:s'))); CMP_Retention::run();" >/dev/null
 ok "retention: entries for events over 12 months ago removed, upcoming kept" $([ "$(q "SELECT COUNT(*) FROM $CAL WHERE event_id=$OLD")" = 0 ] && [ "$(q "SELECT COUNT(*) FROM $CAL WHERE user_id=$ANN AND event_id=$E3")" = 1 ] && echo 1 || echo 0)
 ok "export lists calendar entries and the default" $(ev "\$j=wp_json_encode(CMP_Account::export('calann@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'ZZ Rope Jam')&&false!==strpos(\$j,'Who sees new calendar events by default')?1:0;")
-ok "erase removes them" $(ev "CMP_Account::erase('calann@example.com'); global \$wpdb; echo 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $CAL WHERE user_id=$ANN\")?1:0;")
+ok "erase removes them and the private link" $(ev "CMP_Account::erase('calann@example.com'); global \$wpdb; echo 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $CAL WHERE user_id=$ANN\") && ''===CMP_Calendar::feed_token($ANN)?1:0;")
 
 pkill -f "php -S 127.0.0.1:8899" 2>/dev/null
 ev "global \$wpdb; \$wpdb->query(\"DELETE FROM $CAL\"); \$wpdb->query(\"DELETE FROM $RSVP WHERE event_id IN ($E1,$E2,$E3,$E4)\"); \$wpdb->query(\"DELETE FROM \".CMP_Install::table('dynamics').\" WHERE proposer_id=$ANN\"); \$wpdb->query(\"DELETE FROM \".CMP_Install::table('follows').\" WHERE followed_id=$ANN\");" >/dev/null

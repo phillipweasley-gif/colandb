@@ -754,3 +754,9 @@
 .cmp-member-area select.cmp-cal-aud.is-partners { border-color: var(--cmp-secondary) !important; }
 .cmp-member-area .cmp-cal-default .cmp-muted { margin: 8px 0 0; }
 .cmp-member-area [data-cmp-autosave-btn][hidden] { display: none !important; }
+
+/* Private calendar feed 0.18.0 */
+.cmp-member-area .cmp-cal-feed-acts { margin: 12px 0; }
+.cmp-member-area .cmp-cal-feed-copy { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cmp-member-area .cmp-cal-feed-copy input[type="text"] { flex: 1 1 260px; min-width: 0; width: auto !important; min-height: 44px; padding: 10px 14px !important; background: #0f0d16 !important; color: var(--cmp-text) !important; border: 1px solid rgba(255, 255, 255, 0.35) !important; border-radius: 8px !important; font-family: var(--cmp-mono, ui-monospace, monospace) !important; font-size: 13px !important; }
+.cmp-member-area .cmp-cal-feed-copy .cmp-btn { min-height: 44px; }

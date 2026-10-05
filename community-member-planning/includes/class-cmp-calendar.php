@@ -30,6 +30,7 @@ class CMP_Calendar {
 	const MIGRATED     = 'cmp_calendar_migrated';
 	const AUDIENCES    = array( 'members', 'partners', 'private' );
 	const RESPONSES    = array( 'going', 'interested' );
+	const META_FEED    = 'cmp_cal_feed_token';
 
 	/** Per-request cache for the calendar marker: viewer => followed ids. */
 	private static $followed = array();
@@ -42,6 +43,7 @@ class CMP_Calendar {
 		add_filter( 'cec_event_social_label', array( __CLASS__, 'calendar_label' ), 10, 2 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_filter( 'cec_account_links', array( __CLASS__, 'account_links' ), 10, 2 );
+		add_action( 'template_redirect', array( __CLASS__, 'maybe_feed' ), 1 );
 	}
 
 	/**
@@ -75,6 +77,9 @@ class CMP_Calendar {
 			'cal_default' => array( 'success', __( 'Saved. New events start with this choice.', 'cmp' ) ),
 			'cal_full'    => array( 'error', __( 'This event is full, so you can\'t RSVP as Going. You can add it as Interested.', 'cmp' ) ),
 			'cal_gone'    => array( 'error', __( 'That event isn\'t available.', 'cmp' ) ),
+			'cal_feed_on' => array( 'success', __( 'Your private calendar link is ready. Add it to your phone\'s calendar below.', 'cmp' ) ),
+			'cal_feed_new' => array( 'success', __( 'New link made. The old one has stopped working, so add the new one to your calendar app.', 'cmp' ) ),
+			'cal_feed_off' => array( 'success', __( 'Your calendar link is turned off. Calendar apps using it will stop updating.', 'cmp' ) ),
 		);
 	}
 
@@ -265,6 +270,16 @@ class CMP_Calendar {
 			}
 			$go( 'cal_default' );
 		}
+		if ( in_array( $do, array( 'feed_on', 'feed_new', 'feed_off' ), true ) ) {
+			$had = (bool) self::feed_token( $user_id );
+			if ( 'feed_off' === $do ) {
+				delete_user_meta( $user_id, self::META_FEED );
+			} elseif ( 'feed_new' === $do || ! $had ) {
+				update_user_meta( $user_id, self::META_FEED, wp_generate_password( 40, false, false ) );
+			}
+			CMP_Audit::log( 'calendar_feed_' . ( 'feed_off' === $do ? 'off' : ( $had ? 'reset' : 'on' ) ), 'user', $user_id );
+			$go( 'feed_off' === $do ? 'cal_feed_off' : ( $had ? 'cal_feed_new' : 'cal_feed_on' ) );
+		}
 		if ( 'remove' === $do ) {
 			self::remove( $user_id, $event_id );
 			$go( 'cal_removed' );
@@ -381,6 +396,91 @@ class CMP_Calendar {
 		return $html . ( $month ? '</ul>' : '' );
 	}
 
+	/* ------------------------------------------------------------------
+	 * Private calendar feed (0.18.0)
+	 * ---------------------------------------------------------------- */
+
+	public static function feed_token( $user_id ) {
+		$t = (string) get_user_meta( $user_id, self::META_FEED, true );
+		return preg_match( '/^[A-Za-z0-9]{40}$/', $t ) ? $t : '';
+	}
+
+	public static function feed_url( $user_id ) {
+		$t = self::feed_token( $user_id );
+		return $t ? add_query_arg( 'cmp_cal_feed', $t, home_url( '/' ) ) : '';
+	}
+
+	/**
+	 * ?cmp_cal_feed=<token>: the member's own calendar as .ics, for calendar
+	 * apps to subscribe to (they can't sign in, so the secret link is the
+	 * key). Everything on their calendar, whoever it's shown to: upcoming
+	 * and the last 30 days; Interested marked tentative. Unknown, reset or
+	 * turned-off links, and accounts that are no longer members, get 404.
+	 */
+	public static function maybe_feed() {
+		if ( ! isset( $_GET['cmp_cal_feed'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return;
+		}
+		$token = sanitize_text_field( wp_unslash( $_GET['cmp_cal_feed'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$user  = 0;
+		if ( preg_match( '/^[A-Za-z0-9]{40}$/', $token ) ) {
+			$found = get_users( array( 'meta_key' => self::META_FEED, 'meta_value' => $token, 'number' => 2, 'fields' => 'ID' ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
+			$user  = 1 === count( $found ) && hash_equals( self::feed_token( (int) $found[0] ), $token ) ? (int) $found[0] : 0;
+		}
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true ); // Page caches must not keep a copy of a private feed.
+		}
+		nocache_headers();
+		header( 'Cache-Control: private, no-store, max-age=0' );
+		header( 'X-Robots-Tag: noindex, nofollow' );
+		if ( ! $user || ! CMP_Access::is_member( $user ) || ! self::events_ready() || ! class_exists( 'CEC_Ical' ) || ! method_exists( 'CEC_Ical', 'calendar' ) ) {
+			status_header( 404 );
+			header( 'Content-Type: text/plain; charset=utf-8' );
+			echo 'Not found';
+			exit;
+		}
+		$since   = wp_date( 'Y-m-d', time() - 30 * DAY_IN_SECONDS );
+		$recent  = array_filter(
+			self::entries( $user, $user, false, 50 ),
+			function ( $e ) use ( $since ) {
+				return substr( $e->start, 0, 10 ) >= $since;
+			}
+		);
+		$events  = array();
+		$tent    = array();
+		foreach ( array_merge( self::entries( $user, $user, true, 300 ), $recent ) as $e ) {
+			$events[] = CEC_Event_Helper::data( (int) $e->event_id );
+			if ( 'interested' === $e->response ) {
+				$tent[] = (int) $e->event_id;
+			}
+		}
+		/* translators: %s: site name */
+		$name = sprintf( __( 'My %s calendar', 'cmp' ), CEC_Event_Helper::site_name() );
+		header( 'Content-Type: text/calendar; charset=utf-8' );
+		header( 'Content-Disposition: inline; filename="my-calendar.ics"' );
+		echo CEC_Ical::calendar( $events, $name, $tent ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- .ics text, escaped by CEC_Ical.
+		exit;
+	}
+
+	/** "Add to your phone's calendar" on the Calendar tab. */
+	private static function feed_html( $user_id ) {
+		$url  = self::feed_url( $user_id );
+		$html = '<section class="cmp-panel cmp-cal-feed" id="cmp-cal-feed"><h3 class="cmp-panel-title">' . esc_html__( 'Add to your phone\'s calendar', 'cmp' ) . '</h3>';
+		if ( ! $url ) {
+			return $html . '<p>' . esc_html__( 'Get a private link your calendar app can subscribe to (iPhone, Google Calendar, Outlook…). The events on your calendar here then appear there and stay up to date. It\'s off until you turn it on.', 'cmp' ) . '</p>'
+				. self::form_open( 'feed_on', 0, 'tab', 'cmp-form' ) . '<button type="submit" class="cmp-btn">' . esc_html__( 'Get my calendar link', 'cmp' ) . '</button></form></section>';
+		}
+		$webcal = preg_replace( '#^https?://#', 'webcal://', $url );
+		$html  .= '<p>' . esc_html__( 'Your calendar app checks this link every few hours. It includes every event on your calendar, including ones only you can see, so keep it to yourself: anyone with the link can see those events.', 'cmp' ) . '</p>'
+			. '<p class="cmp-cal-feed-acts"><a class="cmp-btn" href="' . esc_url( $webcal, array( 'webcal', 'https', 'http' ) ) . '">' . esc_html__( 'Subscribe (iPhone, Mac, Outlook)', 'cmp' ) . '</a></p>'
+			. '<p class="cmp-field"><label for="cmp_cal_feed_url">' . esc_html__( 'Your private link (for Google Calendar: Other calendars → + → From URL)', 'cmp' ) . '</label>'
+			. '<span class="cmp-cal-feed-copy"><input type="text" id="cmp_cal_feed_url" value="' . esc_attr( $url ) . '" readonly data-cmp-copy-src /><button type="button" class="cmp-btn cmp-btn-small cmp-btn-outline" data-cmp-copy="#cmp_cal_feed_url" data-cmp-copied="' . esc_attr__( 'Copied', 'cmp' ) . '" data-cmp-select="' . esc_attr__( 'Link selected, copy it', 'cmp' ) . '">' . esc_html__( 'Copy link', 'cmp' ) . '</button></span></p>'
+			. '<p class="cmp-muted">' . esc_html__( 'Shared it by mistake, or lost a phone? Get a new link: the old one stops working (allow a few minutes for any cached copy to expire).', 'cmp' ) . '</p>'
+			. '<div class="cmp-actions">' . self::form_open( 'feed_new', 0, 'tab', 'cmp-form cmp-inline-form' ) . '<button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline" data-cmp-confirm="' . esc_attr__( 'Make a new link? Calendar apps using the old one will stop updating until you add the new one.', 'cmp' ) . '">' . esc_html__( 'Get a new link', 'cmp' ) . '</button></form>'
+			. self::form_open( 'feed_off', 0, 'tab', 'cmp-form cmp-inline-form' ) . '<button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline cmp-btn-danger" data-cmp-confirm="' . esc_attr__( 'Turn off your calendar link? Calendar apps using it will stop updating.', 'cmp' ) . '">' . esc_html__( 'Turn off', 'cmp' ) . '</button></form></div>';
+		return $html . '</section>';
+	}
+
 	/**
 	 * The community calendar page for "Browse events" (0.17.1): a page with
 	 * the full calendar first, then the event list, then an upcoming list;
@@ -416,6 +516,7 @@ class CMP_Calendar {
 		}
 		$html .= '</select><button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Save', 'cmp' ) . '</button></form><p class="cmp-muted">' . esc_html__( 'You can still choose for each event when you add it. Dynamic partners are members you\'re in an active dynamic with.', 'cmp' ) . '</p></section>';
 		$html .= '<section class="cmp-panel"><h3 class="cmp-panel-title">' . esc_html__( 'Coming up', 'cmp' ) . '</h3>' . ( $upcoming ? self::list_html( $upcoming, true ) : '<p class="cmp-empty">' . esc_html__( 'Nothing yet. Open an event and choose "Add to my calendar".', 'cmp' ) . '</p>' ) . '</section>';
+		$html .= self::feed_html( $user_id );
 		if ( $past ) {
 			$html .= '<section class="cmp-panel"><h3 class="cmp-panel-title">' . esc_html__( 'Recent', 'cmp' ) . '</h3>' . self::list_html( $past, false ) . '</section>';
 		}
@@ -527,12 +628,14 @@ class CMP_Calendar {
 			);
 		}
 		$rows[] = array( 'name' => __( 'Who sees new calendar events by default', 'cmp' ), 'value' => $labels[ self::default_audience( $user_id ) ] );
+		$rows[] = array( 'name' => __( 'Private calendar link', 'cmp' ), 'value' => self::feed_token( $user_id ) ? __( 'On', 'cmp' ) : __( 'Off', 'cmp' ) );
 		return $rows;
 	}
 
 	public static function erase( $user_id ) {
 		global $wpdb;
 		delete_user_meta( $user_id, self::META_DEFAULT );
+		delete_user_meta( $user_id, self::META_FEED );
 		return (int) $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . self::t() . ' WHERE user_id = %d', $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 }

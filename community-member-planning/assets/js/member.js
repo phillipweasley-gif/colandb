@@ -621,6 +621,46 @@
 	} );
 }() );
 
+/* Copy buttons (0.18.0): copy a read-only field's text; without the
+   Clipboard API, select it so the member can copy it themselves. */
+( function () {
+	'use strict';
+	Array.prototype.forEach.call( document.querySelectorAll( '[data-cmp-copy]' ), function ( btn ) {
+		btn.addEventListener( 'click', function () {
+			var field = document.querySelector( btn.getAttribute( 'data-cmp-copy' ) );
+			if ( ! field ) {
+				return;
+			}
+			var label = btn.getAttribute( 'data-cmp-label' ) || btn.textContent;
+			btn.setAttribute( 'data-cmp-label', label );
+			var say = function ( text ) {
+				btn.textContent = text || label;
+				window.setTimeout( function () {
+					btn.textContent = label;
+				}, 2500 );
+			};
+			var done = function () {
+				say( btn.getAttribute( 'data-cmp-copied' ) );
+			};
+			// Copying blocked: leave the link selected and say so.
+			var fallback = function () {
+				field.focus();
+				field.select();
+				var ok = false;
+				try {
+					ok = document.execCommand( 'copy' );
+				} catch ( e ) {}
+				say( ok ? btn.getAttribute( 'data-cmp-copied' ) : btn.getAttribute( 'data-cmp-select' ) );
+			};
+			if ( navigator.clipboard && navigator.clipboard.writeText ) {
+				navigator.clipboard.writeText( field.value ).then( done, fallback );
+			} else {
+				fallback();
+			}
+		} );
+	} );
+}() );
+
 /* Profile tab (0.4.0): a field's "Show to members" switch only appears once
    the field has something in it, already switched on. Without JavaScript the
    hidden switch still posts "on", so the server reaches the same result. */
