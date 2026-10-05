@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chastity Tracking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root { --primary: #e1f577; --secondary: #ff50d7; --text: #f5f4f7; --muted: #a9a6bb; --card: #1b1826; --field: #110f18; --border: rgba(255,255,255,.10); --line: rgba(255,255,255,.08); --page: #0b0a10; --ok: #7be495; --bad: #ff6b6b; --warn: #ffc857; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font-family: Inter, system-ui, sans-serif; }
+.intro { max-width: 1150px; margin: 0 auto; padding: 28px 16px 6px; }
+.intro h1 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 22px; margin: 0 0 8px; }
+.intro p { color: var(--muted); max-width: 900px; line-height: 1.55; margin: 0 0 6px; }
+.intro strong { color: var(--text); }
+.row { display: flex; flex-wrap: wrap; gap: 26px; justify-content: center; padding: 18px 16px; align-items: flex-start; }
+.phone { width: 380px; max-width: calc(100vw - 32px); height: 800px; border: 10px solid #26232f; border-radius: 44px; background: #000; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.screen { height: 100%; overflow-y: auto; padding: 18px 14px 30px; }
+.cap { font-size: 12.5px; color: var(--muted); text-align: center; max-width: 380px; margin: 8px auto 0; }
+h2 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 19px; margin: 0 0 4px; }
+.sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+.timer { text-align: center; padding: 18px 10px; }
+.timer .lock { font-size: 34px; }
+.timer b { display: block; font-family: 'Archivo Black', sans-serif; font-size: 28px; color: var(--primary); letter-spacing: .02em; }
+.timer small { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.timer .left { margin-top: 10px; font-size: 13.5px; }
+.timer .hidden { color: var(--secondary); font-weight: 700; }
+.rule { font-size: 13px; line-height: 1.45; }
+.rule b { color: var(--secondary); text-transform: uppercase; font-size: 11px; letter-spacing: .05em; display: block; }
+.acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.btn { border: none; border-radius: 100px; min-height: 44px; padding: 0 14px; font-weight: 800; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
+.btn.y { background: var(--primary); color: #0b0a12; }
+.btn.o { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
+.btn.r { background: transparent; color: var(--bad); border: 1.5px solid rgba(255,107,107,.5); }
+.code { display: inline-block; font-family: ui-monospace, monospace; font-size: 20px; font-weight: 800; letter-spacing: .2em; background: var(--field); border: 1.5px dashed var(--primary); border-radius: 8px; padding: 6px 12px; color: var(--primary); }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 8px; }
+.cal span { height: 30px; border-radius: 6px; background: #2a2636; font-size: 11px; display: grid; place-items: center; color: var(--muted); }
+.cal .l { background: rgba(255,80,215,.28); color: #ffd0f4; }
+.cal .v { box-shadow: inset 0 -3px 0 var(--ok); }
+.cal .b { background: transparent; }
+.cal .t { outline: 2px solid var(--primary); }
+.log { font-size: 12.5px; }
+.log div { padding: 7px 0; border-top: 1px solid var(--line); display: flex; gap: 8px; }
+.log time { color: var(--muted); min-width: 64px; }
+.desk { width: 1080px; max-width: calc(100vw - 32px); border: 1px solid var(--border); border-radius: 14px; background: #0e0c14; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.cols { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 14px; margin-top: 14px; }
+.box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 13px; }
+.box h4 { margin: 0 0 8px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.ph { height: 120px; border-radius: 8px; background: linear-gradient(135deg,#2c2238,#14101c); display: grid; place-items: center; color: rgba(255,255,255,.35); font-size: 12px; margin: 6px 0; }
+select, input { background: var(--field); border: 1.5px solid var(--border); color: var(--text); border-radius: 8px; min-height: 40px; padding: 0 10px; font: inherit; font-size: 13px; }
+.badge { display: inline-flex; gap: 6px; align-items: center; background: rgba(255,80,215,.15); color: #ffd0f4; border: 1px solid rgba(255,80,215,.4); border-radius: 100px; padding: 4px 10px; font-size: 12px; font-weight: 700; }
+.decisions { max-width: 1000px; margin: 10px auto 60px; padding: 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.decisions b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="intro">
+	<h1>Chastity tracking</h1>
+	<p>Mockup for <strong>Community Member Planning 0.8.0</strong>, modelled on Chaster (lock timer, keyholder controls, verification pictures, hygiene openings, locked-days calendar) and on the chastity options in the owner's homework tracker (Option A full lockdown, B one release a week with permission, C current routine with no release). It builds on dynamics (0.6.0): the keyholder is the leading side of an active dynamic. This tracks a lock; it doesn't control a device. Sample data.</p>
+</div>
+<div class="row">
+	<div>
+		<div class="phone"><div class="screen">
+			<h2>My lock</h2>
+			<p class="sub">Keyholder: <b style="color:var(--text)">SampleSir</b> · started Sep 28</p>
+			<div class="card timer">
+				<div class="lock">🔒</div>
+				<b>7d 14h 22m</b>
+				<small>Locked for</small>
+				<div class="left"><span class="hidden">Time left is hidden by your keyholder</span></div>
+			</div>
+			<div class="card rule"><b>Option A · Full lockdown</b>Wear chastity 24/7 until leaving for friends. Release: none.</div>
+			<div class="card">
+				<div class="rule"><b>Today's verification</b>Take a photo of the device with today's code written on paper.</div>
+				<p style="text-align:center;margin:10px 0"><span class="code">K7M2QX</span></p>
+				<div class="acts"><button class="btn y">Add photo</button></div>
+			</div>
+			<div class="card">
+				<div class="rule"><b>Hygiene opening</b>Up to 15 minutes. Your keyholder is told when you open and when you relock.</div>
+				<div class="acts"><button class="btn o">Open for hygiene</button><button class="btn o">Ask to unlock</button></div>
+			</div>
+			<div class="card">
+				<div class="rule"><b>October</b></div>
+				<div class="cal">
+					<span class="b"></span><span class="b"></span><span class="l v">1</span><span class="l v">2</span><span class="l">3</span><span class="l v">4</span><span class="l v t">5</span>
+					<span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span>
+				</div>
+			</div>
+			<div class="card"><button class="btn r" style="width:100%">Emergency unlock</button><p class="sub" style="margin:8px 0 0">Always available. Ends the lock now and tells your keyholder.</p></div>
+		</div></div>
+		<div class="cap">Wearer's phone: timer, today's verification code, hygiene opening, calendar, and an emergency unlock that is always there.</div>
+	</div>
+	<div class="desk">
+		<h2>boyJay's lock</h2>
+		<p class="sub">You're the keyholder · Keyholder / chastity wearer dynamic</p>
+		<div class="cols">
+			<div class="box">
+				<h4>Timer</h4>
+				<p style="margin:0 0 4px;font-size:22px;font-weight:800">7d 14h 22m locked</p>
+				<p style="margin:0 0 8px;color:var(--muted)">Planned end Oct 12, 8:00 PM · 6d 23h left · hidden from boyJay</p>
+				<div class="acts"><select><option>1 hour</option><option>12 hours</option><option>1 day</option><option>3 days</option><option>1 week</option></select><button class="btn y">Add time</button><button class="btn o">Remove time</button></div>
+				<div class="acts"><button class="btn o">Show time left</button><button class="btn o">Unlock now</button></div>
+			</div>
+			<div class="box">
+				<h4>Today's verification · code K7M2QX</h4>
+				<div class="ph">verification photo</div>
+				<div class="acts"><button class="btn y">Accept</button><button class="btn o">Ask for another</button></div>
+			</div>
+			<div class="box">
+				<h4>Rules</h4>
+				<p style="margin:0 0 6px"><b>Option A · Full lockdown</b><br>Wear 24/7 until leaving for friends.</p>
+				<p style="margin:0 0 6px;color:var(--muted)">Release: none · Daily verification: on · Hygiene: up to 15 min</p>
+				<div class="acts"><button class="btn o">Change rules</button><button class="btn o">Allow one release</button></div>
+			</div>
+		</div>
+		<div class="box log" style="margin-top:14px">
+			<h4>History</h4>
+			<div><time>Today 8:02</time>Verification photo added</div>
+			<div><time>Oct 4 21:15</time>Hygiene opening, 11 min, relocked</div>
+			<div><time>Oct 3 9:00</time>You added 1 day</div>
+			<div><time>Sep 28 20:00</time>Locked: Option A, planned 14 days</div>
+		</div>
+		<p style="margin:14px 0 0;font-size:13px;color:var(--muted)">On the wearer's profile, only if they turn it on: <span class="badge">🔒 Locked · 7 days</span></p>
+	</div>
+</div>
+<div class="decisions">
+	<h2 style="font-family:'Archivo Black',sans-serif;color:var(--primary);text-transform:uppercase;font-size:16px">Decisions made overnight, for the owner to confirm</h2>
+	<ol>
+		<li><b>The wearer starts a lock</b> (they're the one putting the device on): on their own (self-lock) or with a keyholder they're in an active directed dynamic with. One lock at a time.</li>
+		<li><b>Options from the tracker</b> as presets (A full lockdown, B one release a week with permission, C routine without release) plus "Custom". Each has a rule and a release policy: none / keyholder decides / routine.</li>
+		<li><b>The keyholder</b> can add or remove time, hide or show the time left, change the rules, turn daily verification on or off, set how long a hygiene opening may last, allow a release, and unlock.</li>
+		<li><b>Safety:</b> the wearer can <b>always</b> end the lock with "Emergency unlock"; it's recorded and the keyholder is told. Nothing here can stop someone taking a device off.</li>
+		<li><b>Verification:</b> a code for the day (different every day, per lock) to write on paper in the photo, like Chaster. Photos are re-encoded (no location data) and seen only by the wearer and their keyholder.</li>
+		<li><b>When the dynamic ends</b> the keyholder loses access at once; the lock carries on as a self-lock the wearer controls.</li>
+		<li><b>Profile:</b> a "Locked · N days" badge only if the wearer turns it on (off by default).</li>
+		<li><b>Not yet:</b> Chaster's games (wheel of fortune, dice, card games), public "pillory" voting, reward store, and links into homework tasks.</li>
+	</ol>
+</div>
+</body>
+</html>

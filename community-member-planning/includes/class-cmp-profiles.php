@@ -754,6 +754,7 @@ class CMP_Profiles {
 		if ( $stat ) {
 			$html .= '<p class="cmp-prof-stat">' . esc_html( implode( ' · ', $stat ) ) . '</p>';
 		}
+		$html .= CMP_Chastity::profile_badge_html( $owner_id );
 		if ( $details ) {
 			$html .= '<dl class="cmp-prof-table">';
 			foreach ( $details as $label => $text ) {

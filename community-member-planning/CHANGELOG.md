@@ -4,6 +4,27 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.8.0
+
+**Chastity tracking** (owner, 2026-10-04: "For tracking chastity we can use Chaster as an example"; the tracker's chastity options). Built overnight from `docs/mockups/chastity.html`; **not yet approved by the owner.**
+
+- **`CMP_Chastity`**, two new tables `cmp_locks`, `cmp_lock_events` (`CMP_DB_VERSION` 6), a **Chastity** tab, and a `lock` notification category ("Chastity lock updates", members can turn it off).
+- **Starting a lock (the wearer):** self-lock, or with a keyholder who leads them in an active directed dynamic (`CMP_Dynamics`). One active lock at a time. Options from the tracker: Full lockdown · One release a week (with permission) · Daily routine, no release · Custom (name, rule, release policy: none / with permission / allowed). Planned length 1 hour – 30 days or open-ended; optional photo.
+- **Keyholder:** add or remove time (never below now), hide the time left, change the rules, daily verification on/off, hygiene allowance (none / 10 / 15 / 30 / 60 minutes), allow one release, review verification photos (accept / ask for another), unlock.
+- **Wearer:** live "Locked for" timer; time left unless hidden (then neither the end date, time changes, nor the planned length are shown to them); verification photo with **today's code** (6 characters, different per lock and per day, keyed with the site salt), to write on paper in the photo, like Chaster; hygiene opening and relock (flagged when longer than allowed); log a release (recorded either way, flagged when the rule didn't allow it); ask to be unlocked; self-locks unlock once their time is up.
+- **Safety:** "Emergency unlock" is always available to the wearer, ends the lock at once, is recorded, and tells the keyholder. The page says plainly that this tracks a lock and doesn't control a device.
+- **Dynamic ends:** the keyholder loses access at once (controls and photos); the lock carries on as a self-lock, timer shown again, wearer told.
+- **Photos:** re-encoded and resized like homework proof (no location data), stored privately, served only to the wearer and their current keyholder (`?cmp_lockpic=<id>`, 404 for anyone else).
+- **Calendar:** this month's locked days and verified days (Chaster's activity calendar). Past locks listed with length and how they ended.
+- **Profile:** a "🔒 Locked · N days" badge, only if the wearer turns it on (off by default).
+- **Privacy:** export lists locks (as wearer or keyholder) and the wearer's full history; erase deletes the wearer's locks and history, and turns locks they held as keyholder into self-locks.
+- **Verification** (local WordPress 7.1.2):
+  - new `tests/chastity-e2e.sh` 55/55;
+  - `homework-e2e.sh` 44/44, `dynamics-e2e.sh` 34/34, `setup-e2e.sh` 32/32, `dob-e2e.sh` 34/34, `e2e.sh` 60/60, `account-e2e.sh` 64/64, `profile-e2e.sh` 68 (+12 photo checks needing ImageMagick); no plugin PHP warnings;
+  - rendered at 375 px under Hello Elementor (wearer and keyholder views).
+
+---
+
 ## 0.7.0
 
 **Homework programs** (owner, 2026-10-04: the Weekly Homework Tracker spreadsheet is "a great example of how a Dom might manage their submissive"; the core features should "enhance the tasks and calendar" and let members "manage their dynamics"). Built overnight from `docs/mockups/homework.html`; **not yet approved by the owner.**

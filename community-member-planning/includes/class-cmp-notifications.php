@@ -20,6 +20,7 @@ class CMP_Notifications {
 		'due_reminder',
 		'submission',
 		'review_decision',
+		'lock',
 	);
 
 	const QUIET_START = 22;
