@@ -91,6 +91,13 @@ class CEC_Auth {
 			'password_mismatch' => __( 'Passwords do not match.', 'cec' ),
 			'failed'            => __( 'Something went wrong creating your account. Please try again.', 'cec' ),
 		);
+		/**
+		 * Messages for error codes added by cec_register_validate (e.g. the
+		 * member plugin's date-of-birth check).
+		 *
+		 * @param array $errors code => message
+		 */
+		$errors = (array) apply_filters( 'cec_register_error_messages', $errors );
 		$error_key = isset( $_GET['cec_register_error'] ) ? sanitize_key( wp_unslash( $_GET['cec_register_error'] ) ) : '';
 
 		ob_start();
@@ -109,6 +116,13 @@ class CEC_Auth {
 				<div class="cec-field"><label><?php esc_html_e( 'Email', 'cec' ); ?></label><input type="email" name="cec_email" required autocomplete="email"></div>
 				<div class="cec-field"><label><?php esc_html_e( 'Password', 'cec' ); ?></label><input type="password" name="cec_password" required minlength="8" autocomplete="new-password"></div>
 				<div class="cec-field"><label><?php esc_html_e( 'Confirm Password', 'cec' ); ?></label><input type="password" name="cec_password_confirm" required minlength="8" autocomplete="new-password"></div>
+				<?php
+				/**
+				 * Extra sign-up fields from other plugins (the member plugin's
+				 * date of birth). This plugin stores nothing they collect.
+				 */
+				do_action( 'cec_register_form_fields' );
+				?>
 				<p class="cec-hp-field" aria-hidden="true"><label>Leave this field empty</label><input type="text" name="cec_website" tabindex="-1" autocomplete="off"></p>
 				<button type="submit" class="cec-btn"><?php esc_html_e( 'Create Account', 'cec' ); ?></button>
 				<p class="description"><?php esc_html_e( 'Already have an account?', 'cec' ); ?> <a href="<?php echo esc_url( CEC_Admin_Settings::login_url( $redirect ) ); ?>"><?php esc_html_e( 'Log in', 'cec' ); ?></a></p>
@@ -166,6 +180,18 @@ class CEC_Auth {
 			wp_safe_redirect( add_query_arg( 'cec_register_error', 'password_mismatch', $back ) );
 			exit;
 		}
+		/**
+		 * Lets another plugin refuse the sign-up before the account exists.
+		 * Return a WP_Error whose code has a message registered through
+		 * cec_register_error_messages; anything else lets it continue.
+		 *
+		 * @param true|WP_Error $result
+		 */
+		$extra = apply_filters( 'cec_register_validate', true );
+		if ( is_wp_error( $extra ) ) {
+			wp_safe_redirect( add_query_arg( 'cec_register_error', sanitize_key( $extra->get_error_code() ), $back ) );
+			exit;
+		}
 
 		$user_id = wp_insert_user(
 			array(
@@ -186,6 +212,14 @@ class CEC_Auth {
 			wp_safe_redirect( add_query_arg( 'cec_register_error', 'failed', $back ) );
 			exit;
 		}
+
+		/**
+		 * The account now exists; another plugin can store what its
+		 * cec_register_form_fields collected (read from $_POST).
+		 *
+		 * @param int $user_id
+		 */
+		do_action( 'cec_user_registered', $user_id );
 
 		wp_new_user_notification( $user_id, null, 'admin' );
 

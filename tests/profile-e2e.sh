@@ -34,7 +34,8 @@ for u in pat quinn rex; do $W user delete $u --yes >/dev/null 2>&1; done
 $W user create pat pat@example.com --role=subscriber --user_pass=patpass1234 --display_name="Pat Smith" >/dev/null
 $W user create quinn quinn@example.com --role=subscriber --user_pass=quinnpass12 >/dev/null
 $W user create rex rex@example.com --role=subscriber --user_pass=rexpass1234 >/dev/null
-for u in pat quinn; do ev "\$i=get_user_by('login','$u')->ID; update_user_meta(\$i,'cmp_verified_email','$u@example.com'); CMP_Access::record_attestation(\$i);" >/dev/null; done
+for u in pat quinn; do ev "\$i=get_user_by('login','$u')->ID; update_user_meta(\$i,'cmp_verified_email','$u@example.com'); update_user_meta(\$i,'cmp_birth_date','1983-02-14'); CMP_Access::record_attestation(\$i);" >/dev/null; done
+AGE=$(ev 'echo CMP_Birth_Date::age_from("1983-02-14");')
 ev 'global $wpdb; $wpdb->query("DELETE FROM ".CMP_Install::table("profile_values")); $wpdb->query("DELETE FROM ".CMP_Install::table("profile_images")); delete_option("cmp_profile_options");' >/dev/null
 ev 'foreach(array("interests"=>array("Leatherwork","Hiking","Board games"),"roles"=>array("Volunteer","Organizer"),"identity"=>array("Gay","Bi"),"availability"=>array("Weekends","Evenings"),"looking_for"=>array("Friends","Event buddies")) as $l=>$labels){ $rows=array(); foreach($labels as $i=>$x){ $rows[]=array("label"=>$x,"active"=>true,"order"=>$i); } CMP_Profile_Fields::save_list($l,$rows); }' >/dev/null
 # Test photos: a large JPEG carrying a comment and an Exif block with a marker that must not survive, a small one, a PNG, a non-image, an over-size file.
@@ -64,7 +65,10 @@ ok "member cannot change options" $([ "$code" = 403 ] && [ "$(ev 'echo in_array(
 echo "== Profile tab"
 get pat p1 "$PROF"
 ok "member sees Home | Profile | Account" $([ "$(has $T/p1.html '>Home<')$(has $T/p1.html '>Profile<')$(has $T/p1.html '>Account<')" = 111 ] && echo 1 || echo 0)
-ok "every field rendered, default Only me" $([ "$(has $T/p1.html 'id="cmp-row-bio"')$(has $T/p1.html 'id="cmp-row-age"')$(has $T/p1.html 'id="cmp-row-member_since"')$(grep -o "selected='selected'>Only me" $T/p1.html | wc -l | awk '{print ($1>=11)}')" = 1111 ] && echo 1 || echo 0)
+ok "every field rendered with a Show switch" $([ "$(has $T/p1.html 'id="cmp-row-bio"')$(has $T/p1.html 'id="cmp-row-age"')$(has $T/p1.html 'id="cmp-row-member_since"')$(grep -o 'name="sp\[' $T/p1.html | wc -l | awk '{print ($1>=11)}')" = 1111 ] && echo 1 || echo 0)
+ok "empty fields: switch hidden (and on, ready for when filled)" $(grep -o '<span class="cmp-show" data-cmp-show hidden><input type="hidden" name="sp\[bio\]" value="1" /><input type="checkbox" class="cmp-switch-input" id="cmp_s_bio" name="s\[bio\]" value="1" checked' $T/p1.html | wc -l | awk '{print ($1==1)}')
+ok "existing member's filled fields keep Only me (switch off)" $(grep -o 'id="cmp_s_display_name" name="s\[display_name\]" value="1" />' $T/p1.html | wc -l | awk '{print ($1==1)}')
+ok "age calculated from date of birth, not typed" $([ "$(has $T/p1.html "cmp-age-value\">$AGE<")$(hasnt $T/p1.html 'name="f[age]')" = 11 ] && echo 1 || echo 0)
 ok "options list shows renamed choice" $(has $T/p1.html 'Leathercraft')
 ok "display name read-only, links to Account" $([ "$(has $T/p1.html 'Pat Smith')$(has $T/p1.html 'cmp_tab=account#cmp-details')" = 11 ] && echo 1 || echo 0)
 ok "Profile page is no-store" $(grep -qi '^cache-control:.*no-store' $T/p1.h && echo 1 || echo 0)
@@ -74,31 +78,34 @@ ok "non-member gets the gate, not the profile" $([ "$(has $T/r1.html 'Confirm yo
 
 N=$(pnonce $T/p1.html)
 LONG=$(head -c 501 /dev/zero | tr '\0' 'a')
-r=$(post pat --data-urlencode "action=cmp_profile_save" --data-urlencode "_cmp_nonce=$N" --data-urlencode "f[bio]=$LONG" --data-urlencode "f[pronouns]=they/them" --data-urlencode "f[age][mode]=exact" --data-urlencode "f[age][exact]=17")
-ok "bio over 500 and age 17 refused" $(echo "$r" | grep -q 'profile_invalid' && echo 1 || echo 0)
+r=$(post pat --data-urlencode "action=cmp_profile_save" --data-urlencode "_cmp_nonce=$N" --data-urlencode "f[bio]=$LONG" --data-urlencode "f[pronouns]=they/them" --data-urlencode "sp[pronouns]=1" --data-urlencode "s[pronouns]=1")
+ok "bio over 500 refused" $(echo "$r" | grep -q 'profile_invalid' && echo 1 || echo 0)
 ok "nothing saved on error" $([ "$(ev "global \$wpdb; echo (int)\$wpdb->get_var('SELECT COUNT(*) FROM '.CMP_Install::table('profile_values').' WHERE user_id = '. $(uid pat));")" = 0 ] && echo 1 || echo 0)
 get pat p2 "$PROF"
-ok "errors listed, typed answers kept" $([ "$(has $T/p2.html 'id="cmp-profile-errors"')$(has $T/p2.html 'value="they/them"')$(has $T/p2.html 'aria-invalid="true"')$(has $T/p2.html 'from 18 to 120')" = 1111 ] && echo 1 || echo 0)
+ok "errors listed, typed answers kept" $([ "$(has $T/p2.html 'id="cmp-profile-errors"')$(has $T/p2.html 'value="they/them"')$(has $T/p2.html 'aria-invalid="true"')" = 111 ] && echo 1 || echo 0)
 KEYS=$(ev 'echo implode(" ",array_keys(CMP_Profile_Fields::options("interests")));')
 args=(--data-urlencode "action=cmp_profile_save" --data-urlencode "_cmp_nonce=$N")
 for k in $KEYS; do args+=(--data-urlencode "f[interests][keys][]=$k"); done
 r=$(post pat "${args[@]}" --data-urlencode "f[interests][keys][]=not-a-real-option")
 ok "unknown choices ignored (not stored)" $(echo "$r" | grep -q 'profile_saved' && [ "$(ev "echo in_array('not-a-real-option',CMP_Profiles::rows($(uid pat))['interests']['value']['keys'],true)?0:1;")" = 1 ] && echo 1 || echo 0)
 R1=$(ev 'echo CMP_Profile_Fields::raw_options("roles")[0]["key"];'); I1=$(ev 'echo CMP_Profile_Fields::raw_options("identity")[0]["key"];'); A1=$(ev 'echo CMP_Profile_Fields::raw_options("availability")[1]["key"];')
-FULL=(--data-urlencode "action=cmp_profile_save" \
-  --data-urlencode "f[bio]=Leather & <b>laughs</b>" --data-urlencode "v[bio]=members" \
-  --data-urlencode "f[pronouns]=they/them" --data-urlencode "v[pronouns]=members" \
-  --data-urlencode "f[location][city]=Columbus" --data-urlencode "f[location][region]=Ohio" --data-urlencode "f[location][country]=USA" --data-urlencode "v[location]=connections" \
-  --data-urlencode "f[interests][keys][]=$K" --data-urlencode "v[interests]=members" \
+# Location was set to My connections before 0.4.0's switches; switched off it must stay Connections.
+ev "CMP_Profiles::save_field($(uid pat),'location',null,'connections');" >/dev/null
+SP=(); for k in display_name bio pronouns location interests roles identity availability looking_for age member_since; do SP+=(--data-urlencode "sp[$k]=1"); done
+FULL=(--data-urlencode "action=cmp_profile_save" "${SP[@]}" \
+  --data-urlencode "f[bio]=Leather & <b>laughs</b>" --data-urlencode "s[bio]=1" \
+  --data-urlencode "f[pronouns]=they/them" --data-urlencode "s[pronouns]=1" \
+  --data-urlencode "f[location][city]=Columbus" --data-urlencode "f[location][region]=Ohio" --data-urlencode "f[location][country]=USA" \
+  --data-urlencode "f[interests][keys][]=$K" --data-urlencode "s[interests]=1" \
   --data-urlencode "f[roles][keys][]=$R1" \
   --data-urlencode "f[identity][keys][]=$I1" --data-urlencode "f[identity][other]=Leather family" \
   --data-urlencode "f[availability]=$A1" \
-  --data-urlencode "f[age][mode]=band" --data-urlencode "f[age][band]=35-44" --data-urlencode "v[age]=members" \
-  --data-urlencode "v[display_name]=members" --data-urlencode "v[member_since]=members")
+  --data-urlencode "s[age]=1" --data-urlencode "s[display_name]=1" --data-urlencode "s[member_since]=1")
 r=$(post pat "${FULL[@]}" --data-urlencode "_cmp_nonce=$N")
 ok "valid profile saved" $(echo "$r" | grep -q 'profile_saved' && echo 1 || echo 0)
-ok "values stored cleanly" $(ev "\$r=CMP_Profiles::rows($(uid pat)); echo 'Leather & laughs'===\$r['bio']['value'] && 'Columbus'===\$r['location']['value']['city'] && array('mode'=>'band','value'=>'35-44')===\$r['age']['value'] && 'Leather family'===\$r['identity']['value']['other'] ?1:0;")
-ok "visibility stored; untouched fields stay Only me" $(ev "\$r=CMP_Profiles::rows($(uid pat)); echo 'members'===\$r['bio']['visibility'] && 'connections'===\$r['location']['visibility'] && 'private'===\$r['roles']['visibility'] && 'private'===\$r['identity']['visibility'] ?1:0;")
+ok "values stored cleanly" $(ev "\$r=CMP_Profiles::rows($(uid pat)); echo 'Leather & laughs'===\$r['bio']['value'] && 'Columbus'===\$r['location']['value']['city'] && 'Leather family'===\$r['identity']['value']['other'] ?1:0;")
+ok "switches stored: on = members, off = Only me, off keeps an old Connections" $(ev "\$r=CMP_Profiles::rows($(uid pat)); echo 'members'===\$r['bio']['visibility'] && 'members'===\$r['age']['visibility'] && 'connections'===\$r['location']['visibility'] && 'private'===\$r['roles']['visibility'] && 'private'===\$r['identity']['visibility'] ?1:0;")
+ok "an empty field's choice is left alone" $(ev "\$r=CMP_Profiles::rows($(uid pat)); echo 'private'===\$r['looking_for']['visibility']?1:0;")
 ok "nothing is searchable (directory not open yet)" $(ev 'global $wpdb; echo 0===(int)$wpdb->get_var("SELECT COUNT(*) FROM ".CMP_Install::table("profile_values")." WHERE searchable=1")?1:0;')
 ok "audit says which fields changed, not their contents" $(ev "global \$wpdb; \$rows=\$wpdb->get_col(\"SELECT new_value FROM \".CMP_Install::table('audit_log').\" WHERE action='profile_updated' AND object_id=$(uid pat)\"); \$all=implode(' ',\$rows); echo \$rows && false!==strpos(\$all,'bio') && false===strpos(\$all,'Columbus') && false===strpos(\$all,'laughs')?1:0;")
 ok "visibility change audited old -> new" $(ev "global \$wpdb; \$v=\$wpdb->get_var(\"SELECT new_value FROM \".CMP_Install::table('audit_log').\" WHERE action='profile_visibility_changed' AND object_id=$(uid pat) ORDER BY id DESC\"); echo false!==strpos(\$v,'\"bio\":\"members\"')?1:0;")
@@ -113,7 +120,7 @@ ok "bad nonce refused" $(echo "$r" | grep -q 'cmp_notice=expired' && echo 1 || e
 
 echo "== Who sees what"
 get quinn q1 "$PAGE&cmp_member=$(uid pat)"
-ok "another member sees fields set to All members" $([ "$(has $T/q1.html 'Pat Smith')$(has $T/q1.html 'they/them')$(has $T/q1.html 'Leathercraft')$(has $T/q1.html '35–44')" = 1111 ] && echo 1 || echo 0)
+ok "another member sees fields switched on (age calculated)" $([ "$(has $T/q1.html 'Pat Smith')$(has $T/q1.html 'they/them')$(has $T/q1.html 'Leathercraft')$(has $T/q1.html "<dd>$AGE</dd>")$(hasnt $T/q1.html '1983')" = 11111 ] && echo 1 || echo 0)
 ok "...but not Only me or Connections fields" $([ "$(hasnt $T/q1.html 'Columbus')$(hasnt $T/q1.html 'Leather family')" = 11 ] && echo 1 || echo 0)
 ok "connections rule: not connected = not shown" $(ev "echo CMP_Profiles::can_view('location',$(uid pat),$(uid quinn))?0:1;")
 ok "connections rule: connected (2.3 filter) = shown" $(ev "add_filter('cmp_are_connected','__return_true'); echo CMP_Profiles::can_view('location',$(uid pat),$(uid quinn))?1:0;")
@@ -140,14 +147,14 @@ r=$(up pat -F kind=avatar -F "photo=@$T/huge.jpg;type=image/jpeg" -F "alt=Me")
 ok "over 5 MB refused" $(echo "$r" | grep -q 'photo_error' && echo 1 || echo 0)
 r=$(up pat -F kind=avatar -F "photo=@$T/small.jpg;type=image/jpeg" -F "alt=Me")
 ok "too-small photo refused" $(echo "$r" | grep -q 'photo_error' && echo 1 || echo 0)
-r=$(up pat -F kind=avatar -F "photo=@$T/big.jpg;type=image/jpeg" -F "alt=Pat at the market" -F "visibility=private")
+r=$(up pat -F kind=avatar -F "photo=@$T/big.jpg;type=image/jpeg" -F "alt=Pat at the market" -F show_present=1)
 ok "avatar uploaded" $(echo "$r" | grep -q 'photo_saved' && echo 1 || echo 0)
 ok "stored as a 512×512 JPEG (centre-cropped)" $(ev "\$i=CMP_Profile_Images::get($(uid pat),'avatar'); echo \$i && 512==\$i->width && 512==\$i->height && 'image/jpeg'===\$i->mime?1:0;")
 ev "echo CMP_Profile_Images::get($(uid pat),'avatar',true)->data;" > $T/stored.jpg
 ok "camera metadata and comments stripped" $([ "$(grep -c 'SECRET-GPS-MARKER' $T/stored.jpg)" = 0 ] && grep -q 'SECRET-GPS-MARKER' $T/big.jpg && echo 1 || echo 0)
-r=$(up pat -F kind=cover -F "photo=@$T/sq.png;type=image/png" -F "decorative=1" -F "visibility=members")
+r=$(up pat -F kind=cover -F "photo=@$T/sq.png;type=image/png" -F "decorative=1" -F show_present=1 -F show=1)
 ok "PNG cover saved as decorative 3:1 JPEG" $(echo "$r" | grep -q 'photo_saved' && [ "$(ev "\$i=CMP_Profile_Images::get($(uid pat),'cover'); echo \$i && \$i->decorative && 3*\$i->height==\$i->width && 'image/jpeg'===\$i->mime?1:0;")" = 1 ] && echo 1 || echo 0)
-r=$(curl -s -b $T/pat.jar -o $T/ajax.json -w '%{http_code}' "$H/wp-admin/admin-post.php" -F "action=cmp_profile_image" -F "_cmp_nonce=$PN" -F kind=avatar -F cmp_ajax=1 -F "photo=@$T/big.jpg;type=image/jpeg" -F "alt=Pat again" -F "visibility=private")
+r=$(curl -s -b $T/pat.jar -o $T/ajax.json -w '%{http_code}' "$H/wp-admin/admin-post.php" -F "action=cmp_profile_image" -F "_cmp_nonce=$PN" -F kind=avatar -F cmp_ajax=1 -F "photo=@$T/big.jpg;type=image/jpeg" -F "alt=Pat again" -F show_present=1)
 ok "JavaScript upload path answers JSON" $([ "$r" = 200 ] && php -r '$j=json_decode(file_get_contents($argv[1]),true); exit($j["ok"]&&false!==strpos($j["redirect"],"cmp_tab=profile")?0:1);' $T/ajax.json && echo 1 || echo 0)
 r=$(curl -s -b $T/pat.jar -o $T/ajax2.json -w '%{http_code}' "$H/wp-admin/admin-post.php" -F "action=cmp_profile_image" -F "_cmp_nonce=$PN" -F kind=avatar -F cmp_ajax=1 -F "photo=@$T/fake.jpg;type=image/jpeg" -F "alt=x")
 ok "JavaScript upload errors answer JSON with the reason" $([ "$r" = 400 ] && grep -q "PNG, WebP or HEIC" $T/ajax2.json && echo 1 || echo 0)
@@ -171,7 +178,7 @@ get quinn q3 "$PAGE&cmp_member=$(uid pat)"
 ok "member view: cover shown (empty alt, decorative), private avatar not" $([ "$(has $T/q3.html "cmp_photo=$(uid pat)-cover")$(has $T/q3.html 'alt=""')$(hasnt $T/q3.html "cmp_photo=$(uid pat)-avatar")" = 111 ] && echo 1 || echo 0)
 get pat p6 "$PROF"
 PN=$(pnonce $T/p6.html cmp_profile_image)
-r=$(up pat -F kind=cover -F "decorative=1" -F "visibility=private")
+r=$(up pat -F kind=cover -F "decorative=1" -F show_present=1)
 ok "hiding the cover takes effect at once" $(echo "$r" | grep -q 'photo_updated' && [ "$(curl -s -b $T/quinn.jar -o /dev/null -w '%{http_code}' "$CV")" = 404 ] && echo 1 || echo 0)
 r=$(up pat -F kind=cover -F "remove=1")
 ok "remove photo" $(echo "$r" | grep -q 'photo_removed' && [ "$(curl -s -b $T/pat.jar -o /dev/null -w '%{http_code}' "$CV")" = 404 ] && echo 1 || echo 0)

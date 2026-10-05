@@ -459,3 +459,35 @@
 		} );
 	} );
 }() );
+
+/* Profile tab (0.4.0): a field's "Show to members" switch only appears once
+   the field has something in it, already switched on. Without JavaScript the
+   hidden switch still posts "on", so the server reaches the same result. */
+( function () {
+	'use strict';
+	Array.prototype.forEach.call( document.querySelectorAll( '.cmp-profile-row' ), function ( row ) {
+		var sw = row.querySelector( '[data-cmp-show]' );
+		if ( ! sw || ! sw.hasAttribute( 'hidden' ) ) {
+			return; // Already filled when the page loaded: always shown.
+		}
+		var box = sw.querySelector( 'input[type="checkbox"]' );
+		var filled = function () {
+			return Array.prototype.some.call( row.querySelectorAll( '.cmp-profile-input input, .cmp-profile-input textarea, .cmp-profile-input select' ), function ( el ) {
+				if ( 'checkbox' === el.type || 'radio' === el.type ) {
+					return el.checked;
+				}
+				return '' !== String( el.value ).trim();
+			} );
+		};
+		var sync = function () {
+			var was = ! sw.hasAttribute( 'hidden' );
+			var now = filled();
+			if ( now && ! was && box ) {
+				box.checked = true; // A newly filled field starts shown.
+			}
+			sw.toggleAttribute( 'hidden', ! now );
+		};
+		row.addEventListener( 'input', sync );
+		row.addEventListener( 'change', sync );
+	} );
+}() );

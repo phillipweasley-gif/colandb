@@ -121,15 +121,25 @@ class CMP_Member_Area {
 		if ( CMP_Access::STATE_UNATTESTED !== CMP_Access::state( $user_id ) ) {
 			self::back();
 		}
-		if ( empty( $_POST['cmp_attest_18'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked in check_nonce().
-			self::back( 'attest_required' );
+		if ( CMP_Birth_Date::is_blocked( $user_id ) ) {
+			self::back();
+		}
+		$dob = CMP_Birth_Date::from_request( $_POST ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked in check_nonce().
+		if ( is_wp_error( $dob ) ) {
+			if ( 'dob_under_18' === $dob->get_error_code() ) {
+				// Lock rather than let a different year be tried next.
+				CMP_Birth_Date::block( $user_id );
+				self::back();
+			}
+			self::back( $dob->get_error_code() );
 		}
 
+		CMP_Birth_Date::store( $user_id, $dob, 'member_area' );
 		CMP_Access::record_attestation( $user_id );
 		CMP_Notifications::add(
 			$user_id,
 			'account',
-			__( 'Welcome to the member area. Your profile and calendars stay private unless you choose to share them.', 'cmp' ),
+			__( 'Welcome to the member area. Your calendars stay private. On your profile, anything you fill in is shown to signed-in members unless you switch it off.', 'cmp' ),
 			'',
 			false
 		);
@@ -173,7 +183,8 @@ class CMP_Member_Area {
 			'rate_limited'    => array( 'error', __( 'A verification email was sent a few minutes ago. Please check your inbox (and spam folder) before requesting another.', 'cmp' ) ),
 			'mail_failed'     => array( 'error', __( "We couldn't send the verification email. Please try again later or contact the site administrator.", 'cmp' ) ),
 			'no_email'        => array( 'error', __( 'Your account has no valid email address. Please change it on the Account tab.', 'cmp' ) ),
-			'attest_required' => array( 'error', __( 'Please tick the box to confirm before continuing.', 'cmp' ) ),
+			'dob_missing'     => array( 'error', __( 'Please enter your date of birth.', 'cmp' ) ),
+			'dob_invalid'     => array( 'error', __( 'That date of birth isn\'t a real date. Please check it.', 'cmp' ) ),
 			'expired'         => array( 'error', __( 'Your session expired. Please try again.', 'cmp' ) ),
 			'welcome'         => array( 'success', __( "You're in. Welcome to the member area.", 'cmp' ) ),
 		);
@@ -305,7 +316,7 @@ class CMP_Member_Area {
 	private static function steps_html( $current ) {
 		$steps = array(
 			1 => __( 'Confirm your email', 'cmp' ),
-			2 => __( 'Confirm you are 18 or older', 'cmp' ),
+			2 => __( 'Enter your date of birth', 'cmp' ),
 		);
 		$html = '<ol class="cmp-steps">';
 		foreach ( $steps as $n => $label ) {
@@ -360,32 +371,40 @@ class CMP_Member_Area {
 	private static function render_unattested() {
 		$privacy = CMP_Settings::get( 'privacy_notice_url' );
 		ob_start();
+		if ( CMP_Birth_Date::is_blocked( get_current_user_id() ) ) :
+			?>
+			<section class="cmp-step" aria-labelledby="cmp-step-title">
+				<h2 id="cmp-step-title" class="cmp-title"><?php esc_html_e( 'The member area is for adults 18 and over', 'cmp' ); ?></h2>
+				<p><?php esc_html_e( 'The date of birth given for this account is under 18, so the member area is closed to it. If that date was a mistake, please contact the site team.', 'cmp' ); ?></p>
+			</section>
+			<?php
+			return ob_get_clean();
+		endif;
 		?>
 		<section class="cmp-step" aria-labelledby="cmp-step-title">
-			<h2 id="cmp-step-title" class="cmp-title"><?php esc_html_e( 'Confirm you are 18 or older', 'cmp' ); ?></h2>
+			<h2 id="cmp-step-title" class="cmp-title"><?php esc_html_e( 'One more step', 'cmp' ); ?></h2>
 			<?php echo self::steps_html( 2 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in steps_html(). ?>
-			<p><?php esc_html_e( 'The member area is for adults. We only record that you confirmed this and when; we never ask for your date of birth or ID.', 'cmp' ); ?></p>
+			<p><?php esc_html_e( 'The member area is for adults 18 and over, so we ask every member for their date of birth. You\'ll only be asked this once.', 'cmp' ); ?></p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="cmp-form">
 				<input type="hidden" name="action" value="cmp_attest" />
 				<?php wp_nonce_field( self::NONCE_ATTEST, '_cmp_nonce' ); ?>
-				<p class="cmp-check">
-					<input type="checkbox" name="cmp_attest_18" id="cmp_attest_18" value="1" required aria-describedby="cmp_attest_help" />
-					<label for="cmp_attest_18"><?php echo esc_html( CMP_Settings::get( 'attestation_text' ) ); ?></label>
-				</p>
-				<?php if ( $privacy ) : ?>
+				<div class="cmp-field">
+					<span class="cmp-label" id="cmp_dob_label"><?php esc_html_e( 'Date of birth', 'cmp' ); ?></span>
+					<?php echo CMP_Birth_Date::fields_html( 'cmp_dob', '', 'cmp_attest_help' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 					<p id="cmp_attest_help" class="cmp-muted">
-						<?php
-						printf(
-							/* translators: %s: link to the member privacy notice */
-							esc_html__( 'See the %s for how member information is handled.', 'cmp' ),
-							'<a href="' . esc_url( $privacy ) . '">' . esc_html__( 'member privacy notice', 'cmp' ) . '</a>'
-						);
-						?>
+						<?php esc_html_e( 'Never shown to anyone; only your age can appear on your profile, and only if you choose. It can\'t be changed later from your account. If it\'s wrong, contact the site team.', 'cmp' ); ?>
+						<?php if ( $privacy ) : ?>
+							<?php
+							printf(
+								/* translators: %s: link to the member privacy notice */
+								esc_html__( 'See the %s for how member information is handled.', 'cmp' ),
+								'<a href="' . esc_url( $privacy ) . '">' . esc_html__( 'member privacy notice', 'cmp' ) . '</a>'
+							);
+							?>
+						<?php endif; ?>
 					</p>
-				<?php else : ?>
-					<p id="cmp_attest_help" class="screen-reader-text"><?php esc_html_e( 'Required to continue.', 'cmp' ); ?></p>
-				<?php endif; ?>
-				<button type="submit" class="cmp-btn"><?php esc_html_e( 'Continue', 'cmp' ); ?></button>
+				</div>
+				<button type="submit" class="cmp-btn"><?php esc_html_e( 'Continue to the member area', 'cmp' ); ?></button>
 			</form>
 		</section>
 		<?php

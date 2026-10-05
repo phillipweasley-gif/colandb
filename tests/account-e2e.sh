@@ -36,7 +36,7 @@ for u in carol dave ed; do $W user delete $u --yes >/dev/null 2>&1; done
 $W user create carol carol@example.com --role=subscriber --user_pass=carolpass1 --display_name=Carol >/dev/null
 $W user create dave dave@example.com --role=subscriber --user_pass=davepass12 >/dev/null
 $W user create ed ed@example.com --role=editor --user_pass=edpass1234 >/dev/null
-$W eval '$d=get_user_by("login","dave")->ID; update_user_meta($d,"cmp_verified_email","dave@example.com"); update_user_meta($d,"cmp_email_verified_at",gmdate("Y-m-d H:i:s")); CMP_Access::record_attestation($d); CMP_Notifications::add($d,"account","Hello Dave","",false); global $wpdb; $wpdb->query("DELETE FROM {$wpdb->posts} WHERE post_type=\"user_request\"");' >/dev/null
+$W eval '$d=get_user_by("login","dave")->ID; update_user_meta($d,"cmp_verified_email","dave@example.com"); update_user_meta($d,"cmp_email_verified_at",gmdate("Y-m-d H:i:s")); update_user_meta($d,"cmp_birth_date","1980-06-01"); CMP_Access::record_attestation($d); CMP_Notifications::add($d,"account","Hello Dave","",false); global $wpdb; $wpdb->query("DELETE FROM {$wpdb->posts} WHERE post_type=\"user_request\"");' >/dev/null
 $W eval 'foreach(array("carol","dave") as $u){ $id=get_user_by("login",$u)->ID; delete_transient("cmp_pw_fail_$id"); delete_transient("cmp_email_change_wait_$id"); }' >/dev/null
 
 echo "== Signed out"

@@ -6,6 +6,17 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.27.1
+
+**Sign-up extension hooks** for the member plugin's required date of birth (Community Member Planning 0.4.0). `[cec_register]` gains:
+- `do_action( 'cec_register_form_fields' )` inside the form, before the honeypot;
+- `apply_filters( 'cec_register_validate', true )` after the existing checks and before the account is created: a `WP_Error` refuses the sign-up with its code as `cec_register_error`;
+- `apply_filters( 'cec_register_error_messages', $errors )` for those codes' messages;
+- `do_action( 'cec_user_registered', $user_id )` once the account exists.
+
+This plugin stores nothing those hooks collect (the events/member data boundary in `CLAUDE.md`). With the member plugin inactive the form is unchanged.
+- **Verified** in a local WordPress 7.1.2 with `tests/dob-e2e.sh`: a missing date or an under-18 date refuses the sign-up and creates no account; a valid date creates it; no birth data is stored under this plugin's keys. `php -l` clean.
+
 ## 1.27.0
 
 **Phone month grid replaces the long phone agenda** (owner request: the phone calendar "goes to a list view and is inconvenient to scroll through"). Below 700px wide, `[cec_calendar]` used to show every day of the month with every event running that day, about 84 entries and roughly 22 phone screens for October 2026, because each national weekend repeats on every day it runs. It now shows a compact month grid on one screen, and tapping a day lists that day's events underneath. The design was approved from a mockup built with the real October 2026 events.

@@ -9,8 +9,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  * is_member() (brief §5: "Enforce authorization server-side on every page,
  * API request, calendar feed, image upload, and file download"). Being
  * logged in is not enough: the account must also have verified its current
- * email address (decision D2) and accepted the 18+ self-attestation (brief
- * §2: "before first access to the member area").
+ * email address (decision D2) and given a date of birth showing 18+ (owner
+ * decision 2026-10-04, replacing the brief's checkbox attestation; see
+ * CMP_Birth_Date). Accounts that only ticked the old checkbox are asked for
+ * the date once, through the same "unattested" step.
  */
 class CMP_Access {
 
@@ -40,16 +42,21 @@ class CMP_Access {
 		return self::STATE_MEMBER === self::state( $user_id );
 	}
 
+	/**
+	 * Past the age step: a date of birth on file showing 18+, and not locked
+	 * for having given an under-18 date. (The name predates 0.4.0, when this
+	 * was the 18+ checkbox.)
+	 */
 	public static function has_attested( $user_id ) {
-		return (bool) get_user_meta( $user_id, self::META_ATTESTED_AT, true );
+		return CMP_Birth_Date::qualifies( $user_id );
 	}
 
 	/**
-	 * Stores only the flag (as a UTC timestamp) and the wording version —
-	 * never a date of birth or ID (brief §2).
+	 * Records when the member passed the age step and which wording they
+	 * saw. The date of birth itself is stored by CMP_Birth_Date.
 	 */
 	public static function record_attestation( $user_id ) {
-		if ( self::has_attested( $user_id ) ) {
+		if ( get_user_meta( $user_id, self::META_ATTESTED_AT, true ) ) {
 			return;
 		}
 		$at      = gmdate( 'Y-m-d H:i:s' );
