@@ -49,6 +49,8 @@ class CMP_Install {
 			dbDelta( $sql );
 		}
 		self::add_caps();
+		// 0.5.0: starter options for any profile list that has none yet.
+		CMP_Profile_Fields::seed_defaults();
 		update_option( self::DB_VERSION_OPTION, CMP_DB_VERSION, false );
 	}
 

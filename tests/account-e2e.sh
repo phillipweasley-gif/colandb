@@ -168,6 +168,7 @@ r=$(post dave -d "action=cmp_account_sessions&_cmp_nonce=$(nonce $T/d1.html sess
 ok "sign out everywhere else" $(echo "$r" | grep -q 'sessions_ended' && echo 1 || echo 0)
 get dave2 d2 "$ACCT"; get dave d3 "$ACCT"
 ok "other device signed out, this one not" $([ "$(has $T/d2.html 'Sign in with your site account')$(has $T/d3.html 'only signed in here')" = 11 ] && echo 1 || echo 0)
+$W eval 'update_user_meta(get_user_by("login","dave")->ID,"cmp_setup_done","later");' >/dev/null
 get dave d4 "$PAGE"
 ok "member sees Home | Account tabs" $([ "$(has $T/d4.html '>Home<')$(has $T/d4.html 'Hello Dave')" = 11 ] && echo 1 || echo 0)
 

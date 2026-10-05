@@ -254,6 +254,21 @@
 .cmp-member-area .cmp-switch-input:checked + .cmp-switch-label { color: var(--cmp-secondary) !important; }
 .cmp-member-area .cmp-show-state { min-width: 52px; text-align: right; order: -1; }
 .cmp-member-area .cmp-age-value { font-size: 1.1rem; font-weight: 700; }
+/* Profile sections (0.5.0). */
+.cmp-member-area .cmp-section-title { font-family: 'Archivo Black', sans-serif; font-size: 1rem; text-transform: uppercase; letter-spacing: .04em; color: var(--cmp-secondary); margin: 26px 0 4px; padding-top: 14px; border-top: 2px solid var(--cmp-border); }
+.cmp-member-area .cmp-section-title:first-of-type { margin-top: 0; border-top: 0; padding-top: 0; }
+.cmp-member-area .cmp-section-note { margin: 0 0 6px; }
+.cmp-member-area .cmp-unit { display: inline-flex; align-items: center; gap: 8px; }
+.cmp-member-area .cmp-unit input { max-width: 120px; }
+/* Rated kinks: name | how much | giving/receiving. */
+.cmp-member-area .cmp-rated { display: flex; flex-direction: column; }
+.cmp-member-area .cmp-rated-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--cmp-border); }
+.cmp-member-area .cmp-rated-row select { min-height: 40px; max-width: 120px; }
+@media (max-width: 600px) {
+	.cmp-member-area .cmp-rated-row { grid-template-columns: 1fr 1fr; }
+	.cmp-member-area .cmp-rated-name { grid-column: 1 / -1; font-weight: 600; }
+	.cmp-member-area .cmp-rated-row select { max-width: none; }
+}
 /* Date of birth: Month / Day / Year in one row. */
 .cmp-member-area .cmp-dob { display: grid; grid-template-columns: 1.4fr 1fr 1.2fr; gap: 8px; max-width: 420px; }
 .cmp-member-area .cmp-dob select { min-height: 44px; width: 100% !important; }
@@ -348,4 +363,71 @@
 	.cmp-member-area .cmp-profile-input > .cmp-muted:first-of-type { padding-right: 118px !important; }
 	.cmp-member-area .cmp-card-head { flex-direction: column; align-items: flex-start; }
 	.cmp-member-area .cmp-tabs ul a { padding: 10px 12px !important; }
+}
+
+/* Profile setup steps (0.5.0). */
+.cmp-member-area .cmp-setup-progress { display: flex; gap: 4px; margin-bottom: 8px; }
+.cmp-member-area .cmp-setup-progress span { flex: 1; height: 5px; border-radius: 3px; background: var(--cmp-border); }
+.cmp-member-area .cmp-setup-progress span.is-done { background: var(--cmp-secondary); }
+.cmp-member-area .cmp-setup-count { margin: 0 0 8px; font-size: 0.85rem; }
+.cmp-member-area .cmp-setup-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
+.cmp-member-area .cmp-setup-nav .cmp-btn-outline { margin-right: auto; }
+.cmp-member-area .cmp-setup-skip,
+.cmp-member-area .cmp-link-button {
+	background: transparent !important; border: 0 !important; padding: 10px 4px !important; min-height: 44px;
+	color: var(--cmp-muted) !important; text-decoration: underline !important; font: inherit !important; cursor: pointer; box-shadow: none !important;
+}
+.cmp-member-area .cmp-setup-later { text-align: center; margin: 4px 0 24px; }
+.cmp-member-area .cmp-setup-nudge { border-color: var(--cmp-secondary); }
+
+
+/* Profile display (0.5.0): Sniffies-style on phones, FetLife-style from 900px. */
+.cmp-member-area .cmp-prof { border: 1px solid var(--cmp-border); border-radius: var(--cmp-radius); overflow: hidden; background: #0e0c14; container-type: inline-size; }
+.cmp-member-area .cmp-prof-band { position: relative; }
+.cmp-member-area .cmp-prof-photo { position: relative; aspect-ratio: 1 / 1; max-height: 420px; width: 100%; background: linear-gradient(160deg, #3b2a4a, #14101c 70%); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.cmp-member-area .cmp-prof-photo > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cmp-member-area .cmp-prof-cover { display: none; }
+.cmp-member-area .cmp-prof-photo .cmp-avatar-placeholder { font-family: 'Archivo Black', sans-serif; font-size: 4rem; color: rgba(255,255,255,.3); }
+.cmp-member-area .cmp-prof-head { padding: 14px 16px; background: linear-gradient(180deg, rgba(0,0,0,.0), rgba(0,0,0,.35)); }
+.cmp-member-area .cmp-prof-name { font-size: 1.35rem; font-weight: 800; margin: 0; color: var(--cmp-text); }
+.cmp-member-area .cmp-prof-name small { font-size: 0.95rem; font-weight: 700; color: var(--cmp-primary); margin-left: 6px; }
+.cmp-member-area .cmp-prof-loc { margin: 2px 0 0; color: var(--cmp-muted); font-size: 0.9rem; }
+.cmp-member-area .cmp-prof-stat { margin: 6px 0 0; color: #e6e3ee; font-size: 0.92rem; }
+.cmp-member-area .cmp-prof-head .cmp-prof-table { display: none; }
+.cmp-member-area .cmp-prof-table { display: grid; gap: 4px; margin: 0; font-size: 0.92rem; }
+.cmp-member-area .cmp-prof-table > div { display: grid; grid-template-columns: 120px 1fr; gap: 12px; }
+.cmp-member-area .cmp-prof-table dt { color: var(--cmp-muted); }
+.cmp-member-area .cmp-prof-table dd { margin: 0; overflow-wrap: anywhere; }
+.cmp-member-area .cmp-prof-body { display: flex; flex-direction: column-reverse; gap: 0; padding: 4px 16px 16px; }
+.cmp-member-area .cmp-prof-card { padding: 12px 0; border-top: 1px solid var(--cmp-border); }
+.cmp-member-area .cmp-prof-card h4 { margin: 0 0 8px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--cmp-muted); font-weight: 800; }
+.cmp-member-area .cmp-prof-card p { margin: 0; line-height: 1.55; }
+.cmp-member-area .cmp-prof-bio { margin: 0; border-left: 3px solid var(--cmp-secondary); padding: 4px 0 4px 12px; line-height: 1.55; color: #e6e3ee; }
+.cmp-member-area .cmp-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.cmp-member-area .cmp-chips li { font-size: 0.85rem; padding: 5px 11px; border-radius: 100px; background: var(--cmp-card-alt); border: 1px solid var(--cmp-border); }
+.cmp-member-area .cmp-prof-kinks { list-style: none; margin: 0; padding: 0; }
+.cmp-member-area .cmp-prof-kinks li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--cmp-border); font-size: 0.92rem; }
+.cmp-member-area .cmp-prof-kinks li:last-child { border-bottom: 0; }
+.cmp-member-area .cmp-prof-kinks b { font-size: 0.72rem; text-transform: uppercase; color: var(--cmp-primary); }
+.cmp-member-area .cmp-prof-kinks small { color: var(--cmp-muted); margin-left: 4px; }
+/* On phones the stat line covers the Stats card. */
+.cmp-member-area .cmp-prof-side .cmp-prof-stats { display: none; }
+
+/* Laid out by the profile's own width (themes give the member area very
+   different widths): header band from 600px, two columns from 820px. */
+@container (min-width: 600px) {
+	.cmp-member-area .cmp-prof-band { display: grid; grid-template-columns: 180px 1fr; gap: 24px; padding: 24px; background: linear-gradient(180deg, #1c1726, #120f19); border-bottom: 1px solid var(--cmp-border); }
+	.cmp-member-area .cmp-prof-photo { aspect-ratio: 1 / 1; width: 180px; border-radius: 10px; }
+	.cmp-member-area .cmp-prof-head { padding: 0; background: none; }
+	.cmp-member-area .cmp-prof-name { font-family: 'Archivo Black', sans-serif; font-size: 1.6rem; color: var(--cmp-secondary); }
+	.cmp-member-area .cmp-prof-name small { font-family: inherit; color: var(--cmp-text); }
+	.cmp-member-area .cmp-prof-stat { display: none; }
+	.cmp-member-area .cmp-prof-head .cmp-prof-table { display: grid; margin-top: 12px; }
+	.cmp-member-area .cmp-prof-body { padding: 20px 24px 24px; display: flex; flex-direction: column; }
+	.cmp-member-area .cmp-prof-side .cmp-prof-stats { display: block; }
+	.cmp-member-area .cmp-prof-card { background: var(--cmp-card); border: 1px solid var(--cmp-border); border-radius: var(--cmp-radius); padding: 14px 16px; margin-bottom: 14px; }
+}
+@container (min-width: 820px) {
+	.cmp-member-area .cmp-prof-body { display: grid; grid-template-columns: 260px 1fr; gap: 24px; }
+	.cmp-member-area .cmp-prof-body:not(:has(.cmp-prof-side)) { grid-template-columns: 1fr; }
 }

@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Member Profiles v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Colors from the live member area / calendar (frontend.css, member.css). */
+:root {
+	--primary: #e1f577; --secondary: #ff50d7; --text: #f5f4f7; --muted: #a9a6bb;
+	--card: #1b1826; --card-alt: #211d2e; --field: #110f18; --border: rgba(255,255,255,.10); --line: rgba(255,255,255,.08);
+	--page: #0b0a10;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font-family: Inter, -apple-system, system-ui, sans-serif; }
+h1, h2, h3 { margin: 0; }
+.intro { max-width: 1200px; margin: 0 auto; padding: 28px 16px 8px; }
+.intro h1 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 22px; margin-bottom: 8px; }
+.intro p { color: var(--muted); max-width: 880px; line-height: 1.55; margin: 0 0 6px; }
+.intro strong { color: var(--text); }
+.section-title { max-width: 1200px; margin: 30px auto 6px; padding: 0 16px; font-family: 'Archivo Black', sans-serif; color: var(--secondary); text-transform: uppercase; font-size: 15px; letter-spacing: .03em; }
+.section-note { max-width: 1200px; margin: 0 auto 14px; padding: 0 16px; color: var(--muted); font-size: 14px; }
+.row { display: flex; flex-wrap: wrap; gap: 28px; justify-content: center; padding: 8px 16px 20px; align-items: flex-start; }
+.phone { width: 380px; max-width: calc(100vw - 32px); height: 780px; border: 10px solid #26232f; border-radius: 44px; background: #000; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.6); flex-shrink: 0; }
+.screen { height: 100%; overflow-y: auto; scrollbar-width: thin; }
+.cap { font-size: 12.5px; color: var(--muted); text-align: center; max-width: 360px; margin: 8px auto 0; line-height: 1.5; }
+
+/* ---------- Phone profile (Sniffies-style) ---------- */
+.p-photo { position: relative; height: 330px; background: linear-gradient(160deg, #3b2a4a, #14101c 70%); display: flex; align-items: flex-end; }
+.p-photo .ph { position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255,255,255,.25); font-size: 13px; }
+.p-thumbs { position: absolute; right: 10px; top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.p-thumbs span { width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(255,255,255,.6); background: #2c2238; }
+.p-head { position: relative; padding: 14px 16px 12px; width: 100%; background: linear-gradient(transparent, rgba(0,0,0,.85) 40%); }
+.p-name { font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.badge { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: 3px 8px; border-radius: 100px; background: rgba(225,245,119,.15); color: var(--primary); }
+.badge.pink { background: rgba(255,80,215,.16); color: #ff8fe4; }
+.p-stat { font-size: 13.5px; color: #e6e3ee; margin-top: 4px; }
+.p-body { padding: 4px 16px 30px; }
+.p-quote { border-left: 3px solid var(--secondary); padding: 6px 0 6px 12px; margin: 12px 0 16px; color: #e6e3ee; font-size: 14px; line-height: 1.5; }
+.p-sec { padding: 12px 0; border-top: 1px solid var(--line); }
+.p-sec h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 8px; font-weight: 800; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 13px; padding: 5px 11px; border-radius: 100px; background: var(--card-alt); border: 1px solid var(--border); }
+.chip.hl { border-color: rgba(255,80,215,.6); color: #ff8fe4; }
+.kink { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; font-size: 14px; border-bottom: 1px dashed var(--line); }
+.kink:last-child { border-bottom: 0; }
+.lvl { font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--primary); }
+.dir { font-size: 11px; color: var(--muted); margin-left: 6px; }
+.p-actions { display: flex; gap: 8px; margin: 4px 0 6px; }
+.btn { border: none; border-radius: 100px; min-height: 44px; padding: 0 16px; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
+.btn.y { background: var(--primary); color: #0b0a12; }
+.btn.o { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
+
+/* ---------- Desktop profile (FetLife-style) ---------- */
+.desk { width: 1080px; max-width: calc(100vw - 32px); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: #0e0c14; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.d-band { display: grid; grid-template-columns: 170px 1fr auto; gap: 24px; padding: 26px 28px; background: linear-gradient(180deg, #1c1726, #120f19); border-bottom: 1px solid var(--line); }
+.d-avatar { width: 170px; height: 170px; border-radius: 10px; background: linear-gradient(160deg, #3b2a4a, #1a1424); display: grid; place-items: center; color: rgba(255,255,255,.3); font-size: 12px; }
+.d-name { font-family: 'Archivo Black', sans-serif; font-size: 26px; color: var(--secondary); }
+.d-name small { font-family: Inter, sans-serif; font-size: 16px; color: var(--text); font-weight: 700; margin-left: 8px; }
+.d-loc { color: var(--muted); font-size: 14px; margin: 4px 0 12px; }
+.d-table { display: grid; grid-template-columns: 130px 1fr; gap: 5px 16px; font-size: 14px; }
+.d-table dt { color: var(--muted); }
+.d-table dd { margin: 0; }
+.d-btns { display: flex; flex-direction: column; gap: 8px; }
+.d-tabs { display: flex; gap: 4px; padding: 0 28px; border-bottom: 1px solid var(--line); background: #100d16; }
+.d-tabs a { padding: 14px 16px; color: var(--muted); text-decoration: none; font-weight: 700; font-size: 14px; border-bottom: 3px solid transparent; }
+.d-tabs a.on { color: var(--text); border-bottom-color: var(--secondary); }
+.d-tabs a .n { font-size: 11px; background: var(--card-alt); padding: 2px 6px; border-radius: 100px; margin-left: 4px; }
+.d-main { display: grid; grid-template-columns: 260px 1fr; gap: 24px; padding: 24px 28px 30px; }
+.d-side h3, .d-card h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 10px; font-weight: 800; }
+.d-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; }
+.d-card p { margin: 0 0 10px; line-height: 1.6; font-size: 14.5px; color: #e6e3ee; }
+.d-dyn { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.d-dyn:last-child { border-bottom: 0; }
+.d-dyn i { width: 32px; height: 32px; border-radius: 50%; background: #2c2238; flex-shrink: 0; }
+.d-dyn small { display: block; color: var(--muted); font-size: 12px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* ---------- Setup wizard ---------- */
+.w { padding: 18px 16px 30px; }
+.w-progress { display: flex; gap: 4px; margin-bottom: 6px; }
+.w-progress span { flex: 1; height: 5px; border-radius: 3px; background: #2c2838; }
+.w-progress span.done { background: var(--secondary); }
+.w-step { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+.w h2 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 20px; margin-bottom: 6px; }
+.w .lead { color: var(--muted); font-size: 13.5px; line-height: 1.5; margin: 0 0 16px; }
+.f { margin-bottom: 14px; }
+.f label, .f .l { display: block; font-size: 12px; font-weight: 800; color: var(--secondary); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.f input, .f select, .f textarea { width: 100%; min-height: 44px; background: var(--field); border: 1.5px solid var(--border); border-radius: 10px; color: var(--text); font: inherit; font-size: 15px; padding: 10px 12px; }
+.f textarea { min-height: 110px; }
+.f .h { font-size: 12px; color: var(--muted); margin-top: 5px; }
+.pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick span { font-size: 13px; padding: 8px 12px; border-radius: 100px; border: 1.5px solid var(--border); min-height: 36px; display: inline-flex; align-items: center; cursor: pointer; user-select: none; }
+.pick span.on { border-color: var(--secondary); background: rgba(255,80,215,.14); color: #ff8fe4; }
+.krow { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.krow select { min-height: 36px; background: var(--field); color: var(--text); border: 1.5px solid var(--border); border-radius: 8px; font: inherit; font-size: 12.5px; padding: 4px 6px; }
+.w-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; gap: 10px; }
+.skip { color: var(--muted); font-size: 13px; text-decoration: underline; }
+.note { background: rgba(225,245,119,.08); border: 1px solid rgba(225,245,119,.25); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; color: #e6e3ee; line-height: 1.5; margin-bottom: 14px; }
+
+.decisions { max-width: 1000px; margin: 10px auto 60px; padding: 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.decisions h2 { font-family: 'Archivo Black', sans-serif; color: var(--primary); text-transform: uppercase; font-size: 16px; margin-bottom: 10px; }
+.decisions b { color: var(--text); }
+.decisions li { margin-bottom: 7px; }
+</style>
+</head>
+<body>
+
+<div class="intro">
+	<h1>Member profiles v2 + step-by-step setup</h1>
+	<p>Mockup for <strong>Community Member Planning 0.5.0</strong>, built from the owner's research of Sniffies (phone layout), FetLife (desktop layout, fields and lists) and Chaster (rated kinks with giving/receiving). <strong>Sample member, not real data.</strong> Every item still has its own Show switch; nothing is ever public.</p>
+</div>
+
+<div class="section-title">1 · Phone profile (Sniffies-style)</div>
+<div class="section-note">Photo first, one auto-built stat line, the bio as a quote, then tag sections. Only items switched on appear.</div>
+<div class="row">
+	<div>
+		<div class="phone"><div class="screen">
+			<div class="p-photo">
+				<div class="ph">profile photo</div>
+				<div class="p-thumbs"><span></span><span></span><span></span></div>
+				<div class="p-head">
+					<div class="p-name">SampleSir <span class="badge">Member</span><span class="badge pink">Keyholder</span></div>
+					<div class="p-stat">41 · 5'11" · 185 lb · athletic · gay · vers top · Dom, Daddy, Handler</div>
+				</div>
+			</div>
+			<div class="p-body">
+				<div class="p-actions"><button class="btn y">Message</button><button class="btn o">Propose a dynamic</button></div>
+				<div class="p-quote">Columbus leatherman, community volunteer. Into structure, service and training. Ask about my limits before anything else.</div>
+				<div class="p-sec"><h3>Looking for</h3><div class="chips"><span class="chip hl">A dynamic</span><span class="chip hl">Keeping someone locked</span><span class="chip">Mentee / student</span><span class="chip">Events</span><span class="chip">Friendship</span></div></div>
+				<div class="p-sec"><h3>Not looking for</h3><div class="chips"><span class="chip">Online only</span><span class="chip">Casual hookups</span></div></div>
+				<div class="p-sec"><h3>Kinks</h3>
+					<div class="kink">Chastity / keyholding <span><span class="lvl">Love it</span><span class="dir">giving</span></span></div>
+					<div class="kink">Service &amp; protocol <span><span class="lvl">Love it</span><span class="dir">receiving</span></span></div>
+					<div class="kink">Rope bondage <span><span class="lvl">Like it</span><span class="dir">both</span></span></div>
+					<div class="kink">Pup play <span><span class="lvl">Curious</span><span class="dir">giving</span></span></div>
+				</div>
+				<div class="p-sec"><h3>Hosting</h3><div class="chips"><span class="chip">Host or travel</span></div></div>
+				<div class="p-sec"><h3>Health &amp; safer sex</h3><div class="chips"><span class="chip">On PrEP</span><span class="chip">Tested Sep 2026</span><span class="chip">Mpox vaccinated</span><span class="chip">No drugs</span></div></div>
+				<div class="p-sec"><h3>Member since</h3><div class="chips"><span class="chip">October 2026</span></div></div>
+			</div>
+		</div></div>
+		<div class="cap">The stat line is built from Age, Height, Weight, Body type, Orientation, Position and Roles, skipping anything hidden. "Propose a dynamic" arrives with release 2.</div>
+	</div>
+</div>
+
+<div class="section-title">2 · Desktop profile (FetLife-style)</div>
+<div class="section-note">Header band with photo and details table, tabs, a side column and an About column. Tabs other than About arrive with later releases.</div>
+<div class="row">
+	<div class="desk">
+		<div class="d-band">
+			<div class="d-avatar">profile photo</div>
+			<div>
+				<div class="d-name">SampleSir<small>41 M Dom</small></div>
+				<div class="d-loc">Columbus, Ohio, United States</div>
+				<dl class="d-table">
+					<dt>Gender</dt><dd>Man</dd>
+					<dt>Pronouns</dt><dd>he/him</dd>
+					<dt>Orientation</dt><dd>Gay</dd>
+					<dt>Roles</dt><dd>Dom, Daddy, Handler, Keyholder</dd>
+					<dt>Active</dt><dd>I live the lifestyle when I can</dd>
+					<dt>Looking for</dt><dd>A dynamic, Keeping someone locked, Mentee / student, Events</dd>
+					<dt>Member since</dt><dd>October 2026</dd>
+				</dl>
+			</div>
+			<div class="d-btns"><button class="btn y">Message</button><button class="btn o">Propose a dynamic</button></div>
+		</div>
+		<div class="d-tabs"><a class="on" href="#">About</a><a href="#">Activity</a><a href="#">Dynamics<span class="n">2</span></a><a href="#">Calendar</a><a href="#">Pictures<span class="n">6</span></a></div>
+		<div class="d-main">
+			<div class="d-side">
+				<div class="d-card"><h3>Dynamics</h3>
+					<div class="d-dyn"><i></i><div>Keyholder of <b>boyJay</b><small>since Aug 2026</small></div></div>
+					<div class="d-dyn"><i></i><div>Mentor to <b>NewRigger</b><small>since Sep 2026</small></div></div>
+				</div>
+				<div class="d-card"><h3>Stats</h3><dl class="d-table"><dt>Age</dt><dd>41</dd><dt>Height</dt><dd>5'11"</dd><dt>Weight</dt><dd>185 lb</dd><dt>Body type</dt><dd>Athletic</dd><dt>Position</dt><dd>Vers top</dd></dl></div>
+			</div>
+			<div>
+				<div class="d-card"><h3>About</h3><p>Columbus leatherman, community volunteer. Into structure, service and training. Ask about my limits before anything else.</p><p>Experienced keyholder; I run weekly homework with clear proof and a fair consequence ladder.</p></div>
+				<div class="two">
+					<div class="d-card"><h3>Kinks</h3>
+						<div class="kink">Chastity / keyholding <span><span class="lvl">Love it</span><span class="dir">giving</span></span></div>
+						<div class="kink">Service &amp; protocol <span><span class="lvl">Love it</span><span class="dir">receiving</span></span></div>
+						<div class="kink">Rope bondage <span><span class="lvl">Like it</span><span class="dir">both</span></span></div>
+					</div>
+					<div class="d-card"><h3>Hard limits</h3><p>No public play, no drugs, nothing permanent.</p><h3 style="margin-top:12px">Not looking for</h3><div class="chips"><span class="chip">Online only</span><span class="chip">Casual hookups</span></div></div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="section-title">3 · Step-by-step setup after sign-up</div>
+<div class="section-note">After confirming their email, a new member goes straight into 6 short steps. Each step saves on its own; "Skip for now" is always there; the Profile tab keeps everything editable later.</div>
+<div class="row">
+	<div>
+		<div class="phone"><div class="screen"><div class="w">
+			<div class="w-progress"><span class="done"></span><span></span><span></span><span></span><span></span><span></span></div>
+			<div class="w-step">Step 1 of 6 · Photo &amp; bio</div>
+			<h2>Say hello</h2>
+			<p class="lead">A photo and a few lines about you. Everything you fill in is shown to signed-in members; switch any item off later.</p>
+			<div class="f"><span class="l">Profile photo</span><button class="btn o" style="width:100%">Choose a photo</button></div>
+			<div class="f"><label>About me (bio)</label><textarea>Columbus leatherman, community volunteer…</textarea><div class="h">Up to 1,000 characters.</div></div>
+			<div class="f"><label>Pronouns</label><input value="he/him"></div>
+			<div class="w-nav"><a class="skip" href="#">Skip for now</a><button class="btn y">Save &amp; continue</button></div>
+		</div></div></div>
+		<div class="cap">Step 1 · Photo &amp; bio</div>
+	</div>
+	<div>
+		<div class="phone"><div class="screen"><div class="w">
+			<div class="w-progress"><span class="done"></span><span class="done"></span><span class="done"></span><span></span><span></span><span></span></div>
+			<div class="w-step">Step 3 of 6 · Identity &amp; roles</div>
+			<h2>Who you are</h2>
+			<p class="lead">Pick what fits. These lists come from FetLife's, trimmed for this community; the site team can add more.</p>
+			<div class="f"><span class="l">Gender (up to 3)</span><div class="pick"><span class="on">Man</span><span>Woman</span><span>Nonbinary</span><span>Trans man</span><span>Trans woman</span><span>Genderqueer</span><span>Two-Spirit</span></div></div>
+			<div class="f"><span class="l">Orientation (up to 5)</span><div class="pick"><span class="on">Gay</span><span>Bisexual</span><span>Pansexual</span><span>Queer</span><span>Straight</span><span>Asexual</span></div></div>
+			<div class="f"><span class="l">Roles (up to 10)</span><div class="pick"><span class="on">Dom</span><span>submissive</span><span>Switch</span><span class="on">Daddy</span><span>boy</span><span>pup</span><span class="on">Handler</span><span class="on">Keyholder</span><span>Chastity wearer</span><span>Rigger</span><span>Mentor</span></div></div>
+			<div class="f"><label>Position</label><select><option>Vers top</option></select></div>
+			<div class="w-nav"><a class="skip" href="#">Back</a><button class="btn y">Save &amp; continue</button></div>
+		</div></div></div>
+		<div class="cap">Step 3 · Identity &amp; roles</div>
+	</div>
+	<div>
+		<div class="phone"><div class="screen"><div class="w">
+			<div class="w-progress"><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span><span></span></div>
+			<div class="w-step">Step 5 of 6 · Kinks &amp; limits</div>
+			<h2>What you're into</h2>
+			<p class="lead">Rate only what applies (Chaster-style). Hard limits are what everyone should read before proposing anything.</p>
+			<div class="krow">Chastity / keyholding <select><option>Love it</option></select><select><option>Giving</option></select></div>
+			<div class="krow">Service &amp; protocol <select><option>Love it</option></select><select><option>Receiving</option></select></div>
+			<div class="krow">Rope bondage <select><option>Like it</option></select><select><option>Both</option></select></div>
+			<div class="krow">Impact play <select><option>—</option></select><select><option>—</option></select></div>
+			<div class="f" style="margin-top:14px"><label>Hard limits</label><textarea style="min-height:70px">No public play, no drugs, nothing permanent.</textarea></div>
+			<div class="w-nav"><a class="skip" href="#">Back</a><button class="btn y">Save &amp; continue</button></div>
+		</div></div></div>
+		<div class="cap">Step 5 · Kinks &amp; limits</div>
+	</div>
+	<div>
+		<div class="phone"><div class="screen"><div class="w">
+			<div class="w-progress"><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span></div>
+			<div class="w-step">Step 6 of 6 · Health (optional)</div>
+			<h2>Health &amp; safer sex</h2>
+			<div class="note"><b>Optional, and hidden until you switch it on.</b> Unlike other fields, health details start hidden even when filled in, because they're the most sensitive things on a profile.</div>
+			<div class="f"><span class="l">Safer-sex practices</span><div class="pick"><span class="on">On PrEP</span><span>DoxyPEP</span><span>Condoms always</span><span class="on">Mpox vaccinated</span><span>Undetectable (U=U)</span></div></div>
+			<div class="f"><label>Last tested</label><input value="2026-09" type="month"></div>
+			<div class="f"><span class="l">Substances</span><div class="pick"><span class="on">No drugs</span><span>Sober</span><span>Drinks socially</span><span>420 friendly</span><span>No tobacco</span></div></div>
+			<div class="w-nav"><a class="skip" href="#">Skip</a><button class="btn y">Finish</button></div>
+		</div></div></div>
+		<div class="cap">Step 6 · Health (optional, starts hidden)</div>
+	</div>
+</div>
+
+<div class="decisions">
+	<h2>Decisions made overnight, for the owner to confirm</h2>
+	<ol>
+		<li><b>Steps:</b> 1 Photo &amp; bio · 2 Basics (location, hosting, active level) · 3 Identity &amp; roles · 4 Stats (height, weight, body type) · 5 Kinks &amp; limits · 6 Health (optional). Each saves on its own; skip anytime.</li>
+		<li><b>New fields:</b> Gender, Position, Expression, Height, Weight, Body type, How active, Not looking for, Kinks (rated, with giving/receiving), Hard limits, Hosting, Safer-sex practices, Last tested, Substances. Bio grows to 1,000 characters.</li>
+		<li><b>Left out on purpose:</b> HIV status as its own field (practices + last tested cover it with less exposure) and endowment. Both are easy to add if wanted.</li>
+		<li><b>Health starts hidden</b> even when filled in: the one exception to "filled = shown".</li>
+		<li><b>Starter lists</b> are trimmed from FetLife/Sniffies (e.g. ~35 roles instead of 813). The site team edits them in wp-admin; nothing is lost if renamed.</li>
+		<li><b>Desktop tabs</b> Activity, Dynamics, Calendar and Pictures appear as their releases land.</li>
+	</ol>
+</div>
+
+<script>
+document.querySelectorAll('.pick span').forEach(s => s.addEventListener('click', () => s.classList.toggle('on')));
+</script>
+</body>
+</html>

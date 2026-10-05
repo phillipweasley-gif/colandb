@@ -9,6 +9,7 @@ bash tests/setup.sh                  # downloads WordPress + WP-CLI, installs bo
 bash tests/e2e.sh                    # member plugin: 57 end-to-end checks over real HTTP
 bash tests/account-e2e.sh            # member plugin Account tab + dashboard lockout: 64 checks
 bash tests/profile-e2e.sh            # member plugin profiles, photos, preferences, menus, account bar: 80 checks
+bash tests/setup-e2e.sh              # profiles v2 + step-by-step setup: 32 checks
 bash tests/dob-e2e.sh                # date of birth at sign-up, one-time step, under-18 lock, Show switches: 33 checks
 ```
 
@@ -19,6 +20,7 @@ bash tests/dob-e2e.sh                # date of birth at sign-up, one-time step, 
 | `seed.php` | Creates sample events through the real wp-admin save path (all admission/location/time modes, multi-day, week-crossing, overlaps, a pending duplicate). |
 | `e2e.sh` | Member plugin end-to-end: logged-out, unverified, unattested, member and a second member; tokens, rate limits, nonces, headers, sitemap/search exclusion, quiet hours, audit log. Prints `RESULT: N passed, M failed` and any plugin warnings from `debug.log`. |
 | `account-e2e.sh` | Member plugin Account tab and dashboard lockout: details, email change by link, password, devices, privacy requests, exporter/eraser, who is kept out of wp-admin. Copies the plugin from this repo into the test site first. |
+| `setup-e2e.sh` | Profiles v2 (CMP 0.5.0): starter lists, new field types (height, weight, month, rated kinks), health starting hidden, the six setup steps (one-step saves, resume, skip / later / finish), the home nudge for existing members, and the new profile display. Resets the profile option lists to the starter lists. |
 | `dob-e2e.sh` | Date of birth (CMP 0.4.0 + CEC 1.27.1 sign-up hooks): `[cec_register]` refusals and success, existing member asked once, under-18 lock and site-team unlock, calculated age, "a filled-in field starts shown", export/erase. Creates its own `[cec_register]` page and turns on registration. |
 | `profile-e2e.sh` | Member profiles: options admin, validation, who-sees-what, photos (upload checks, metadata stripping, permission-checked serving), preferences, export/erasure, sign-in-aware menus and `[cmp_account_bar]`. Starts the test server with 12 MB upload limits; needs ImageMagick's `convert` for its test photos. |
 | `updater-e2e.sh` + `mock-github.php` | COL&B Plugin Updater: 27 checks against a local stand-in for GitHub (tokens, staging vs live channel, install, background auto-update, rejected zips, token never sent to the storage server). Run with `WPTEST` set, after `setup.sh`. The mock's release list expects member plugin releases 0.1.0/0.2.0; update `mock-github.php` if that test data needs to move. |

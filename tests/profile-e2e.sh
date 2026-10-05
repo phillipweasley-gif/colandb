@@ -77,9 +77,9 @@ get rex r1 "$PROF"
 ok "non-member gets the gate, not the profile" $([ "$(has $T/r1.html 'Confirm your email')$(hasnt $T/r1.html 'cmp_profile_save')" = 11 ] && echo 1 || echo 0)
 
 N=$(pnonce $T/p1.html)
-LONG=$(head -c 501 /dev/zero | tr '\0' 'a')
+LONG=$(head -c 1001 /dev/zero | tr '\0' 'a')
 r=$(post pat --data-urlencode "action=cmp_profile_save" --data-urlencode "_cmp_nonce=$N" --data-urlencode "f[bio]=$LONG" --data-urlencode "f[pronouns]=they/them" --data-urlencode "sp[pronouns]=1" --data-urlencode "s[pronouns]=1")
-ok "bio over 500 refused" $(echo "$r" | grep -q 'profile_invalid' && echo 1 || echo 0)
+ok "bio over 1000 refused" $(echo "$r" | grep -q 'profile_invalid' && echo 1 || echo 0)
 ok "nothing saved on error" $([ "$(ev "global \$wpdb; echo (int)\$wpdb->get_var('SELECT COUNT(*) FROM '.CMP_Install::table('profile_values').' WHERE user_id = '. $(uid pat));")" = 0 ] && echo 1 || echo 0)
 get pat p2 "$PROF"
 ok "errors listed, typed answers kept" $([ "$(has $T/p2.html 'id="cmp-profile-errors"')$(has $T/p2.html 'value="they/them"')$(has $T/p2.html 'aria-invalid="true"')" = 111 ] && echo 1 || echo 0)

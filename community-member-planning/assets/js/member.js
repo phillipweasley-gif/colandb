@@ -483,7 +483,9 @@
 			var was = ! sw.hasAttribute( 'hidden' );
 			var now = filled();
 			if ( now && ! was && box ) {
-				box.checked = true; // A newly filled field starts shown.
+				// A newly filled field starts shown, except health details,
+				// which start hidden (data-cmp-sensitive).
+				box.checked = ! sw.hasAttribute( 'data-cmp-sensitive' );
 			}
 			sw.toggleAttribute( 'hidden', ! now );
 		};

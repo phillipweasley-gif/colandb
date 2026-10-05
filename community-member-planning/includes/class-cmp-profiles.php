@@ -258,13 +258,16 @@ class CMP_Profiles {
 		$input   = isset( $_POST['f'] ) && is_array( $_POST['f'] ) ? wp_unslash( $_POST['f'] ) : array();
 		$show    = isset( $_POST['s'] ) && is_array( $_POST['s'] ) ? wp_unslash( $_POST['s'] ) : array();
 		$present = isset( $_POST['sp'] ) && is_array( $_POST['sp'] ) ? wp_unslash( $_POST['sp'] ) : array();
+		// A setup step saves only its own fields (only[]); the Profile tab saves all.
+		$only    = isset( $_POST['only'] ) && is_array( $_POST['only'] ) ? array_map( 'sanitize_key', wp_unslash( $_POST['only'] ) ) : null;
+		$return  = isset( $_POST['cmp_return'] ) ? wp_validate_redirect( esc_url_raw( wp_unslash( $_POST['cmp_return'] ) ), '' ) : '';
 		// phpcs:enable
 
 		$rows   = self::rows( $user_id );
 		$clean  = array();
 		$errors = array();
 		foreach ( CMP_Profile_Fields::fields() as $key => $f ) {
-			if ( in_array( $f['type'], array( 'account', 'system', 'image', 'age' ), true ) ) {
+			if ( in_array( $f['type'], array( 'account', 'system', 'image', 'age' ), true ) || ( null !== $only && ! in_array( $key, $only, true ) ) ) {
 				continue;
 			}
 			$value = CMP_Profile_Fields::clean( $key, isset( $input[ $key ] ) ? $input[ $key ] : '' );
@@ -276,7 +279,7 @@ class CMP_Profiles {
 		}
 		if ( $errors ) {
 			set_transient( self::ERRORS . $user_id, array( 'errors' => $errors, 'input' => $input, 'show' => $show, 'present' => $present ), self::ERRORS_TTL );
-			wp_safe_redirect( self::url( 'profile_invalid', 'cmp-profile-errors' ) );
+			wp_safe_redirect( $return ? add_query_arg( 'cmp_notice', 'profile_invalid', $return ) . '#cmp-profile-errors' : self::url( 'profile_invalid', 'cmp-profile-errors' ) );
 			exit;
 		}
 		delete_transient( self::ERRORS . $user_id );
@@ -285,8 +288,8 @@ class CMP_Profiles {
 		$vis_old        = array();
 		$vis_new        = array();
 		foreach ( CMP_Profile_Fields::fields() as $key => $f ) {
-			if ( 'image' === $f['type'] ) {
-				continue; // Saved with the photo itself.
+			if ( 'image' === $f['type'] || ( null !== $only && ! in_array( $key, $only, true ) ) ) {
+				continue; // Photos save with the photo itself; a step saves only its fields.
 			}
 			$has_value = array_key_exists( $key, $clean );
 			$current   = $rows[ $key ]['visibility'];
@@ -320,7 +323,14 @@ class CMP_Profiles {
 		if ( $vis_new ) {
 			CMP_Audit::log( 'profile_visibility_changed', 'user', $user_id, $vis_old, $vis_new );
 		}
-		wp_safe_redirect( self::url( 'profile_saved' ) );
+		/**
+		 * After a profile save (the setup steps advance through this).
+		 *
+		 * @param int        $user_id
+		 * @param array|null $only The fields this save covered (null = all).
+		 */
+		do_action( 'cmp_profile_saved', $user_id, $only );
+		wp_safe_redirect( $return ? $return : self::url( 'profile_saved' ) );
 		exit;
 	}
 
@@ -343,7 +353,8 @@ class CMP_Profiles {
 	 */
 	private static function show_switch( $key, $on, $label, $hidden ) {
 		$id = 'cmp_s_' . $key;
-		return '<span class="cmp-show" data-cmp-show' . ( $hidden ? ' hidden' : '' ) . '>'
+		$sensitive = CMP_Profile_Fields::is_sensitive( $key ) ? ' data-cmp-sensitive' : '';
+		return '<span class="cmp-show" data-cmp-show' . $sensitive . ( $hidden ? ' hidden' : '' ) . '>'
 			. '<input type="hidden" name="sp[' . esc_attr( $key ) . ']" value="1" />'
 			. '<input type="checkbox" class="cmp-switch-input" id="' . esc_attr( $id ) . '" name="s[' . esc_attr( $key ) . ']" value="1"' . checked( $on, true, false ) . ' />'
 			. '<label for="' . esc_attr( $id ) . '" class="cmp-switch-label"><span class="cmp-switch" aria-hidden="true"></span>'
@@ -422,6 +433,53 @@ class CMP_Profiles {
 			case 'age':
 				$text = CMP_Profile_Fields::display( 'age', $value );
 				return '<span class="cmp-readonly cmp-age-value">' . esc_html( '' !== $text ? $text : __( 'Not available yet', 'cmp' ) ) . '</span>';
+			case 'height':
+				$html = '<select id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '"' . $bad . '><option value="">' . esc_html__( 'Not set', 'cmp' ) . '</option>';
+				for ( $i = 48; $i <= 96; $i++ ) {
+					$html .= '<option value="' . $i . '"' . selected( (int) $value, $i, false ) . '>' . esc_html( CMP_Profile_Fields::format_height( $i ) ) . '</option>';
+				}
+				return $html . '</select>';
+			case 'weight':
+				return '<span class="cmp-unit"><input type="number" inputmode="numeric" min="70" max="700" step="1" id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( is_scalar( $value ) ? (string) $value : '' ) . '"' . $bad . ' /> ' . esc_html__( 'lb', 'cmp' ) . '</span>';
+			case 'month':
+				return '<input type="month" id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( is_scalar( $value ) ? (string) $value : '' ) . '" max="' . esc_attr( wp_date( 'Y-m' ) ) . '" placeholder="YYYY-MM"' . $bad . ' />';
+			case 'rated':
+				$options = CMP_Profile_Fields::options( $f['list'] );
+				$chosen  = array();
+				foreach ( is_array( $value ) ? $value : array() as $k => $row ) {
+					// Stored rows are {k,lvl,dir}; typed-back input is keyed by option.
+					if ( is_array( $row ) && isset( $row['k'] ) ) {
+						$chosen[ $row['k'] ] = $row;
+					} elseif ( is_array( $row ) ) {
+						$chosen[ (string) $k ] = $row;
+					}
+				}
+				$all = CMP_Profile_Fields::options( $f['list'], true );
+				foreach ( array_keys( $chosen ) as $k ) {
+					if ( ! isset( $options[ $k ] ) && isset( $all[ $k ] ) ) {
+						$options[ $k ] = $all[ $k ];
+					}
+				}
+				if ( ! $options ) {
+					return '<p class="cmp-muted">' . esc_html__( 'No choices yet: the site team is still preparing this list.', 'cmp' ) . '</p>';
+				}
+				$html = '<span class="cmp-rated">';
+				foreach ( $options as $k => $label ) {
+					$lvl   = isset( $chosen[ $k ]['lvl'] ) ? $chosen[ $k ]['lvl'] : '';
+					$dir   = isset( $chosen[ $k ]['dir'] ) ? $chosen[ $k ]['dir'] : '';
+					$rid   = $id . '_' . $k;
+					$html .= '<span class="cmp-rated-row"><span class="cmp-rated-name" id="' . esc_attr( $rid ) . '_l">' . esc_html( $label ) . '</span>';
+					$html .= '<select name="' . esc_attr( $name . '[' . $k . '][lvl]' ) . '" aria-label="' . esc_attr( sprintf( /* translators: %s: kink */ __( 'How much: %s', 'cmp' ), $label ) ) . '"><option value="">' . esc_html__( 'How much?', 'cmp' ) . '</option>';
+					foreach ( CMP_Profile_Fields::kink_level_labels() as $lk => $ll ) {
+						$html .= '<option value="' . esc_attr( $lk ) . '"' . selected( $lvl, $lk, false ) . '>' . esc_html( $ll ) . '</option>';
+					}
+					$html .= '</select><select name="' . esc_attr( $name . '[' . $k . '][dir]' ) . '" aria-label="' . esc_attr( sprintf( /* translators: %s: kink */ __( 'Giving or receiving: %s', 'cmp' ), $label ) ) . '"><option value="">' . esc_html__( 'Giving / receiving?', 'cmp' ) . '</option>';
+					foreach ( CMP_Profile_Fields::kink_dir_labels() as $dk => $dl ) {
+						$html .= '<option value="' . esc_attr( $dk ) . '"' . selected( $dir, $dk, false ) . '>' . esc_html( $dl ) . '</option>';
+					}
+					$html .= '</select></span>';
+				}
+				return $html . '</span>';
 		}
 		return '';
 	}
@@ -429,7 +487,7 @@ class CMP_Profiles {
 	private static function help( $key, $f ) {
 		$help = array(
 			'display_name' => '',
-			'bio'          => sprintf( /* translators: %d: maximum characters */ __( 'Up to %d characters.', 'cmp' ), 500 ),
+			'bio'          => 'bio' === $key ? sprintf( /* translators: %d: maximum characters */ __( 'Up to %d characters.', 'cmp' ), (int) $f['max'] ) : '',
 			'pronouns'     => __( 'For example: she/her, he/him, they/them.', 'cmp' ),
 			'location'     => __( 'City, region and country only. Never a street address.', 'cmp' ),
 			'interests'    => sprintf( /* translators: %d: maximum choices */ __( 'Choose up to %d.', 'cmp' ), 20 ),
@@ -440,7 +498,75 @@ class CMP_Profiles {
 			'age'          => __( 'Worked out from your date of birth, and updates on your birthday. Your birth date itself is never shown.', 'cmp' ),
 			'member_since' => __( 'Set automatically from when you joined.', 'cmp' ),
 		);
-		return isset( $help[ $key ] ) ? $help[ $key ] : '';
+		if ( isset( $help[ $key ] ) ) {
+			return $help[ $key ];
+		}
+		if ( ! empty( $f['help'] ) ) {
+			return $f['help'];
+		}
+		if ( 'multi' === $f['type'] || 'rated' === $f['type'] ) {
+			/* translators: %d: maximum choices */
+			return sprintf( __( 'Choose up to %d.', 'cmp' ), (int) $f['limit'] );
+		}
+		return '';
+	}
+
+	/**
+	 * One field's row: label, help, input and its Show switch. Shared by the
+	 * Profile tab and the setup steps (CMP_Onboarding).
+	 *
+	 * @param array      $input   What the member typed, after a failed save.
+	 * @param array|null $show_in The switches as submitted, after a failed save.
+	 */
+	public static function row_html( $user_id, $key, $rows, $input = array(), $show_in = null, $errors = array() ) {
+		$f      = CMP_Profile_Fields::field( $key );
+		$value  = array_key_exists( $key, $input ) ? $input[ $key ] : self::value( $user_id, $key, $rows );
+		$filled = self::is_filled( $key, $value );
+		if ( null !== $show_in ) {
+			$on = ! empty( $show_in[ $key ] );
+		} elseif ( ! $filled ) {
+			$on = ! CMP_Profile_Fields::is_sensitive( $key ); // What a newly filled field starts as.
+		} else {
+			$on = 'members' === $rows[ $key ]['visibility'];
+		}
+		$help   = self::help( $key, $f );
+		$is_set = in_array( $f['type'], array( 'location', 'multi', 'age', 'rated' ), true );
+		$label  = esc_html( $f['label'] );
+		$html   = '<div class="cmp-profile-row' . ( isset( $errors[ $key ] ) ? ' has-error' : '' ) . '" id="cmp-row-' . esc_attr( $key ) . '">';
+		if ( $is_set ) {
+			$html .= '<fieldset class="cmp-profile-input"><legend>' . $label . '</legend>';
+		} else {
+			$html .= '<div class="cmp-profile-input">';
+			if ( in_array( $f['type'], array( 'account', 'system' ), true ) ) {
+				$html .= '<span class="cmp-label">' . $label . '</span>';
+			} else {
+				$html .= '<label for="cmp_f_' . esc_attr( $key ) . '">' . $label . '</label>';
+			}
+		}
+		if ( $help ) {
+			$html .= '<span class="cmp-muted">' . esc_html( $help ) . '</span>';
+		}
+		$html .= self::error_html( $key, $errors );
+		if ( 'account' === $f['type'] ) {
+			$html .= '<span class="cmp-readonly">' . esc_html( (string) $value ) . ' <a href="' . esc_url( CMP_Account::url() . '#cmp-details' ) . '">' . esc_html__( 'Change on the Account tab', 'cmp' ) . '</a></span>';
+		} elseif ( 'system' === $f['type'] ) {
+			$html .= '<span class="cmp-readonly">' . esc_html( (string) $value ) . '</span>';
+		} else {
+			$html .= self::input_html( $key, $f, $value, $errors );
+		}
+		$html .= $is_set ? '</fieldset>' : '</div>';
+		$html .= self::show_switch( $key, $on, $f['label'], ! $filled );
+		return $html . '</div>';
+	}
+
+	/** Errors and typed answers kept from a failed save (Profile tab or setup step). */
+	public static function saved_errors( $user_id ) {
+		$saved = get_transient( self::ERRORS . $user_id );
+		return array(
+			'errors'  => $saved && ! empty( $saved['errors'] ) ? $saved['errors'] : array(),
+			'input'   => $saved && isset( $saved['input'] ) ? (array) $saved['input'] : array(),
+			'show_in' => $saved && isset( $saved['show'] ) ? (array) $saved['show'] : null,
+		);
 	}
 
 	public static function render() {
@@ -481,41 +607,25 @@ class CMP_Profiles {
 				<input type="hidden" name="action" value="cmp_profile_save" />
 				<input type="hidden" name="_cmp_nonce" value="<?php echo esc_attr( wp_create_nonce( self::NONCE ) ); ?>" />
 				<?php
-				foreach ( $fields as $key => $f ) {
-					if ( 'image' === $f['type'] ) {
+				foreach ( CMP_Profile_Fields::sections() as $section => $section_label ) {
+					$keys = array_keys(
+						array_filter(
+							$fields,
+							function ( $f ) use ( $section ) {
+								return $section === $f['section'] && 'image' !== $f['type'];
+							}
+						)
+					);
+					if ( ! $keys ) {
 						continue;
 					}
-					$value  = array_key_exists( $key, $input ) ? $input[ $key ] : self::value( $user_id, $key, $rows );
-					$filled = self::is_filled( $key, $value );
-					$on     = null !== $show_in ? ! empty( $show_in[ $key ] ) : ( ! $filled || 'members' === $rows[ $key ]['visibility'] );
-					$help   = self::help( $key, $f );
-					$is_set = in_array( $f['type'], array( 'location', 'multi', 'age' ), true );
-					$label  = esc_html( $f['label'] );
-					echo '<div class="cmp-profile-row' . ( isset( $errors[ $key ] ) ? ' has-error' : '' ) . '" id="cmp-row-' . esc_attr( $key ) . '">';
-					if ( $is_set ) {
-						echo '<fieldset class="cmp-profile-input"><legend>' . $label . '</legend>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-					} else {
-						echo '<div class="cmp-profile-input">';
-						if ( in_array( $f['type'], array( 'account', 'system' ), true ) ) {
-							echo '<span class="cmp-label">' . $label . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-						} else {
-							echo '<label for="cmp_f_' . esc_attr( $key ) . '">' . $label . '</label>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-						}
+					echo '<h4 class="cmp-section-title" id="cmp-section-' . esc_attr( $section ) . '">' . esc_html( $section_label ) . '</h4>';
+					if ( 'health' === $section ) {
+						echo '<p class="cmp-muted cmp-section-note">' . esc_html__( 'Optional. Health details start hidden even once filled in; switch on only what you want members to see.', 'cmp' ) . '</p>';
 					}
-					if ( $help ) {
-						echo '<span class="cmp-muted">' . esc_html( $help ) . '</span>';
+					foreach ( $keys as $key ) {
+						echo self::row_html( $user_id, $key, $rows, $input, $show_in, $errors ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 					}
-					echo self::error_html( $key, $errors ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-					if ( 'account' === $f['type'] ) {
-						echo '<span class="cmp-readonly">' . esc_html( (string) $value ) . ' <a href="' . esc_url( CMP_Account::url() . '#cmp-details' ) . '">' . esc_html__( 'Change on the Account tab', 'cmp' ) . '</a></span>';
-					} elseif ( 'system' === $f['type'] ) {
-						echo '<span class="cmp-readonly">' . esc_html( (string) $value ) . '</span>';
-					} else {
-						echo self::input_html( $key, $f, $value, $errors ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-					}
-					echo $is_set ? '</fieldset>' : '</div>';
-					echo self::show_switch( $key, $on, $f['label'], ! $filled ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-					echo '</div>';
 				}
 				?>
 				<p class="cmp-actions"><button type="submit" class="cmp-btn"><?php esc_html_e( 'Save profile', 'cmp' ); ?></button></p>
@@ -548,30 +658,157 @@ class CMP_Profiles {
 	 * another member's profile.
 	 */
 	public static function card_html( $owner_id, $viewer_id, $as_members = false ) {
-		$rows    = self::rows( $owner_id );
-		$fields  = self::visible( $owner_id, $viewer_id, $as_members );
-		$can_img = function ( $kind ) use ( $owner_id, $viewer_id, $as_members, $rows ) {
-			return $as_members ? 'members' === $rows[ $kind ]['visibility'] : self::can_view( $kind, $owner_id, $viewer_id, $rows );
+		$rows = self::rows( $owner_id );
+		$can  = function ( $key ) use ( $owner_id, $viewer_id, $as_members, $rows ) {
+			return $as_members ? 'members' === $rows[ $key ]['visibility'] : self::can_view( $key, $owner_id, $viewer_id, $rows );
 		};
-		$cover   = $can_img( 'cover' ) ? CMP_Profile_Images::get( $owner_id, 'cover', false ) : null;
-		$avatar  = $can_img( 'avatar' ) ? CMP_Profile_Images::get( $owner_id, 'avatar', false ) : null;
-		$name    = isset( $fields['display_name'] ) ? $fields['display_name']['text'] : __( 'Member', 'cmp' );
-		unset( $fields['display_name'] );
+		// Visible, non-empty values only.
+		$val = function ( $key ) use ( $can, $owner_id, $rows ) {
+			if ( ! $can( $key ) ) {
+				return '';
+			}
+			$v = self::value( $owner_id, $key, $rows );
+			return '' === CMP_Profile_Fields::display( $key, $v ) ? '' : $v;
+		};
+		$txt = function ( $key ) use ( $val ) {
+			$v = $val( $key );
+			return '' === $v ? '' : CMP_Profile_Fields::display( $key, $v );
+		};
+		// Option labels of a visible multi field, for chips.
+		$chips = function ( $key ) use ( $val ) {
+			$v = $val( $key );
+			if ( '' === $v ) {
+				return array();
+			}
+			$f      = CMP_Profile_Fields::field( $key );
+			$o      = CMP_Profile_Fields::options( $f['list'], true );
+			$labels = array();
+			foreach ( isset( $v['keys'] ) ? (array) $v['keys'] : array() as $k ) {
+				if ( isset( $o[ $k ] ) ) {
+					$labels[] = $o[ $k ];
+				}
+			}
+			if ( ! empty( $v['other'] ) ) {
+				$labels[] = $v['other'];
+			}
+			return $labels;
+		};
+		$chip_html = function ( $labels ) {
+			return $labels ? '<ul class="cmp-chips">' . implode( '', array_map( function ( $l ) {
+				return '<li>' . esc_html( $l ) . '</li>';
+			}, $labels ) ) . '</ul>' : '';
+		};
 
-		$html = '<div class="cmp-card">';
-		$html .= '<div class="cmp-card-cover">' . ( $cover ? CMP_Profile_Images::img_html( $owner_id, 'cover', $cover ) : '' ) . '</div>';
-		$html .= '<div class="cmp-card-head"><span class="cmp-card-avatar">' . ( $avatar ? CMP_Profile_Images::img_html( $owner_id, 'avatar', $avatar ) : '<span class="cmp-avatar-placeholder" aria-hidden="true">' . esc_html( mb_strtoupper( mb_substr( $name, 0, 1 ) ) ) . '</span>' ) . '</span>';
-		$html .= '<span class="cmp-card-name">' . esc_html( $name ) . '</span></div>';
-		if ( $fields ) {
-			$html .= '<dl class="cmp-card-fields">';
-			foreach ( $fields as $f ) {
-				$html .= '<div><dt>' . esc_html( $f['label'] ) . '</dt><dd>' . nl2br( esc_html( $f['text'] ) ) . '</dd></div>';
+		$name   = $txt( 'display_name' ) ? $txt( 'display_name' ) : __( 'Member', 'cmp' );
+		$avatar = $can( 'avatar' ) ? CMP_Profile_Images::get( $owner_id, 'avatar', false ) : null;
+		$cover  = $can( 'cover' ) ? CMP_Profile_Images::get( $owner_id, 'cover', false ) : null;
+		$roles  = $chips( 'roles' );
+		$gender = $chips( 'gender' );
+
+		// FetLife-style "43 M Dom" tag next to the name.
+		$tag = trim( $txt( 'age' ) . ' ' . ( $gender ? mb_substr( $gender[0], 0, 1 ) : '' ) . ' ' . ( $roles ? $roles[0] : '' ) );
+		// Sniffies-style stat line: whatever is shown, in a fixed order.
+		$stat = array_filter(
+			array(
+				$txt( 'age' ),
+				$txt( 'height' ),
+				$txt( 'weight' ),
+				mb_strtolower( $txt( 'body_type' ) ),
+				mb_strtolower( implode( ', ', $chips( 'identity' ) ) ),
+				mb_strtolower( $txt( 'position' ) ),
+				implode( ', ', array_slice( $roles, 0, 3 ) ),
+			)
+		);
+		$details = array_filter(
+			array(
+				__( 'Gender', 'cmp' )       => implode( ', ', $gender ),
+				__( 'Pronouns', 'cmp' )     => $txt( 'pronouns' ),
+				__( 'Orientation', 'cmp' )  => $txt( 'identity' ),
+				__( 'Roles', 'cmp' )        => implode( ', ', $roles ),
+				__( 'Expression', 'cmp' )   => $txt( 'expression' ),
+				__( 'Active', 'cmp' )       => $txt( 'active_level' ),
+				__( 'Looking for', 'cmp' )  => $txt( 'looking_for' ),
+				__( 'Member since', 'cmp' ) => $txt( 'member_since' ),
+			)
+		);
+		$stats = array_filter(
+			array(
+				__( 'Age', 'cmp' )       => $txt( 'age' ),
+				__( 'Height', 'cmp' )    => $txt( 'height' ),
+				__( 'Weight', 'cmp' )    => $txt( 'weight' ),
+				__( 'Body type', 'cmp' ) => $txt( 'body_type' ),
+				__( 'Position', 'cmp' )  => $txt( 'position' ),
+				__( 'Hosting', 'cmp' )   => $txt( 'hosting' ),
+				__( 'Availability', 'cmp' ) => $txt( 'availability' ),
+			)
+		);
+
+		$html  = '<article class="cmp-prof" aria-label="' . esc_attr( $name ) . '">';
+		$html .= '<header class="cmp-prof-band">';
+		$html .= '<div class="cmp-prof-photo">' . ( $cover ? '<span class="cmp-prof-cover">' . CMP_Profile_Images::img_html( $owner_id, 'cover', $cover ) . '</span>' : '' )
+			. ( $avatar ? CMP_Profile_Images::img_html( $owner_id, 'avatar', $avatar ) : '<span class="cmp-avatar-placeholder" aria-hidden="true">' . esc_html( mb_strtoupper( mb_substr( $name, 0, 1 ) ) ) . '</span>' ) . '</div>';
+		$html .= '<div class="cmp-prof-head"><h3 class="cmp-prof-name">' . esc_html( $name ) . ( $tag ? ' <small>' . esc_html( $tag ) . '</small>' : '' ) . '</h3>';
+		if ( $txt( 'location' ) ) {
+			$html .= '<p class="cmp-prof-loc">' . esc_html( $txt( 'location' ) ) . '</p>';
+		}
+		if ( $stat ) {
+			$html .= '<p class="cmp-prof-stat">' . esc_html( implode( ' · ', $stat ) ) . '</p>';
+		}
+		if ( $details ) {
+			$html .= '<dl class="cmp-prof-table">';
+			foreach ( $details as $label => $text ) {
+				$html .= '<div><dt>' . esc_html( $label ) . '</dt><dd>' . esc_html( $text ) . '</dd></div>';
 			}
 			$html .= '</dl>';
-		} else {
-			$html .= '<p class="cmp-empty">' . esc_html( $as_members ? __( 'Nothing else is shared with members yet.', 'cmp' ) : __( 'This member hasn\'t shared anything else with you.', 'cmp' ) ) . '</p>';
 		}
-		return $html . '</div>';
+		$html .= '</div></header>';
+
+		$side = '';
+		if ( $stats ) {
+			$side .= '<section class="cmp-prof-card cmp-prof-stats"><h4>' . esc_html__( 'Stats', 'cmp' ) . '</h4><dl class="cmp-prof-table">';
+			foreach ( $stats as $label => $text ) {
+				$side .= '<div><dt>' . esc_html( $label ) . '</dt><dd>' . esc_html( $text ) . '</dd></div>';
+			}
+			$side .= '</dl></section>';
+		}
+
+		$main = '';
+		if ( $txt( 'bio' ) ) {
+			$main .= '<section class="cmp-prof-card"><h4>' . esc_html__( 'About', 'cmp' ) . '</h4><blockquote class="cmp-prof-bio">' . nl2br( esc_html( $txt( 'bio' ) ) ) . '</blockquote></section>';
+		}
+		foreach ( array( 'looking_for', 'not_looking_for', 'interests' ) as $key ) {
+			$labels = $chips( $key );
+			if ( $labels ) {
+				$main .= '<section class="cmp-prof-card"><h4>' . esc_html( CMP_Profile_Fields::field( $key )['label'] ) . '</h4>' . $chip_html( $labels ) . '</section>';
+			}
+		}
+		$kinks = $val( 'kinks' );
+		if ( '' !== $kinks ) {
+			$o    = CMP_Profile_Fields::options( 'kinks', true );
+			$lvls = CMP_Profile_Fields::kink_level_labels();
+			$dirs = CMP_Profile_Fields::kink_dir_labels();
+			$main .= '<section class="cmp-prof-card"><h4>' . esc_html__( 'Kinks', 'cmp' ) . '</h4><ul class="cmp-prof-kinks">';
+			foreach ( (array) $kinks as $row ) {
+				if ( ! isset( $row['k'], $o[ $row['k'] ] ) ) {
+					continue;
+				}
+				$main .= '<li><span>' . esc_html( $o[ $row['k'] ] ) . '</span><span><b>' . esc_html( isset( $lvls[ $row['lvl'] ] ) ? $lvls[ $row['lvl'] ] : '' ) . '</b>' . ( ! empty( $row['dir'] ) && isset( $dirs[ $row['dir'] ] ) ? ' <small>' . esc_html( mb_strtolower( $dirs[ $row['dir'] ] ) ) . '</small>' : '' ) . '</span></li>';
+			}
+			$main .= '</ul></section>';
+		}
+		if ( $txt( 'hard_limits' ) ) {
+			$main .= '<section class="cmp-prof-card"><h4>' . esc_html__( 'Hard limits', 'cmp' ) . '</h4><p>' . nl2br( esc_html( $txt( 'hard_limits' ) ) ) . '</p></section>';
+		}
+		$health = array_merge( $chips( 'practices' ), $txt( 'last_tested' ) ? array( sprintf( /* translators: %s: month and year */ __( 'Tested %s', 'cmp' ), $txt( 'last_tested' ) ) ) : array(), $chips( 'substances' ) );
+		if ( $health ) {
+			$main .= '<section class="cmp-prof-card"><h4>' . esc_html__( 'Health & safer sex', 'cmp' ) . '</h4>' . $chip_html( $health ) . '</section>';
+		}
+
+		if ( '' === $main && '' === $side && ! $details ) {
+			$main = '<p class="cmp-empty">' . esc_html( $as_members ? __( 'Nothing else is shared with members yet.', 'cmp' ) : __( 'This member hasn\'t shared anything else with you.', 'cmp' ) ) . '</p>';
+		}
+		$html .= '<div class="cmp-prof-body">' . ( $side ? '<aside class="cmp-prof-side">' . $side . '</aside>' : '' ) . '<div class="cmp-prof-main">' . $main . '</div></div>';
+		return $html . '</article>';
 	}
 
 	/**
