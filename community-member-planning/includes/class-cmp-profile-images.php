@@ -171,15 +171,19 @@ class CMP_Profile_Images {
 	 * ---------------------------------------------------------------- */
 
 	private static function respond( $ok, $notice, $message = '', $kind = '' ) {
+		// The setup steps (CMP_Onboarding) send members back to their step.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- only decides where to go next; validated as a same-site URL.
+		$return = isset( $_POST['cmp_return'] ) ? wp_validate_redirect( esc_url_raw( wp_unslash( $_POST['cmp_return'] ) ), '' ) : '';
+		$to     = $return ? add_query_arg( 'cmp_notice', $notice, $return ) . '#cmp-photo-' . $kind : CMP_Profiles::url( $notice, 'cmp-photo-' . $kind );
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- only decides the response format.
 		if ( ! empty( $_POST['cmp_ajax'] ) ) {
 			nocache_headers();
-			wp_send_json( array( 'ok' => $ok, 'message' => $message, 'redirect' => CMP_Profiles::url( $notice, 'cmp-photo-' . $kind ) ), $ok ? 200 : 400 );
+			wp_send_json( array( 'ok' => $ok, 'message' => $message, 'redirect' => $to ), $ok ? 200 : 400 );
 		}
 		if ( ! $ok && $message ) {
 			set_transient( 'cmp_photo_error_' . get_current_user_id(), array( 'kind' => $kind, 'message' => $message ), 10 * MINUTE_IN_SECONDS );
 		}
-		wp_safe_redirect( CMP_Profiles::url( $notice, 'cmp-photo-' . $kind ) );
+		wp_safe_redirect( $to );
 		exit;
 	}
 
@@ -338,14 +342,25 @@ class CMP_Profile_Images {
 		);
 	}
 
-	public static function render_panels( $user_id, $rows ) {
+	/**
+	 * @param array|null $kinds  Only these photos (the setup step shows just the avatar).
+	 * @param string     $return Where to come back to after saving.
+	 */
+	public static function render_panels( $user_id, $rows, $kinds = null, $return = '' ) {
 		$error = get_transient( 'cmp_photo_error_' . $user_id );
 		if ( $error ) {
 			delete_transient( 'cmp_photo_error_' . $user_id );
 		}
 		$html = '<div class="cmp-photo-panels">';
 		foreach ( self::SIZES as $kind => $size ) {
-			$html .= self::panel( $user_id, $kind, $size, $rows[ $kind ]['visibility'], $error && $error['kind'] === $kind ? $error['message'] : '' );
+			if ( null !== $kinds && ! in_array( $kind, $kinds, true ) ) {
+				continue;
+			}
+			$panel = self::panel( $user_id, $kind, $size, $rows[ $kind ]['visibility'], $error && $error['kind'] === $kind ? $error['message'] : '' );
+			if ( $return ) {
+				$panel = str_replace( '<input type="hidden" name="kind"', '<input type="hidden" name="cmp_return" value="' . esc_url( $return ) . '" /><input type="hidden" name="kind"', $panel );
+			}
+			$html .= $panel;
 		}
 		return $html . '</div>';
 	}
