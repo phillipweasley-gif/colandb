@@ -834,3 +834,9 @@ a.cec-cal-day-detail-title:hover, a.cec-cal-day-detail-title:focus-visible { col
 .cec-editor-preview-card { max-width: 340px; }
 .cec-editor-preview-card .cec-event-card:hover { transform: none; }
 .cec-editor-preview-calendar { max-width: 100%; }
+
+/* People you follow are going (1.28.0, filled in by Community Member Planning) */
+.cec-calendar-wrap .cec-cal-social-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--cec-secondary, #ff50d7); margin-right: 5px; vertical-align: 1px; box-shadow: 0 0 0 2px rgba(0, 0, 0, .35); }
+.cec-calendar-wrap .cec-cal-pcard-social { display: block; font-size: 12px; font-weight: 700; color: var(--cec-secondary, #ff50d7); margin-top: 4px; }
+.cec-calendar-wrap .cec-cal-pcard-social::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; }
+.cec-calendar-wrap .screen-reader-text { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

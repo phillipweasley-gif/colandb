@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Community Events Calendar
  * Description: Member and admin-managed community events calendar with submissions, approval workflow, partner organizations, recurring events, postponed/cancelled status, RSS/email subscriptions, volunteer inquiries, RSVP, and Elementor widgets. Shortcodes: [cec_calendar] month view, [cec_events view="grid|list"] filterable grid/list, [cec_upcoming count="8"] scrolling upcoming events, [cec_submit_event] front-end submission form, [cec_admin_dashboard] front-end approval dashboard for delegated Calendar Managers, [cec_my_events] lets a submitter manage their own events, [cec_login]/[cec_register] styled account forms, [cec_manage_submission] guest email-link editing, [cec_subscribe] email subscriptions to all events or specific organizations, [cec_volunteer_form] volunteer inquiry form. Full docs on the Events > Settings page.
- * Version: 1.27.2
+ * Version: 1.28.0
  * Author: RA Marketing
  * Text Domain: cec
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CEC_VERSION', '1.27.2' );
+define( 'CEC_VERSION', '1.28.0' );
 define( 'CEC_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CEC_URL', plugin_dir_url( __FILE__ ) );
 define( 'CEC_TABLE_RSVP', 'cec_rsvps' );
