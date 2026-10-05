@@ -88,10 +88,7 @@ class CEC_Roles {
 		if ( $requested_redirect_to && false === strpos( $requested_redirect_to, 'wp-admin' ) ) {
 			return $requested_redirect_to;
 		}
-		$manager = user_can( $user, self::CAP );
-		return $manager
-			? ( CEC_Admin_Settings::get( 'dashboard_page_url' ) ?: home_url( '/' ) )
-			: ( CEC_Admin_Settings::get( 'submit_page_url' ) ?: home_url( '/' ) );
+		return CEC_Auth::default_redirect( $user );
 	}
 
 	public static function hide_admin_bar( $show ) {

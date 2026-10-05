@@ -48,6 +48,21 @@ ok "signed-out form post -> sign-in page, back to member area" $(echo "$r" | gre
 echo "== Dashboard lockout (on by default)"
 login carol carol carolpass1 "$H/wp-admin/"
 ok "sign-in never lands in wp-admin" $(grep -i '^location:' $T/carol.login.h | grep -vq 'wp-admin' && echo 1 || echo 0)
+echo "== Where signing in lands (CEC 1.28.1 / CMP 0.12.1)"
+login carold carol carolpass1 ""
+ok "wp-login with no destination: the member area" $(grep -i '^location:' $T/carold.login.h | grep -q "page_id=$PAGE_ID" && echo 1 || echo 0)
+LP=$($W post create --post_type=page --post_status=publish --post_title="ZZ Log In" --post_content='[cec_login]' --porcelain 2>/dev/null)
+rm -f $T/lf.jar; curl -s -c $T/lf.jar -b $T/lf.jar -o $T/lf.html "$H/?page_id=$LP"
+LN=$(grep -o 'name="cec_login_nonce" value="[^"]*"' $T/lf.html | cut -d'"' -f4)
+ok "site Log In form: no destination filled in" $(grep -q 'name="cec_redirect" value=""' $T/lf.html && echo 1 || echo 0)
+r=$(curl -s -c $T/lf.jar -b $T/lf.jar -o /dev/null -w '%{redirect_url}' "$H/wp-admin/admin-post.php" --data-urlencode "action=cec_login" --data-urlencode "cec_login_nonce=$LN" --data-urlencode "cec_redirect=" --data-urlencode "cec_identifier=carol" --data-urlencode "cec_password=carolpass1")
+ok "site Log In form: a member lands in the member area" $(echo "$r" | grep -q "page_id=$PAGE_ID" && echo 1 || echo 0)
+rm -f $T/lf2.jar; curl -s -c $T/lf2.jar -b $T/lf2.jar -o $T/lf2.html "$H/?page_id=$LP&redirect_to=$(php -r 'echo rawurlencode($argv[1]);' "$H/?page_id=$LP&back=1")"
+LN2=$(grep -o 'name="cec_login_nonce" value="[^"]*"' $T/lf2.html | cut -d'"' -f4)
+r=$(curl -s -c $T/lf2.jar -b $T/lf2.jar -o /dev/null -w '%{redirect_url}' "$H/wp-admin/admin-post.php" --data-urlencode "action=cec_login" --data-urlencode "cec_login_nonce=$LN2" --data-urlencode "cec_redirect=$H/?page_id=$LP&back=1" --data-urlencode "cec_identifier=carol" --data-urlencode "cec_password=carolpass1")
+ok "an explicit destination is still respected" $(echo "$r" | grep -q "back=1" && echo 1 || echo 0)
+ok "event managers keep their default (not the member area)" $($W eval '$u=new WP_User(0); $u->ID=999999; $u->allcaps=array("cec_manage_events"=>true); $u->caps=array("cec_manage_events"=>true); echo false===strpos(CEC_Auth::default_redirect($u),"page_id='$PAGE_ID'")?1:0;' 2>&1)
+$W post delete $LP --force >/dev/null 2>&1
 login carolp carol carolpass1 "$H/wp-admin/profile.php"
 ok "sign-in aimed at profile.php lands on the Account tab" $(grep -i '^location:' $T/carolp.login.h | grep -q "page_id=$PAGE_ID.*cmp_tab=account" && echo 1 || echo 0)
 r=$(loc carol "$H/wp-admin/")

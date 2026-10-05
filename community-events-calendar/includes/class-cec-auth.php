@@ -18,7 +18,8 @@ class CEC_Auth {
 			return '<div class="cec-auth-form"><div class="cec-notice">' . esc_html__( "You're already logged in.", 'cec' ) . '</div></div>';
 		}
 
-		$redirect = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( $_GET['redirect_to'] ) ) : CEC_Admin_Settings::submit_url();
+		// No destination asked for: decided after sign-in, per account (default_redirect()).
+		$redirect = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( $_GET['redirect_to'] ) ) : '';
 		$error    = isset( $_GET['cec_login'] ) && '0' === $_GET['cec_login'];
 
 		ob_start();
@@ -48,7 +49,7 @@ class CEC_Auth {
 	}
 
 	public static function handle_login() {
-		$redirect = isset( $_POST['cec_redirect'] ) ? esc_url_raw( wp_unslash( $_POST['cec_redirect'] ) ) : home_url();
+		$redirect = isset( $_POST['cec_redirect'] ) ? esc_url_raw( wp_unslash( $_POST['cec_redirect'] ) ) : '';
 
 		if ( ! isset( $_POST['cec_login_nonce'] ) || ! wp_verify_nonce( $_POST['cec_login_nonce'], self::LOGIN_NONCE ) ) {
 			wp_safe_redirect( add_query_arg( 'cec_login', '0', wp_get_referer() ) );
@@ -68,8 +69,26 @@ class CEC_Auth {
 			exit;
 		}
 
-		wp_safe_redirect( $redirect );
+		wp_safe_redirect( '' !== $redirect ? $redirect : self::default_redirect( $user ) );
 		exit;
+	}
+
+	/**
+	 * Where an account goes after signing in when nothing was asked for
+	 * (1.28.1): event managers to the dashboard, everyone else to Submit an
+	 * Event, unless another plugin says otherwise (Community Member Planning
+	 * sends members to their member area).
+	 */
+	public static function default_redirect( $user ) {
+		$manager = $user instanceof WP_User && user_can( $user, CEC_Roles::CAP );
+		$default = $manager
+			? ( CEC_Admin_Settings::get( 'dashboard_page_url' ) ?: home_url( '/' ) )
+			: ( CEC_Admin_Settings::get( 'submit_page_url' ) ?: home_url( '/' ) );
+		/**
+		 * @param string  $default
+		 * @param WP_User $user
+		 */
+		return (string) apply_filters( 'cec_login_default_redirect', $default, $user );
 	}
 
 	public static function render_register_shortcode( $atts ) {

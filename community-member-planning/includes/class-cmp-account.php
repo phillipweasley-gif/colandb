@@ -43,6 +43,7 @@ class CMP_Account {
 		add_filter( 'show_admin_bar', array( __CLASS__, 'admin_bar' ) );
 		add_filter( 'edit_profile_url', array( __CLASS__, 'profile_url' ), 10, 2 );
 		add_filter( 'login_redirect', array( __CLASS__, 'login_redirect' ), 20, 3 ); // After the events plugin's (10).
+		add_filter( 'cec_login_default_redirect', array( __CLASS__, 'default_after_login' ), 10, 2 );
 
 		add_filter( 'wp_privacy_personal_data_exporters', array( __CLASS__, 'register_exporter' ) );
 		add_filter( 'wp_privacy_personal_data_erasers', array( __CLASS__, 'register_eraser' ) );
@@ -101,6 +102,18 @@ class CMP_Account {
 	public static function profile_url( $url, $user_id ) {
 		$user = get_userdata( $user_id );
 		return $user && get_current_user_id() === (int) $user_id && self::is_kept_out( $user ) ? self::url() : $url;
+	}
+
+	/**
+	 * Signing in with no destination asked for (the site's Log In link):
+	 * members land in their member area (owner, 2026-10-04/05: "it went to
+	 * the submit an event page"). Event managers keep their dashboard.
+	 */
+	public static function default_after_login( $url, $user ) {
+		if ( ! $user instanceof WP_User || user_can( $user, 'manage_options' ) || ( class_exists( 'CEC_Roles' ) && user_can( $user, CEC_Roles::CAP ) ) ) {
+			return $url;
+		}
+		return CMP_Settings::member_page_url();
 	}
 
 	/**

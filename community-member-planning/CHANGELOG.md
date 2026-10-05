@@ -4,6 +4,14 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.12.1
+
+**Signing in lands in the member area** (needs Community Events Calendar 1.28.1). Members who sign in with the site's Log In link (or `wp-login.php`) with no particular destination now go to their member area instead of Submit an Event. Administrators and event managers keep their usual destination; a requested destination (`redirect_to`) is still respected. Uses the new `cec_login_default_redirect` filter.
+
+- Verification: `account-e2e.sh` 69/69, `dob-e2e.sh` 34/34, `setup-e2e.sh` 39/39, `e2e.sh` 60/60 (local WordPress 7.1.2).
+
+---
+
 ## 0.12.0
 
 **Follow / unfollow** (owner, 2026-10-05: "in case you don't want to be friends but want to engage and see where someone is attending"). Owner's choices: anyone can follow, no approval; event plans only if the member opts in; shown as a Following feed filter, a "Going to" profile card, a calendar marker and notifications. Needs Community Events Calendar 1.28.0 for the calendar marker and RSVP notifications.
