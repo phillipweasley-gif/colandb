@@ -159,7 +159,7 @@ class CMP_Messages {
 
 	/** Unread inbox conversations + waiting requests, for the tab label. */
 	public static function unread_count( $user_id ) {
-		$n = 0;
+		$n = CMP_Nods::unseen_count( $user_id );
 		foreach ( array_merge( self::conversations( $user_id, 'inbox' ), self::conversations( $user_id, 'requests' ) ) as $c ) {
 			$n += self::is_unread( $c, $user_id ) ? 1 : 0;
 		}
@@ -179,8 +179,9 @@ class CMP_Messages {
 		return $today >= self::DAILY_NEW ? 'msg_limit' : true;
 	}
 
+	/** An active dynamic, or mutual nods (0.14.0). */
 	public static function connected( $a, $b ) {
-		return (bool) CMP_Dynamics::active_between( $a, $b );
+		return (bool) CMP_Dynamics::active_between( $a, $b ) || CMP_Nods::mutual( $a, $b );
 	}
 
 	/* ------------------------------------------------------------------
@@ -316,6 +317,7 @@ class CMP_Messages {
 		if ( ! self::i_blocked( $user_id, $them ) ) {
 			$wpdb->insert( self::t( 'blocks' ), array( 'blocker_id' => $user_id, 'blocked_id' => $them, 'created_at' => gmdate( 'Y-m-d H:i:s' ) ) );
 			CMP_Follows::remove_pair( $user_id, $them );
+			CMP_Nods::remove_pair( $user_id, $them );
 			CMP_Audit::log( 'member_blocked', 'user', $them );
 			$d = CMP_Install::table( 'dynamics' );
 			foreach ( $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $d WHERE status IN ('pending','active') AND ( ( proposer_id = %d AND partner_id = %d ) OR ( proposer_id = %d AND partner_id = %d ) )", $user_id, $them, $them, $user_id ) ) as $dyn ) { // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -427,17 +429,22 @@ class CMP_Messages {
 			return self::render_thread( $user_id, self::conversation( $c ) );
 		}
 		$requests = self::conversations( $user_id, 'requests' );
-		$box      = in_array( $box, array( 'inbox', 'requests', 'blocked' ), true ) ? $box : 'inbox';
+		$box      = in_array( $box, array( 'inbox', 'requests', 'nods', 'blocked' ), true ) ? $box : 'inbox';
+		$nods_n   = CMP_Nods::unseen_count( $user_id );
 		$html     = '<section class="cmp-step" aria-labelledby="cmp-msg-title"><h2 id="cmp-msg-title" class="cmp-title">' . esc_html__( 'Messages', 'cmp' ) . '</h2>';
 		$html    .= '<p class="cmp-muted">' . esc_html__( 'Private between you and the other member. To start one, open a member\'s profile and choose Message.', 'cmp' ) . '</p>';
 		$html    .= '<nav class="cmp-msg-boxes" aria-label="' . esc_attr__( 'Message lists', 'cmp' ) . '">';
 		$req_n    = count( $requests );
-		foreach ( array( 'inbox' => __( 'Inbox', 'cmp' ), 'requests' => __( 'Requests', 'cmp' ), 'blocked' => __( 'Blocked', 'cmp' ) ) as $k => $l ) {
-			$html .= '<a href="' . esc_url( self::url( 'inbox' === $k ? array() : array( 'box' => $k ) ) ) . '"' . ( $k === $box ? ' aria-current="page" class="is-current"' : '' ) . '>' . esc_html( $l ) . ( 'requests' === $k && $req_n ? ' <span class="cmp-msg-badge">' . (int) $req_n . '</span>' : '' ) . '</a>';
+		foreach ( array( 'inbox' => __( 'Inbox', 'cmp' ), 'requests' => __( 'Requests', 'cmp' ), 'nods' => __( 'Nods', 'cmp' ), 'blocked' => __( 'Blocked', 'cmp' ) ) as $k => $l ) {
+			$badge = 'requests' === $k ? $req_n : ( 'nods' === $k ? $nods_n : 0 );
+			$html .= '<a href="' . esc_url( self::url( 'inbox' === $k ? array() : array( 'box' => $k ) ) ) . '"' . ( $k === $box ? ' aria-current="page" class="is-current"' : '' ) . '>' . esc_html( $l ) . ( $badge ? ' <span class="cmp-msg-badge">' . (int) $badge . '</span>' : '' ) . '</a>';
 		}
 		$html .= '</nav></section>';
 		if ( 'blocked' === $box ) {
 			return $html . self::render_blocked( $user_id );
+		}
+		if ( 'nods' === $box ) {
+			return $html . CMP_Nods::list_html( $user_id );
 		}
 		$list  = 'requests' === $box ? $requests : self::conversations( $user_id, 'inbox' );
 		$html .= '<section class="cmp-panel cmp-msg-list">';
@@ -556,7 +563,7 @@ class CMP_Messages {
 	public static function profile_actions_html( $viewer_id, $owner_id, $with_report = true ) {
 		$ok   = self::can_start( $viewer_id, $owner_id );
 		$conv = self::between( $viewer_id, $owner_id );
-		$html = '<div class="cmp-actions cmp-msg-profile">' . CMP_Follows::button_html( $viewer_id, $owner_id );
+		$html = '<div class="cmp-actions cmp-msg-profile">' . CMP_Follows::button_html( $viewer_id, $owner_id ) . CMP_Nods::button_html( $viewer_id, $owner_id );
 		if ( ( $conv && self::can_use( $conv, $viewer_id ) ) || true === $ok ) {
 			$html .= '<a class="cmp-btn" href="' . esc_url( self::url( array( 'to' => (int) $owner_id ) ) ) . '">' . esc_html__( 'Message', 'cmp' ) . '</a>';
 		} elseif ( 'msg_closed' === $ok ) {

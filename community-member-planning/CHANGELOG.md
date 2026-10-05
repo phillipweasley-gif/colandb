@@ -4,6 +4,19 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.14.0
+
+**Nods: a quiet way to show interest** (owner, 2026-10-05: "a way to indicate interest passively … somewhat neutral … related to kink but not aggressive", not another app's version). Named after the nod across the bar; our own word and our own mark (a small dot with a dip beneath), not another app's feature name or icon.
+
+- **`CMP_Nods`**, new table `cmp_nods` (`CMP_DB_VERSION` 11). A **Nod** button in every profile header (beside Follow); tap again to take it back. One nod per member per member; at most 30 a day.
+- **Messages → Nods** (badge for new ones, also counted in "Messages (N)"): who nodded at you, with **Nod back** and **Message**. Ignoring a nod tells nobody anything.
+- **Mutual nods:** both members are told "You and <name> both nodded. Say hello?" with a link to message, and from then on messages between them go straight to the inbox (they count as connected, like an active dynamic).
+- **Wording never assumes pronouns** (owner): every nod message uses names only.
+- New notification category **Nods** (can be turned off). Blocks remove nods both ways and stop new ones. Export lists nods you sent; erase removes nods both ways.
+- **Verification** (local WordPress 7.1.2): new `tests/nods-e2e.sh` 20/20 (incl. a check that no nod wording contains he / she / him / his / her); all other suites pass (setup 39, profile 84, dob 34, account 69, feed 41, messages 46, follows 27, directory 21, dynamics 34, homework 44, chastity 55, e2e 60). In a browser at 1440 px: the Nod button in a profile header and the Nods list.
+
+---
+
 ## 0.13.1
 
 **Wider member area on desktop** (owner, 2026-10-05: "why is it so thin on desktop?"). The member area was capped at 760px (sized for forms in 0.1). It's now up to 1200px, so profiles (Details beside About, buttons beside the name), Members (filters beside a 3-column grid) and messages use the screen. The Profile, Account and Setup tabs and the Feed keep a reading width of 860px for their content; the tab bar stays full width on every tab so it doesn't jump.
