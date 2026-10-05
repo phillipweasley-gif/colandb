@@ -667,3 +667,21 @@
 	.cmp-member-area .cmp-dir { grid-template-columns: 260px minmax(0, 1fr); align-items: start; }
 	.cmp-member-area .cmp-dir-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* Nods (0.14.0): our own mark, a small dot with a dip beneath, like a head nodding. */
+.cmp-member-area .cmp-nod-btn { gap: 8px; }
+.cmp-member-area .cmp-nod-icon { position: relative; display: inline-block; width: 10px; height: 14px; flex: 0 0 auto; }
+.cmp-member-area .cmp-nod-icon::before { content: ""; position: absolute; left: 1px; top: 0; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.cmp-member-area .cmp-nod-icon::after { content: ""; position: absolute; left: 0; bottom: 0; width: 10px; height: 4px; border: 2px solid currentColor; border-top: 0; border-radius: 0 0 10px 10px; }
+.cmp-member-area button.cmp-nod-btn.is-sent { border-color: var(--cmp-secondary) !important; color: var(--cmp-secondary) !important; }
+@media (prefers-reduced-motion: no-preference) {
+	.cmp-member-area button.cmp-nod-btn:not(.is-sent):hover .cmp-nod-icon::before { animation: cmp-nod .5s ease-in-out; }
+	@keyframes cmp-nod { 50% { transform: translateY(3px); } }
+}
+.cmp-member-area .cmp-nod-rows { list-style: none !important; margin: 0 !important; padding: 0 !important; }
+.cmp-member-area .cmp-nod-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--cmp-border); margin: 0 !important; }
+.cmp-member-area .cmp-nod-row:first-child { border-top: none; }
+.cmp-member-area .cmp-nod-row .cmp-actions { margin: 0 !important; }
+.cmp-member-area a.cmp-nod-who { color: var(--cmp-text) !important; text-decoration: none !important; background: transparent !important; }
+.cmp-member-area a.cmp-nod-who small { display: block; color: var(--cmp-muted); font-size: 13px; }
+.cmp-member-area .cmp-nod-row.is-new b::after { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--cmp-secondary); margin-left: 8px; vertical-align: 2px; }

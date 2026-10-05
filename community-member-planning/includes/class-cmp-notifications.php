@@ -23,6 +23,7 @@ class CMP_Notifications {
 		'lock',
 		'message',
 		'follow',
+		'nod',
 	);
 
 	const QUIET_START = 22;
