@@ -16,6 +16,7 @@ bash tests/feed-e2e.sh               # member feed: 41 checks
 bash tests/messages-e2e.sh           # member messages: 46 checks
 bash tests/follows-e2e.sh            # follow / unfollow: 27 checks
 bash tests/directory-e2e.sh          # Members search and the profile view: 21 checks
+bash tests/nods-e2e.sh               # nods: 20 checks
 bash tests/setup-e2e.sh              # profiles v2 + step-by-step setup: 32 checks
 bash tests/dob-e2e.sh                # date of birth at sign-up, one-time step, under-18 lock, Show switches: 33 checks
 ```
@@ -34,6 +35,7 @@ bash tests/dob-e2e.sh                # date of birth at sign-up, one-time step, 
 | `messages-e2e.sh` | Messages (CMP 0.11.0): requests vs. inbox, the 3-message request limit, accepting, connected members, conversation privacy, requests off, the daily limit, deleting, blocking (messages, profiles, feed, dynamics), reports and the admin screen, export/erase. Creates and removes an administrator "mod". |
 | `follows-e2e.sh` | Follow (CMP 0.12.0 + CEC 1.28.0): following, the opt-in Going to card (upcoming published RSVPs only), the calendar label, RSVP and post notifications, the Following feed filter, blocks, export/erase. Creates and removes three test events. |
 | `directory-e2e.sh` | Members (CMP 0.13.0): who is listed (not self, opted out, blocked, unverified), only shown answers matched, each filter, sort, profile items linking to a filtered list, the cover on profiles, tabs, the opt-out, export/erase. Re-seeds the starter option lists first. |
+| `nods-e2e.sh` | Nods (CMP 0.14.0): sending, taking back, the notification and Nods list, mutual nods (both told; messages go to the inbox), pronoun-free wording, the daily limit, blocks, export/erase. |
 | `setup-e2e.sh` | Profiles v2 (CMP 0.5.0): starter lists, new field types (height, weight, month, rated kinks), health starting hidden, the six setup steps (one-step saves, resume, skip / later / finish), the home nudge for existing members, and the new profile display. Resets the profile option lists to the starter lists. |
 | `dob-e2e.sh` | Date of birth (CMP 0.4.0 + CEC 1.27.1 sign-up hooks): `[cec_register]` refusals and success, existing member asked once, under-18 lock and site-team unlock, calculated age, "a filled-in field starts shown", export/erase. Creates its own `[cec_register]` page and turns on registration. |
 | `profile-e2e.sh` | Member profiles: options admin, validation, who-sees-what, photos (upload checks, metadata stripping, permission-checked serving), preferences, export/erasure, sign-in-aware menus and `[cmp_account_bar]`. Starts the test server with 12 MB upload limits; test photos are made with PHP's GD. |
