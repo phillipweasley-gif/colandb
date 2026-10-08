@@ -4,6 +4,20 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.19.2
+
+**Chastity: a keyholder who doesn't have an account yet** (member request via the owner, 2026-10-08: "For those whose partners haven't created accounts yet, it would be nice to be able to identify the key holder manually by typing in a name.").
+
+- **Start a lock → Keyholder → "Someone without an account…"**, then type their name (up to 60 characters). The name field appears when that choice is picked; without JavaScript it's always shown and only used for that choice.
+- **It's a name for the wearer's own record.** The person can't sign in, so nobody is notified and the lock works exactly like a self-lock: the wearer keeps every control and can always end it. My lock shows "Keyholder: <name> (no account)".
+- **The wearer can change or clear the name** under the lock's Settings while it's on. Cleared, it's a plain self-lock again.
+- Choosing a member as keyholder ignores any typed name. Once the partner joins and they agree chastity in a dynamic, the wearer can choose them as a member for their next lock.
+- **Privacy:** the name is someone else's personal detail, so the audit log records only that a name was given. The wearer's data export includes it, and erasing the wearer's data removes it with their locks.
+- **Database version 15:** new `keyholder_name` column on locks, added automatically on update. Existing locks are unchanged.
+- **Verification** (local WordPress 7.1.2, Community Events Calendar 1.32.1): `chastity-e2e.sh` 68/68, with 13 new checks. They cover the choice and field being offered; no name refused; the name stored cleaned; nobody notified; the label on My lock; self-lock controls kept; the name not in the audit log; changing it, exporting it, clearing it; ending the lock; another member can't change it; and a typed name ignored for a member keyholder. Also `dynamics-e2e.sh` 56/56, `account-e2e.sh` 69/69, `e2e.sh` 60/60.
+
+---
+
 ## 0.19.1
 
 **App icons are always square** (found checking 0.19.0 on the live site). colandb.com's site icon is the wide COL&B logo (873×327), so the app icon would have been squashed or cropped on phones.

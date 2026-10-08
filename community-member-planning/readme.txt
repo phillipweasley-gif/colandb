@@ -1,7 +1,7 @@
 === Community Member Planning ===
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.3.0
+Stable tag: 0.19.2
 
 Private member area for the Community Events Calendar site.
 
