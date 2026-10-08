@@ -6,6 +6,16 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.32.2
+
+**"Partner Organizations" is now "Partner Organizations & Titleholders"** (owner, 2026-10-08), because the list also holds individual titleholders (for example Foxxy Force, Great Lakes Handler 2026).
+
+- Renamed everywhere it's shown: the event's sidebar box and admin menu (Events → **Partners & Titleholders**), its add/edit/search screens, the Calendar Admin dashboard tab, the event page heading, the submit, guest-edit and My Events forms ("Don't see your organization or titleholder? Add it"), the subscribe form ("Or just specific organizations or titleholders") and the settings-page help text.
+- **Nothing else changes:** the taxonomy (`cec_partner_org`), its stored data and its web addresses (`/partner/<name>/`) are the same, so no links break. "Host Organization" fields are left as they are.
+- **Verification** (local WordPress 7.1.2): `php -l` on every changed file; the `tests/snap.php` month-view comparison before/after is identical (12/12); `calendar-e2e.sh` 63/63; new labels confirmed on the taxonomy, the submit form (with an organization present) and the subscribe form.
+
+---
+
 ## 1.32.1
 
 **Public calendar feeds no longer cached for a week; tapping anywhere in a day opens it** (owner, 2026-10-05: "fix the public feed caching too", and "it forces me to click the number instead of the box of the day … that is counter intuitive").

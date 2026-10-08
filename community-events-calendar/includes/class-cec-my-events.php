@@ -208,15 +208,15 @@ class CEC_My_Events {
 
 			<?php if ( ! empty( $partner_orgs ) && ! is_wp_error( $partner_orgs ) ) : ?>
 			<div class="cec-field">
-				<label><?php esc_html_e( 'Partner Organization(s)', 'cec' ); ?></label>
+				<label><?php esc_html_e( 'Partner Organizations & Titleholders', 'cec' ); ?></label>
 				<?php foreach ( $partner_orgs as $term ) : ?>
 					<label class="cec-checkbox"><input type="checkbox" name="cec_partner_org[]" value="<?php echo esc_attr( $term->term_id ); ?>" <?php checked( in_array( $term->term_id, $my_partners, true ) ); ?>> <?php echo esc_html( $term->name ); ?></label>
 				<?php endforeach; ?>
 			</div>
 			<?php endif; ?>
 			<div class="cec-field">
-				<label><?php esc_html_e( "Don't see your organization? Add it", 'cec' ); ?></label>
-				<input type="text" name="cec_new_partner_org" placeholder="<?php esc_attr_e( 'Organization name', 'cec' ); ?>">
+				<label><?php esc_html_e( "Don't see your organization or titleholder? Add it", 'cec' ); ?></label>
+				<input type="text" name="cec_new_partner_org" placeholder="<?php esc_attr_e( 'Organization or titleholder name', 'cec' ); ?>">
 			</div>
 
 			<div class="cec-field">

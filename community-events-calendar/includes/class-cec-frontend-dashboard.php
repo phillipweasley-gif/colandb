@@ -30,7 +30,7 @@ class CEC_Frontend_Dashboard {
 			$series_id = absint( $_GET['cec_series'] );
 			echo '<h2>' . esc_html( get_the_title( $series_id ) ) . '</h2>' . CEC_Recurrence::render_occurrences_table( $series_id, get_permalink() );
 		} elseif ( 'partners' === $view ) {
-			echo self::render_terms_manager( 'cec_partner_org', __( 'Partner Organizations', 'cec' ) );
+			echo self::render_terms_manager( 'cec_partner_org', __( 'Partner Organizations & Titleholders', 'cec' ) );
 		} elseif ( 'venues' === $view ) {
 			echo self::render_terms_manager( 'cec_venue', __( 'Venues', 'cec' ) );
 		} elseif ( 'import' === $view ) {
@@ -156,7 +156,7 @@ class CEC_Frontend_Dashboard {
 				<?php esc_html_e( 'All Events', 'cec' ); ?>
 			</a>
 			<a class="<?php echo ( 'partners' === $view ) ? 'active' : ''; ?>" href="<?php echo esc_url( add_query_arg( array( 'cec_view' => 'partners' ), get_permalink() ) ); ?>">
-				<?php esc_html_e( 'Partner Orgs', 'cec' ); ?>
+				<?php esc_html_e( 'Partners & Titleholders', 'cec' ); ?>
 			</a>
 			<a class="<?php echo ( 'venues' === $view ) ? 'active' : ''; ?>" href="<?php echo esc_url( add_query_arg( array( 'cec_view' => 'venues' ), get_permalink() ) ); ?>">
 				<?php esc_html_e( 'Venues', 'cec' ); ?>
@@ -327,15 +327,15 @@ class CEC_Frontend_Dashboard {
 
 			<?php if ( ! empty( $partner_orgs ) && ! is_wp_error( $partner_orgs ) ) : ?>
 			<div class="cec-field">
-				<label><?php esc_html_e( 'Partner Organization(s)', 'cec' ); ?></label>
+				<label><?php esc_html_e( 'Partner Organizations & Titleholders', 'cec' ); ?></label>
 				<?php foreach ( $partner_orgs as $term ) : $defaults = CEC_Term_Meta::partner_org_defaults( $term->term_id ); ?>
 					<label class="cec-checkbox"><input type="checkbox" class="cec-org-autofill" name="cec_partner_org[]" value="<?php echo esc_attr( $term->term_id ); ?>" data-coc="<?php echo esc_attr( $defaults['coc'] ); ?>" data-rsvp-mode="<?php echo esc_attr( $defaults['rsvpMode'] ); ?>" data-rsvp-url="<?php echo esc_attr( $defaults['rsvpUrl'] ); ?>" <?php checked( in_array( $term->term_id, $my_partners, true ) ); ?>> <?php echo esc_html( $term->name ); ?></label>
 				<?php endforeach; ?>
 			</div>
 			<?php endif; ?>
 			<div class="cec-field">
-				<label><?php esc_html_e( "Don't see your organization? Add it", 'cec' ); ?></label>
-				<input type="text" name="cec_new_partner_org" placeholder="<?php esc_attr_e( 'Organization name', 'cec' ); ?>">
+				<label><?php esc_html_e( "Don't see your organization or titleholder? Add it", 'cec' ); ?></label>
+				<input type="text" name="cec_new_partner_org" placeholder="<?php esc_attr_e( 'Organization or titleholder name', 'cec' ); ?>">
 			</div>
 
 			<div class="cec-field">
@@ -434,7 +434,7 @@ class CEC_Frontend_Dashboard {
 			</div>
 
 			<div class="cec-field"><label><?php esc_html_e( 'Code of Conduct', 'cec' ); ?></label><textarea name="cec_code_of_conduct" id="cec-dash-coc" rows="2"><?php echo esc_textarea( $data['code_of_conduct'] ); ?></textarea></div>
-			<p class="description"><?php esc_html_e( 'Checking a Partner Organization above fills in Code of Conduct / RSVP fields from that organization\'s saved defaults, but only the ones still empty — manage those defaults under Events > Partner Organizations.', 'cec' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Checking a Partner Organization or Titleholder above fills in Code of Conduct / RSVP fields from that organization\'s saved defaults, but only the ones still empty — manage those defaults under Events > Partner Organizations.', 'cec' ); ?></p>
 
 			<?php if ( ! CEC_Recurrence::is_occurrence( $event_id ) ) : ?>
 				<div class="cec-field-row">

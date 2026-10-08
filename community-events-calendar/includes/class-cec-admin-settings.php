@@ -280,7 +280,7 @@ class CEC_Admin_Settings {
 				</table>
 
 				<h2><?php esc_html_e( 'Subscriptions', 'cec' ); ?></h2>
-				<p class="description"><?php esc_html_e( 'Create a page with [cec_subscribe] on it and paste its URL below. Visitors can subscribe by email to all events or to specific organizations (pulled live from your Partner Organizations list), with a confirm step and an unsubscribe link on every notification.', 'cec' ); ?></p>
+				<p class="description"><?php esc_html_e( 'Create a page with [cec_subscribe] on it and paste its URL below. Visitors can subscribe by email to all events or to specific organizations or titleholders (pulled live from your Partner Organizations & Titleholders list), with a confirm step and an unsubscribe link on every notification.', 'cec' ); ?></p>
 				<table class="form-table">
 					<tr>
 						<th><label for="cec_subscribe_page_url"><?php esc_html_e( 'Subscribe Page URL', 'cec' ); ?></label></th>
@@ -333,7 +333,7 @@ class CEC_Admin_Settings {
 
 			<h2><?php esc_html_e( 'Manage Lists', 'cec' ); ?></h2>
 			<p>
-				<a class="button" href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=cec_partner_org&post_type=cec_event' ) ); ?>"><?php esc_html_e( 'Partner Organizations', 'cec' ); ?></a>
+				<a class="button" href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=cec_partner_org&post_type=cec_event' ) ); ?>"><?php esc_html_e( 'Partner Organizations & Titleholders', 'cec' ); ?></a>
 				<a class="button" href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=cec_venue&post_type=cec_event' ) ); ?>"><?php esc_html_e( 'Venues', 'cec' ); ?></a>
 				<a class="button" href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=cec_event_type&post_type=cec_event' ) ); ?>"><?php esc_html_e( 'Event Types', 'cec' ); ?></a>
 			</p>
@@ -349,7 +349,7 @@ class CEC_Admin_Settings {
 				<tr><td><code>[cec_login]</code></td><td><?php esc_html_e( 'Styled login form', 'cec' ); ?></td></tr>
 				<tr><td><code>[cec_register]</code></td><td><?php esc_html_e( 'Styled account registration form (name, email, password)', 'cec' ); ?></td></tr>
 				<tr><td><code>[cec_manage_submission]</code></td><td><?php esc_html_e( 'Lets a guest (no account) request an emailed edit link, or use one to edit/postpone/cancel/withdraw their event', 'cec' ); ?></td></tr>
-				<tr><td><code>[cec_subscribe]</code></td><td><?php esc_html_e( 'Email subscription form — all events and/or specific organizations', 'cec' ); ?></td></tr>
+				<tr><td><code>[cec_subscribe]</code></td><td><?php esc_html_e( 'Email subscription form — all events and/or specific organizations or titleholders', 'cec' ); ?></td></tr>
 				<tr><td><code>[cec_volunteer_form]</code></td><td><?php esc_html_e( 'Volunteer inquiry form — reviewed privately under Events > Volunteer Inquiries', 'cec' ); ?></td></tr>
 			</table>
 		</div>
