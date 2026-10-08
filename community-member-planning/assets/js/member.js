@@ -902,3 +902,26 @@
 		show( tabs[0].getAttribute( 'data-cmp-pv-tab' ) );
 	} );
 }() );
+
+/* Chastity, start a lock (0.19.2): the keyholder's-name field only shows
+   (and is required) when "Someone without an account" is chosen. Without
+   JavaScript it is always shown and only used for that choice. */
+( function () {
+	'use strict';
+	var select = document.getElementById( 'cmp_cl_kh' );
+	var row = document.querySelector( '[data-cmp-kh-name]' );
+	if ( ! select || ! row ) {
+		return;
+	}
+	var input = row.querySelector( 'input' );
+	var sync = function () {
+		var named = 'named' === select.value;
+		row.hidden = ! named;
+		input.required = named;
+		if ( named && document.activeElement === select ) {
+			input.focus();
+		}
+	};
+	select.addEventListener( 'change', sync );
+	sync();
+}() );

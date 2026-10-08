@@ -63,7 +63,7 @@ get pup p1b "$PAGE&cmp_tab=chastity"
 ok "someone the wearer leads is not offered" $(hasnt $T/p1b.html "<option value=\"$NOSY\"")
 r=$(act pup $PN start -F "keyholder=0" -F "option=custom" -F "option_name=" -F "policy=none")
 ok "custom option needs a name" $(echo "$r" | grep -q 'cl_invalid' && echo 1 || echo 0)
-r=$(act pup $PN start -F "keyholder=$KH" -F "option=b" -F "length=10080" -F "photo=@$T/v.jpg;type=image/jpeg")
+r=$(act pup $PN start -F "keyholder=$KH" -F "keyholder_name=Ignored Name" -F "option=b" -F "length=10080" -F "photo=@$T/v.jpg;type=image/jpeg")
 LID=$(q "SELECT MAX(id) FROM $L_T")
 ok "locked with a keyholder: option B, 1 week" $(echo "$r" | grep -q 'cl_started' && [ "$(lk $LID keyholder_id option_key release_policy status)" = "$KH|b|permission|locked" ] && echo 1 || echo 0)
 ok "keyholder notified (lock)" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$KH AND category='lock'")" -ge 1 ] && echo 1 || echo 0)
@@ -72,6 +72,8 @@ ok "only one active lock" $(echo "$r" | grep -q 'cl_busy' && echo 1 || echo 0)
 get pup p2 "$PAGE&cmp_tab=chastity"
 ok "wearer sees timer, rule, today's code, emergency unlock" $([ "$(has $T/p2.html 'data-cmp-since')$(has $T/p2.html 'One release a week')$(has $T/p2.html 'data-cmp-code')$(has $T/p2.html 'Emergency unlock')" = 1111 ] && echo 1 || echo 0)
 ok "time left shown while not hidden" $(has $T/p2.html 'left · ends')
+
+ok "with a member keyholder, a typed name is ignored" $([ -z "$(q "SELECT keyholder_name FROM $L_T WHERE wearer_id=$PUP AND status='locked'")" ] && echo 1 || echo 0)
 
 echo "== Keyholder controls"
 login kh kh khpass1234567
@@ -188,6 +190,32 @@ ok "self-lock: no ordinary unlock before the time is up" $(echo "$r" | grep -q '
 ev "global \$wpdb; \$wpdb->update('$L_T',array('planned_end'=>gmdate('Y-m-d H:i:s',time()-60)),array('id'=>$SID));" >/dev/null
 r=$(act solo $ON unlock -F "lock=$SID")
 ok "self-lock: unlock once the time is up" $([ "$(lk $SID status end_reason)" = "ended|completed" ] && echo 1 || echo 0)
+
+echo "== Keyholder without an account (0.19.2)"
+get solo n0 "$PAGE&cmp_tab=chastity"
+ok "start form offers 'Someone without an account' and a name field" $([ "$(has $T/n0.html 'value="named"')$(has $T/n0.html 'name="keyholder_name"')" = 11 ] && echo 1 || echo 0)
+NN=$(hnonce $T/n0.html)
+r=$(act solo $NN start -F "keyholder=named" -F "keyholder_name=" -F "option=a")
+ok "no name typed -> asked for one, no lock" $(echo "$r" | grep -q 'cl_kh_name' && [ -z "$(q "SELECT id FROM $L_T WHERE wearer_id=$SOLO AND status='locked'")" ] && echo 1 || echo 0)
+before=$(q "SELECT COUNT(*) FROM $N_T")
+r=$(act solo $NN start -F "keyholder=named" -F "keyholder_name=Alex <b>R.</b>" -F "option=a" -F "length=10080")
+NID=$(q "SELECT MAX(id) FROM $L_T WHERE wearer_id=$SOLO")
+ok "lock started with the typed name, no member keyholder" $(echo "$r" | grep -q 'cl_started' && [ "$(lk $NID keyholder_id keyholder_name)" = "0|Alex R." ] && echo 1 || echo 0)
+ok "nobody is notified (they have no account)" $([ "$(q "SELECT COUNT(*) FROM $N_T")" = "$before" ] && echo 1 || echo 0)
+get solo n1 "$PAGE&cmp_tab=chastity"
+ok "My lock shows 'Keyholder: Alex R. (no account)'" $(has $T/n1.html 'Keyholder: Alex R. (no account)')
+ok "wearer keeps the self-lock controls (verify reminder, name field)" $([ "$(has $T/n1.html 'cmp_cl_vd')$(has $T/n1.html 'value="Alex R."')" = 11 ] && echo 1 || echo 0)
+ok "the name isn't copied into the audit log" $(ev "global \$wpdb; echo false===strpos((string)\$wpdb->get_var(\"SELECT new_value FROM \".CMP_Install::table('audit_log').\" WHERE action='lock_started' AND object_id=$NID\"),'Alex')?1:0;")
+r=$(act solo $NN wearer_settings -F "lock=$NID" -F "keyholder_name=Alex Rivera")
+ok "wearer can change the name" $([ "$(lk $NID keyholder_name)" = "Alex Rivera" ] && echo 1 || echo 0)
+ok "export includes it" $(ev "echo false!==strpos(wp_json_encode(CMP_Account::export('solo@example.com')),'Alex Rivera')?1:0;")
+r=$(act solo $NN wearer_settings -F "lock=$NID" -F "keyholder_name=")
+get solo n2 "$PAGE&cmp_tab=chastity"
+ok "clearing the name makes it a plain self-lock" $([ "$(lk $NID keyholder_name)" = "" ] && [ "$(has $T/n2.html 'Self-lock')" = 1 ] && echo 1 || echo 0)
+r=$(act solo $NN emergency -F "lock=$NID")
+ok "wearer can end it" $([ "$(lk $NID status)" = "ended" ] && echo 1 || echo 0)
+r=$(act nosy $(hnonce $T/n0.html) wearer_settings -F "lock=$NID" -F "keyholder_name=Hacked")
+ok "another member can't change someone's lock" $([ "$(lk $NID keyholder_name)" = "" ] && echo 1 || echo 0)
 
 echo "== Privacy"
 ok "export lists the lock and its history" $(ev "\$j=wp_json_encode(CMP_Account::export('pup@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'One release a week') && false!==strpos(\$j,'Verification photo') && false!==strpos(\$j,'(photo kept)')?1:0;")

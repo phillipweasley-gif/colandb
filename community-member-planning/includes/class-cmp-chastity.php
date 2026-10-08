@@ -86,6 +86,7 @@ class CMP_Chastity {
 			'cl_busy'     => array( 'error', __( 'You already have an active lock.', 'cmp' ) ),
 			'cl_photo'    => array( 'error', __( 'That photo couldn\'t be used. Use a JPEG, PNG or WebP photo under 5 MB.', 'cmp' ) ),
 			'cl_gone'     => array( 'error', __( 'That lock isn\'t available.', 'cmp' ) ),
+			'cl_kh_name'  => array( 'error', __( 'Type your keyholder\'s name, or choose someone else.', 'cmp' ) ),
 		);
 	}
 
@@ -327,7 +328,12 @@ class CMP_Chastity {
 		if ( self::active_lock( $user_id ) ) {
 			self::go( array(), 'cl_busy' );
 		}
-		$keyholder = self::posted_int( 'keyholder' );
+		$named     = 'named' === self::posted_key( 'keyholder' );
+		$kh_name   = $named ? self::text( 'keyholder_name', 60 ) : '';
+		$keyholder = $named ? 0 : self::posted_int( 'keyholder' );
+		if ( $named && '' === $kh_name ) {
+			self::go( array(), 'cl_kh_name' );
+		}
 		$option    = self::posted_key( 'option' );
 		$options   = self::options();
 		$length    = self::posted_int( 'length' );
@@ -350,6 +356,7 @@ class CMP_Chastity {
 			array(
 				'wearer_id'       => $user_id,
 				'keyholder_id'    => $keyholder,
+				'keyholder_name'  => $kh_name,
 				'option_key'      => $option,
 				'option_name'     => $name,
 				'rule'            => $rule,
@@ -372,7 +379,8 @@ class CMP_Chastity {
 			$extra += array( 'photo' => $photo, 'photo_sha' => hash( 'sha256', $photo ) );
 		}
 		self::add_event( $lock_id, $user_id, 'locked', $extra );
-		CMP_Audit::log( 'lock_started', 'lock', $lock_id, null, array( 'keyholder' => $keyholder, 'option' => $option, 'minutes' => $length ) );
+		// The typed name is someone else's personal detail: the audit only notes that one was given.
+		CMP_Audit::log( 'lock_started', 'lock', $lock_id, null, array( 'keyholder' => $keyholder, 'named_keyholder' => '' !== $kh_name, 'option' => $option, 'minutes' => $length ) );
 		if ( $keyholder ) {
 			/* translators: 1: wearer, 2: option */
 			CMP_Notifications::add( $keyholder, 'lock', sprintf( __( '%1$s locked up with you as keyholder: %2$s.', 'cmp' ), self::me(), $name ), self::url( array( 'lock' => $lock_id ) ) );
@@ -470,7 +478,8 @@ class CMP_Chastity {
 	private static function do_wearer_settings( $lock, $user_id ) {
 		$fields = array( 'show_profile' => empty( $_POST['show_profile'] ) ? 0 : 1 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		if ( ! $lock->keyholder_id ) {
-			$fields['verify_daily'] = empty( $_POST['verify_daily'] ) ? 0 : 1; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			$fields['verify_daily']   = empty( $_POST['verify_daily'] ) ? 0 : 1; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			$fields['keyholder_name'] = self::text( 'keyholder_name', 60 );
 		}
 		self::update_lock( $lock->id, $fields );
 		self::go( array(), 'cl_saved' );
@@ -589,6 +598,19 @@ class CMP_Chastity {
 		return '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '"' . ( $multipart ? ' enctype="multipart/form-data"' : '' ) . ' class="' . esc_attr( $class ) . '"><input type="hidden" name="action" value="cmp_chastity" /><input type="hidden" name="do" value="' . esc_attr( $do ) . '" />' . ( $lock_id ? '<input type="hidden" name="lock" value="' . (int) $lock_id . '" />' : '' ) . '<input type="hidden" name="_cmp_nonce" value="' . esc_attr( wp_create_nonce( self::NONCE ) ) . '" />';
 	}
 
+	/**
+	 * The keyholder as shown on a lock: a member, or (0.19.2) a name the
+	 * wearer typed for someone without an account. A named keyholder
+	 * can't sign in, so the lock works as a self-lock: the wearer keeps
+	 * every control. '' for a self-lock.
+	 */
+	private static function keyholder_label( $lock ) {
+		if ( $lock->keyholder_id ) {
+			return self::name( $lock->keyholder_id );
+		}
+		return '' !== (string) $lock->keyholder_name ? sprintf( /* translators: %s: name the wearer typed */ __( '%s (no account)', 'cmp' ), $lock->keyholder_name ) : '';
+	}
+
 	private static function name( $user_id ) {
 		$u = $user_id ? get_userdata( $user_id ) : null;
 		return $u ? $u->display_name : __( 'Former member', 'cmp' );
@@ -623,7 +645,7 @@ class CMP_Chastity {
 		<section class="cmp-step" aria-labelledby="cmp-cl-title">
 			<h2 id="cmp-cl-title" class="cmp-title"><?php echo esc_html( $lock ? __( 'My lock', 'cmp' ) : __( 'Chastity', 'cmp' ) ); ?></h2>
 			<?php if ( $lock ) : ?>
-				<p class="cmp-muted"><?php echo esc_html( ( $lock->keyholder_id ? sprintf( /* translators: %s: keyholder */ __( 'Keyholder: %s', 'cmp' ), self::name( $lock->keyholder_id ) ) : __( 'Self-lock', 'cmp' ) ) . ' · ' . sprintf( /* translators: %s: date */ __( 'started %s', 'cmp' ), wp_date( 'M j, g:i A', self::ts( $lock->started_at ) ) ) ); ?></p>
+				<p class="cmp-muted"><?php echo esc_html( ( '' !== self::keyholder_label( $lock ) ? sprintf( /* translators: %s: keyholder */ __( 'Keyholder: %s', 'cmp' ), self::keyholder_label( $lock ) ) : __( 'Self-lock', 'cmp' ) ) . ' · ' . sprintf( /* translators: %s: date */ __( 'started %s', 'cmp' ), wp_date( 'M j, g:i A', self::ts( $lock->started_at ) ) ) ); ?></p>
 			<?php else : ?>
 				<p><?php esc_html_e( 'Track a chastity lock: on your own, or with a keyholder you\'ve agreed chastity with in a dynamic. This keeps the record; it doesn\'t control any device, and you can always end a lock yourself.', 'cmp' ); ?></p>
 			<?php endif; ?>
@@ -669,9 +691,11 @@ class CMP_Chastity {
 		}
 		$html  = '<section class="cmp-panel"><h3 class="cmp-panel-title">' . esc_html__( 'Start a lock', 'cmp' ) . '</h3>';
 		$html .= self::form_open( 'start', 0, true );
+		$keyholders['named'] = __( 'Someone without an account…', 'cmp' );
 		$html .= '<div class="cmp-grid cmp-grid-3"><p class="cmp-field"><label for="cmp_cl_kh">' . esc_html__( 'Keyholder', 'cmp' ) . '</label>' . self::select( 'keyholder', 'cmp_cl_kh', $keyholders, 0 ) . '</p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_opt">' . esc_html__( 'Option', 'cmp' ) . '</label>' . self::select( 'option', 'cmp_cl_opt', $options, 'a' ) . '</p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_len">' . esc_html__( 'Planned length', 'cmp' ) . '</label>' . self::select( 'length', 'cmp_cl_len', array( 0 => __( 'Open-ended', 'cmp' ) ) + self::lengths(), 10080 ) . '</p></div>';
+		$html .= '<p class="cmp-field" data-cmp-kh-name><label for="cmp_cl_khn">' . esc_html__( 'Keyholder\'s name (if they don\'t have an account)', 'cmp' ) . '</label><input type="text" id="cmp_cl_khn" name="keyholder_name" maxlength="60" autocomplete="off" aria-describedby="cmp_cl_khn_help" /><span class="cmp-muted" id="cmp_cl_khn_help">' . esc_html__( 'Used when Keyholder is "Someone without an account". It\'s just a name for your record: they can\'t sign in to manage the lock, so it works like a self-lock and you keep control. Once they join and you agree chastity in a dynamic, choose them as a member next time.', 'cmp' ) . '</span></p>';
 		$html .= '<details class="cmp-hw-taskedit"><summary>' . esc_html__( 'Custom option', 'cmp' ) . '</summary><p class="cmp-muted">' . esc_html__( 'Used when Option is "Custom".', 'cmp' ) . '</p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_name">' . esc_html__( 'Name', 'cmp' ) . '</label><input type="text" id="cmp_cl_name" name="option_name" maxlength="60" /></p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_rule">' . esc_html__( 'Rule', 'cmp' ) . '</label><input type="text" id="cmp_cl_rule" name="rule" maxlength="300" /></p>';
@@ -679,8 +703,8 @@ class CMP_Chastity {
 		$html .= '<p class="cmp-field"><label for="cmp_cl_photo">' . esc_html__( 'Photo of the lock (optional)', 'cmp' ) . '</label><input type="file" id="cmp_cl_photo" name="photo" accept="image/jpeg,image/png,image/webp" /></p>';
 		$html .= self::check( 'show_profile', 'cmp_cl_show', __( 'Show "Locked · N days" on my profile', 'cmp' ), false );
 		$html .= '<button type="submit" class="cmp-btn">' . esc_html__( 'Lock', 'cmp' ) . '</button></form>';
-		if ( count( $keyholders ) < 2 ) {
-			$html .= '<p class="cmp-muted">' . esc_html__( 'To have a keyholder, agree chastity with them in a dynamic, with them holding the key (any type, or Keyholder / chastity wearer). See the Dynamics tab.', 'cmp' ) . '</p>';
+		if ( count( $keyholders ) < 3 ) {
+			$html .= '<p class="cmp-muted">' . esc_html__( 'To have a member as keyholder, agree chastity with them in a dynamic, with them holding the key (any type, or Keyholder / chastity wearer). See the Dynamics tab. If your keyholder doesn\'t have an account yet, choose "Someone without an account" and type their name.', 'cmp' ) . '</p>';
 		}
 		return $html . '</section>';
 	}
@@ -750,6 +774,7 @@ class CMP_Chastity {
 		$html .= self::check( 'show_profile', 'cmp_cl_show', __( 'Show "Locked · N days" on my profile', 'cmp' ), (int) $lock->show_profile );
 		if ( ! $has_kh ) {
 			$html .= self::check( 'verify_daily', 'cmp_cl_vd', __( 'Remind me to verify every day', 'cmp' ), (int) $lock->verify_daily );
+			$html .= '<p class="cmp-field"><label for="cmp_cl_khn_edit">' . esc_html__( 'Keyholder without an account (optional)', 'cmp' ) . '</label><input type="text" id="cmp_cl_khn_edit" name="keyholder_name" maxlength="60" value="' . esc_attr( $lock->keyholder_name ) . '" aria-describedby="cmp_cl_khn_edit_help" /><span class="cmp-muted" id="cmp_cl_khn_edit_help">' . esc_html__( 'Just a name for your record. They can\'t sign in to manage the lock, so you keep control of it. Leave empty for a self-lock.', 'cmp' ) . '</span></p>';
 		}
 		$html .= '<button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Save', 'cmp' ) . '</button></form></section>';
 
@@ -923,7 +948,7 @@ class CMP_Chastity {
 		$rows  = array();
 		$locks = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . self::t( 'locks' ) . ' WHERE wearer_id = %d OR keyholder_id = %d ORDER BY id', $user_id, $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		foreach ( $locks as $l ) {
-			$rows[] = array( 'name' => __( 'Chastity lock', 'cmp' ), 'value' => sprintf( '%s · %s · %s – %s · %s', (int) $l->wearer_id === (int) $user_id ? __( 'you wore it', 'cmp' ) : __( 'you were keyholder', 'cmp' ), $l->option_name, $l->started_at, $l->ended_at ? $l->ended_at : __( 'now', 'cmp' ), $l->status ) );
+			$rows[] = array( 'name' => __( 'Chastity lock', 'cmp' ), 'value' => sprintf( '%s · %s · %s – %s · %s', (int) $l->wearer_id === (int) $user_id ? ( '' !== (string) $l->keyholder_name && ! $l->keyholder_id ? sprintf( /* translators: %s: keyholder name */ __( 'you wore it; keyholder (no account): %s', 'cmp' ), $l->keyholder_name ) : __( 'you wore it', 'cmp' ) ) : __( 'you were keyholder', 'cmp' ), $l->option_name, $l->started_at, $l->ended_at ? $l->ended_at : __( 'now', 'cmp' ), $l->status ) );
 			if ( (int) $l->wearer_id === (int) $user_id ) {
 				foreach ( array_reverse( self::events( $l->id, 1000 ) ) as $e ) {
 					$rows[] = array( 'name' => __( 'Lock history', 'cmp' ), 'value' => $e->created_at . ' · ' . self::event_text( $e ) . ( $e->photo_sha ? ' · ' . __( '(photo kept)', 'cmp' ) : '' ) );

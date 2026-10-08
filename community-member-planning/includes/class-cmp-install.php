@@ -250,6 +250,7 @@ class CMP_Install {
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 			wearer_id bigint(20) unsigned NOT NULL,
 			keyholder_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			keyholder_name varchar(60) NOT NULL DEFAULT '',
 			option_key varchar(12) NOT NULL DEFAULT 'custom',
 			option_name varchar(60) NOT NULL DEFAULT '',
 			rule varchar(300) NOT NULL DEFAULT '',
