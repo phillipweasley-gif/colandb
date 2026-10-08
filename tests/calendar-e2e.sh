@@ -193,6 +193,35 @@ ok "retention: entries for events over 12 months ago removed, upcoming kept" $([
 ok "export lists calendar entries and the default" $(ev "\$j=wp_json_encode(CMP_Account::export('calann@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'ZZ Rope Jam')&&false!==strpos(\$j,'Who sees new calendar events by default')?1:0;")
 ok "erase removes them and the private link" $(ev "CMP_Account::erase('calann@example.com'); global \$wpdb; echo 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $CAL WHERE user_id=$ANN\") && ''===CMP_Calendar::feed_token($ANN)?1:0;")
 
+echo "== Next-event link for a Partner Organization or Titleholder (Events Calendar 1.33.0)"
+ORG=$(ev '$t=term_exists("ZZ Next Org","cec_partner_org"); if(!$t){$t=wp_insert_term("ZZ Next Org","cec_partner_org",array("slug"=>"zz-next-org"));} echo (int)$t["term_id"];')
+EMPTY=$(ev '$t=term_exists("ZZ Empty Org","cec_partner_org"); if(!$t){$t=wp_insert_term("ZZ Empty Org","cec_partner_org",array("slug"=>"zz-empty-org"));} echo (int)$t["term_id"];')
+NPAST=$(event "ZZ Org Past" -10); NCANC=$(event "ZZ Org Cancelled" 5); NNEXT=$(event "ZZ Org Next" 8); NLATER=$(event "ZZ Org Later" 20)
+for e in $NPAST $NCANC $NNEXT $NLATER; do ev "wp_set_object_terms($e,array($ORG),'cec_partner_org');" >/dev/null; done
+ev "update_post_meta($NCANC,'_cec_event_status','cancelled');" >/dev/null
+NX="$H/wp-admin/admin-post.php?action=cec_next_event&org="
+link(){ curl -s -o /dev/null -D $T/nx.h -w '%{http_code} %{redirect_url}' "$NX$1"; }
+plink(){ ev "echo get_permalink($1);"; }
+ok "helper builds the admin-post link" $([ "$(ev 'echo cec_next_event_url("ZZ Next Org");')" = "$H/wp-admin/admin-post.php?action=cec_next_event&org=zz-next-org" ] && echo 1 || echo 0)
+r=$(link zz-next-org)
+ok "goes to the next event, skipping a cancelled one" $([ "$r" = "302 $(plink $NNEXT)" ] && echo 1 || echo 0)
+ok "redirect is never cached (no-store) and not indexed" $(grep -qi '^cache-control:.*no-store' $T/nx.h && grep -qi '^x-robots-tag: noindex' $T/nx.h && echo 1 || echo 0)
+r=$(curl -s -o /dev/null -b $T/ann.jar -w '%{http_code} %{redirect_url}' "${NX}zz-next-org")
+ok "same for a signed-in visitor" $([ "$r" = "302 $(plink $NNEXT)" ] && echo 1 || echo 0)
+NNOW=$($W post create --post_type=cec_event --post_status=publish --post_title="ZZ Org In Progress" --porcelain 2>/dev/null)
+ev "update_post_meta($NNOW,'_cec_start',wp_date('Y-m-d\\TH:i',time()-HOUR_IN_SECONDS)); update_post_meta($NNOW,'_cec_end',wp_date('Y-m-d\\TH:i',time()+HOUR_IN_SECONDS)); wp_set_object_terms($NNOW,array($ORG),'cec_partner_org');" >/dev/null
+ok "an event in progress counts as next" $([ "$(link zz-next-org)" = "302 $(plink $NNOW)" ] && echo 1 || echo 0)
+ev "update_post_meta($NNOW,'_cec_end',wp_date('Y-m-d\\TH:i',time()-30*MINUTE_IN_SECONDS));" >/dev/null
+ok "...but not once it has ended" $([ "$(link zz-next-org)" = "302 $(plink $NNEXT)" ] && echo 1 || echo 0)
+$W post update $NNEXT --post_status=draft >/dev/null 2>&1
+ok "unpublished events are skipped" $([ "$(link zz-next-org)" = "302 $(plink $NLATER)" ] && echo 1 || echo 0)
+$W post delete $NLATER $NCANC --force >/dev/null 2>&1
+ok "nothing scheduled: the most recent event" $([ "$(link zz-next-org)" = "302 $(plink $NNOW)" ] && echo 1 || echo 0)
+ok "no events at all: the organization's calendar page" $([ "$(link zz-empty-org)" = "302 $(ev "echo get_term_link($EMPTY,'cec_partner_org');")" ] && echo 1 || echo 0)
+ok "unknown organization: the home page" $([ "$(link no-such-org)" = "302 $H/" ] && [ "$(link '')" = "302 $H/" ] && echo 1 || echo 0)
+$W post delete $NPAST $NNEXT $NNOW --force >/dev/null 2>&1
+ev "wp_delete_term($ORG,'cec_partner_org'); wp_delete_term($EMPTY,'cec_partner_org');" >/dev/null
+
 pkill -f "php -S 127.0.0.1:8899" 2>/dev/null
 ev "global \$wpdb; \$wpdb->query(\"DELETE FROM $CAL\"); \$wpdb->query(\"DELETE FROM $RSVP WHERE event_id IN ($E1,$E2,$E3,$E4)\"); \$wpdb->query(\"DELETE FROM \".CMP_Install::table('dynamics').\" WHERE proposer_id=$ANN\"); \$wpdb->query(\"DELETE FROM \".CMP_Install::table('follows').\" WHERE followed_id=$ANN\");" >/dev/null
 $W post delete $E1 $E2 $E3 $E4 $OLD --force >/dev/null 2>&1

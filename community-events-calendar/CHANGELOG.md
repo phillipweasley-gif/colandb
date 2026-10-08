@@ -6,6 +6,20 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.33.0
+
+**"Next event" links for a Partner Organization or Titleholder** (owner, 2026-10-08: the homepage's event cards "should go to the most recent event for that group").
+
+- **`/wp-admin/admin-post.php?action=cec_next_event&org=<slug>`** sends the visitor to that group's next published event. An event in progress counts as next. Cancelled and unpublished events are skipped.
+  - With nothing scheduled, the link goes to the group's most recent event.
+  - With no events at all, it goes to the group's calendar page (`/partner/<slug>/`).
+  - An unknown group goes to the home page.
+- **Never goes stale:** served from `admin-post.php` (like the `.ics` files since 1.32.1) because the host's CDN caches ordinary public pages for signed-out visitors for days, which would freeze the link on an old event. The redirect is also sent `no-store` and `noindex`.
+- **For page builders and themes:** `cec_next_event_url( $slug )` returns the link.
+- **Verification** (local WordPress 7.1.2): `calendar-e2e.sh` 73/73, with 10 new checks. They cover the helper's link; the next event chosen over a cancelled one; no-store/noindex headers; signed in and signed out; an event in progress counting until it ends; unpublished events skipped; falling back to the latest event, then to the group's page; and an unknown group. `php -l` on the changed files.
+
+---
+
 ## 1.32.2
 
 **"Partner Organizations" is now "Partner Organizations & Titleholders"** (owner, 2026-10-08), because the list also holds individual titleholders (for example Foxxy Force, Great Lakes Handler 2026).
