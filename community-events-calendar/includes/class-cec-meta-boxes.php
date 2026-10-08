@@ -142,11 +142,11 @@ class CEC_Meta_Boxes {
 			</div>
 		</div>
 
-		<h3><?php esc_html_e( 'Partner Organizations', 'cec' ); ?></h3>
+		<h3><?php esc_html_e( 'Partner Organizations & Titleholders', 'cec' ); ?></h3>
 		<div class="cec-mb-row">
-			<p class="description"><?php esc_html_e( 'Checked in the Partner Organizations box in the sidebar. Checking one fills in Code of Conduct / RSVP fields below from that organization\'s saved defaults, but only the ones still empty — manage defaults under Events > Partner Organizations.', 'cec' ); ?></p>
-			<label><?php esc_html_e( "Don't see your organization? Add it", 'cec' ); ?></label>
-			<input type="text" name="cec_new_partner_org" placeholder="<?php esc_attr_e( 'Organization name (leave blank to skip)', 'cec' ); ?>" />
+			<p class="description"><?php esc_html_e( 'Checked in the Partner Organizations & Titleholders box in the sidebar. Checking one fills in Code of Conduct / RSVP fields below from that organization\'s saved defaults, but only the ones still empty — manage defaults under Events > Partner Organizations.', 'cec' ); ?></p>
+			<label><?php esc_html_e( "Don't see your organization or titleholder? Add it", 'cec' ); ?></label>
+			<input type="text" name="cec_new_partner_org" placeholder="<?php esc_attr_e( 'Organization or titleholder name (leave blank to skip)', 'cec' ); ?>" />
 		</div>
 
 		<h3><?php esc_html_e( 'When', 'cec' ); ?></h3>

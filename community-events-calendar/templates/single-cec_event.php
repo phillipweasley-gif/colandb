@@ -140,7 +140,7 @@ while ( have_posts() ) :
 					<?php endif; ?>
 
 					<?php if ( ! empty( $data['partners'] ) ) : ?>
-						<h3><?php esc_html_e( 'Partner Organizations', 'cec' ); ?></h3>
+						<h3><?php esc_html_e( 'Partner Organizations & Titleholders', 'cec' ); ?></h3>
 						<p>
 							<?php foreach ( $data['partners'] as $partner ) : ?>
 								<a class="cec-partner-link" href="<?php echo esc_url( $partner['link'] ); ?>"><?php echo esc_html( $partner['name'] ); ?></a><br />

@@ -91,7 +91,7 @@ class CEC_Subscribers {
 			return __( 'all community events', 'cec' );
 		}
 		$term = get_term( (int) $target, 'cec_partner_org' );
-		return $term && ! is_wp_error( $term ) ? $term->name : __( 'that organization', 'cec' );
+		return $term && ! is_wp_error( $term ) ? $term->name : __( 'that organization or titleholder', 'cec' );
 	}
 
 	private static function render_form() {
@@ -120,7 +120,7 @@ class CEC_Subscribers {
 			</div>
 			<?php if ( ! empty( $orgs ) && ! is_wp_error( $orgs ) ) : ?>
 			<div class="cec-field">
-				<label><?php esc_html_e( 'Or just specific organizations', 'cec' ); ?></label>
+				<label><?php esc_html_e( 'Or just specific organizations or titleholders', 'cec' ); ?></label>
 				<?php foreach ( $orgs as $term ) : ?>
 					<label class="cec-checkbox"><input type="checkbox" name="cec_sub_org[]" value="<?php echo esc_attr( $term->term_id ); ?>" <?php checked( $preselect_slug === $term->slug ); ?>> <?php echo esc_html( $term->name ); ?></label>
 				<?php endforeach; ?>
