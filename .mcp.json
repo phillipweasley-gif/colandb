@@ -6,6 +6,13 @@
       "headers": {
         "Authorization": "Basic ${COLANDB_WP_AUTH}"
       }
+    },
+    "colandb-staging": {
+      "type": "http",
+      "url": "https://stg-mtbrmv.elementor.cloud/wp-json/colandb/mcp",
+      "headers": {
+        "Authorization": "Basic ${COLANDB_STG_AUTH}"
+      }
     }
   }
 }

@@ -13,6 +13,7 @@ PLUGINS="
 community-events-calendar:community-events-calendar.php
 community-member-planning:community-member-planning.php
 colandb-updater:colandb-updater.php
+colandb-mcp:colandb-mcp.php
 tools/cmp-hosting-check:cmp-hosting-check.php
 "
 
