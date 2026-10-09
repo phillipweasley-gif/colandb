@@ -19,6 +19,7 @@ bash tests/directory-e2e.sh          # Members search and the profile view: 21 c
 bash tests/nods-e2e.sh               # nods: 20 checks
 bash tests/retention-e2e.sh          # daily data clean-up: 17 checks
 bash tests/setup-e2e.sh              # profiles v2 + step-by-step setup: 32 checks
+bash tests/mcp-e2e.sh                # Claude connector (MCP server): 61 checks, needs jq
 bash tests/dob-e2e.sh                # date of birth at sign-up, one-time step, under-18 lock, Show switches: 33 checks
 ```
 
@@ -41,6 +42,7 @@ bash tests/dob-e2e.sh                # date of birth at sign-up, one-time step, 
 | `setup-e2e.sh` | Profiles v2 (CMP 0.5.0): starter lists, new field types (height, weight, month, rated kinks), health starting hidden, the six setup steps (one-step saves, resume, skip / later / finish), the home nudge for existing members, and the new profile display. Resets the profile option lists to the starter lists. |
 | `dob-e2e.sh` | Date of birth (CMP 0.4.0 + CEC 1.27.1 sign-up hooks): `[cec_register]` refusals and success, existing member asked once, under-18 lock and site-team unlock, calculated age, "a filled-in field starts shown", export/erase. Creates its own `[cec_register]` page and turns on registration. |
 | `profile-e2e.sh` | Member profiles: options admin, validation, who-sees-what, photos (upload checks, metadata stripping, permission-checked serving), preferences, export/erasure, sign-in-aware menus and `[cmp_account_bar]`. Starts the test server with 12 MB upload limits; test photos are made with PHP's GD. |
+| `mcp-e2e.sh` | COL&B Claude Connector: the MCP server over real HTTP with application passwords (who may connect, the Claude Agent role's reach in core REST, protocol errors, each tool's results and refusals, per-tool capabilities, the call log). Allows application passwords over HTTP with a temporary must-use plugin, removed at the end. |
 | `updater-e2e.sh` + `mock-github.php` | COL&B Plugin Updater: 27 checks against a local stand-in for GitHub (tokens, staging vs live channel, install, background auto-update, rejected zips, token never sent to the storage server). Run with `WPTEST` set, after `setup.sh`. The mock's release list expects member plugin releases 0.1.0/0.2.0; update `mock-github.php` if that test data needs to move. |
 | `snap.php` | `wp eval-file tests/snap.php <dir>` saves the public month calendar's HTML for 12 cases. Run it before and after any change to `CEC_Month_Grid` and `diff -r` the two folders: they must be identical. |
 | `shots.js` | `node tests/shots.js <outdir> <member-page-id>` (Playwright): screenshots of each member-area state and a horizontal-overflow check at 320/375/768/1440 px. Expects users `unv`, `att`, `mem` (password `pass1234`) in the matching states. |
