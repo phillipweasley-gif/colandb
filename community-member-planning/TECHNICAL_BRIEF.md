@@ -27,7 +27,7 @@ community-member-planning/
 │   ├── class-cmp-feed.php          member feed: text/photo posts, event tags, likes, reports, admin hide, Feed tab
 │   ├── class-cmp-messages.php      member messages: requests, blocks, reports (Users → Member reports), Messages tab
 │   ├── class-cmp-follows.php       follow / unfollow, opt-in "Going to", Following feed filter, calendar label (cec_event_social_label)
-│   ├── class-cmp-groups.php        member ↔ group links (0.20.0): Profile panel, cmp_group_links, "Members on COL&B" on /partner/<slug>/ via cec_partner_org_page_extra, cec_partner_org_member_requested
+│   ├── class-cmp-groups.php        member ↔ group links (0.20.0; 0.21.0: cec_partner_org_can_edit for Titleholder/Organizer, admin Linked members): Profile panel, cmp_group_links, "Members on COL&B" on /partner/<slug>/ via cec_partner_org_page_extra, cec_partner_org_member_requested
 │   ├── class-cmp-directory.php     Members tab: search and filters (shown answers only), opt-out, profile item links
 │   ├── class-cmp-nods.php          nods: quiet interest, Messages → Nods, mutual nods count as connected
 │   ├── class-cmp-retention.php     daily clean-up: audit log, reports, never-verified accounts; overdue erase notice

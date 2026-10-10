@@ -284,7 +284,8 @@ class CEC_Orgs {
 			'telegram' => __( 'Join our Telegram', 'cec' ),
 			'website'  => __( 'Visit Website', 'cec' ),
 		);
-		$html  = '<section class="cec-org-hero' . ( $p['logo'] || $p['logo_id'] ? ' has-image' : '' ) . ' is-' . esc_attr( $p['kind'] ) . '">';
+		$html  = class_exists( 'CEC_Org_Editor' ) ? CEC_Org_Editor::edit_button_html( $p ) : '';
+		$html .= '<section class="cec-org-hero' . ( $p['logo'] || $p['logo_id'] ? ' has-image' : '' ) . ' is-' . esc_attr( $p['kind'] ) . '">';
 		$html .= '<div class="cec-org-main">';
 		if ( 'titleholder' === $p['kind'] && self::title_line( $p ) ) {
 			$html .= '<p class="cec-org-eyebrow">' . esc_html( self::title_line( $p ) ) . '</p>';
@@ -320,6 +321,7 @@ class CEC_Orgs {
 			$heading = 'titleholder' === $p['kind'] ? __( 'Areas of Focus', 'cec' ) : __( 'Our Mission', 'cec' );
 			$html   .= '<section class="cec-org-card"><h2>' . esc_html( $heading ) . '</h2>' . wpautop( esc_html( $p['mission'] ) ) . '</section>';
 		}
+		$html .= class_exists( 'CEC_Org_Editor' ) ? CEC_Org_Editor::gallery_html( $p ) : '';
 		/**
 		 * Extra content for a group's page, e.g. linked member profiles from
 		 * the member plugin. Printed below the profile, above the events.

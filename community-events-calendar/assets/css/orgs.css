@@ -125,7 +125,30 @@ button.cec-org-submit:hover, button.cec-org-submit:focus-visible { background: v
 .cec-org-notice ul { margin: 0.25rem 0 0; padding-left: 1.2rem; }
 [data-cec-kind][hidden] { display: none !important; }
 
+/* ---- Gallery and page editor (1.35.0) ---- */
+.cec-org-gallery { max-width: 75rem; margin: 0 auto 3rem; padding: 0 2rem; box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.cec-org-gallery h2 { text-align: center; margin: 0 0 1.5rem; font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 900 !important; text-transform: uppercase; letter-spacing: 0.05em; color: #FF50D7 !important; }
+.cec-org-gallery-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
+.cec-org-gallery-grid figure { margin: 0; background: #1A1A1A; border: 1px solid #FF50D7; height: 100%; display: flex; flex-direction: column; }
+.cec-org-gallery-grid a { display: block; }
+.cec-org-gallery-grid a:focus-visible { outline: 3px solid #E1F577; outline-offset: 2px; }
+.cec-org-gallery-img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; }
+.cec-org-gallery-grid figcaption { padding: 0.75rem 1rem; color: #CCCCCC; font-size: 0.95rem; line-height: 1.5; }
+.cec-org-edit-bar { margin: 0; padding: 1rem 2rem 0; text-align: center; background: #100F0F; }
+.cec-org-saved { max-width: 46rem; margin: 1rem auto 0; color: #FFFFFF; }
+.cec-org-editor { margin: 2rem auto 3rem; }
+.cec-org-edit-title { margin: 0 0 0.75rem; font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 900 !important; text-transform: uppercase; color: #FF50D7 !important; font-size: clamp(1.6rem, 4vw, 2.25rem); overflow-wrap: anywhere; }
+.cec-org-editor a { color: #E1F577; }
+.cec-org-edit-current { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.cec-org-edit-thumb { width: 96px !important; height: 96px !important; border-radius: 50%; object-fit: cover; }
+.cec-org-edit-gallery { list-style: none; margin: 0 0 1.25rem; padding: 0; }
+.cec-org-edit-gallery li { display: flex; gap: 1rem; align-items: flex-start; padding: 0.75rem 0; border-bottom: 1px solid rgba(255, 255, 255, 0.15); }
+.cec-org-edit-gallery li > img { width: 96px; height: 96px; object-fit: cover; flex: 0 0 auto; }
+.cec-org-edit-gallery li > div { flex: 1 1 auto; min-width: 0; }
+.cec-org-new-photo { border-top: 1px dashed rgba(255, 255, 255, 0.2); padding-top: 0.5rem; }
+
 @media (max-width: 1024px) {
+	.cec-org-gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.cec-org-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 767px) {
@@ -134,4 +157,7 @@ button.cec-org-submit:hover, button.cec-org-submit:focus-visible { background: v
 	.cec-org-grid { grid-template-columns: 1fr; }
 	.cec-org-card { margin: 0 1rem 2rem; padding: 2rem 1.25rem; }
 	.cec-org-form-wrap { padding: 1.25rem; }
+	.cec-org-gallery { padding: 0 1rem; }
+	.cec-org-gallery-grid { grid-template-columns: 1fr; }
+	.cec-org-edit-gallery li { flex-direction: column; }
 }

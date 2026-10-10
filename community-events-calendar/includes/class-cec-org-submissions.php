@@ -340,7 +340,7 @@ class CEC_Org_Submissions {
 	}
 
 	/** @return true|WP_Error */
-	private static function check_image( $file ) {
+	public static function check_image( $file ) {
 		if ( UPLOAD_ERR_OK !== (int) $file['error'] || ! is_uploaded_file( $file['tmp_name'] ) ) {
 			return new WP_Error( 'cec_img', in_array( (int) $file['error'], array( UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE ), true ) ? __( 'That image is larger than 5 MB.', 'cec' ) : __( 'The image didn\'t upload. Please try again.', 'cec' ) );
 		}
@@ -358,7 +358,7 @@ class CEC_Org_Submissions {
 	 * Saves the image to the media library, attached to the submission. The
 	 * file's content decides its type; its name is replaced.
 	 */
-	private static function store_image( $file, $post_id, $name ) {
+	public static function store_image( $file, $post_id, $name ) {
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 		require_once ABSPATH . 'wp-admin/includes/media.php';

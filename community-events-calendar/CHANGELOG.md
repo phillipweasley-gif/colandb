@@ -6,6 +6,33 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.35.0
+
+**Titleholders and organizers edit their own page, with an event gallery** (owner, 2026-10-10: "I also need a way as the titleholder to update that page including text, info, external links, and photos. There should also be an option for gallery uploads so I can showcase events I've been to and add captions". The owner chose: edits go live right away, the gallery is public).
+
+- **"Edit this page"** on `/partner/<slug>/` for anyone allowed to edit it: site admins, plus members the member plugin allows. Member Planning 0.21.0 allows members linked as Titleholder or Organizer. The new filter `cec_partner_org_can_edit` decides. The editor is at `?cec_org_edit=1` and covers:
+  - bio or description, highlights (organizations), mission / areas of focus;
+  - title, year and producer (titleholders);
+  - every link (the same checks as the submission form; the first link is the big button);
+  - the photo or logo: replace or remove.
+  - The name, kind, listing and private contact stay with the site admin.
+- **Gallery ("Events & Appearances" for titleholders, "Gallery" for organizations):**
+  - Up to 30 photos with captions, shown publicly below the mission, each linking to the full-size image.
+  - Add up to 6 at a time (JPEG/PNG/WebP, 5 MB each, checked by content); change captions and order; remove photos.
+  - Adding photos requires ticking "Everyone who can be recognised… agreed to be shown publicly".
+- **Live right away, with undo:**
+  - The site admin is emailed each change by a titleholder or organizer, with before/after text and a link.
+  - The last 10 versions are kept. The group's edit screen in wp-admin lists them under **Page edits** with a **Restore** button.
+  - Photos no kept version uses any more are deleted from the media library. Deleting a group deletes its gallery.
+- Signed-in views of group pages, and the editor, are sent no-cache headers.
+- **Verification** (local WordPress 7.1.2):
+  - `tests/org-e2e.sh` 90/90, with 28 new checks covering who sees the button; refusal for non-editors, a bad nonce and after a role downgrade; editor fields (no name or contact); no-cache; bad link kept and reported with nothing saved; consent required; save live with gallery captions and order; admin email; history; public gallery markup; caption, order, remove and photo replace; Restore; pruning; admin edits not emailed.
+  - `calendar-e2e.sh` 73/73, `profile-e2e.sh` 84/84, `account-e2e.sh` 69/69.
+  - `e2e.sh` 60/60 when run on its own. Run straight after the other suites, it failed 2 email-verification checks once and then passed on rerun. Those checks don't touch this code.
+  - `php -l` on every changed file. The month view is untouched.
+
+---
+
 ## 1.34.0
 
 **Organization & titleholder listings people can submit, one page template for every group, and a homepage grid** (owner, 2026-10-10: "a page and form … that will allow people to submit an affiliate organization", "You approve first", "Anyone, with a contact email", "One template at /partner/name/ (old pages redirect)", and titleholders get "photo, year, title, producer, bio, areas of focus/mission, and social links").
