@@ -55,6 +55,10 @@ class CMP_Groups {
 	public static function set_role( $user_id, $term_id, $role, $source = 'admin' ) {
 		global $wpdb;
 		$role = in_array( $role, self::ROLES, true ) ? $role : 'member';
+		if ( self::is_titleholder_listing( $term_id ) ) {
+			$role = 'titleholder';
+			self::only( $user_id, $term_id );
+		}
 		$have = self::links( $user_id );
 		if ( isset( $have[ $term_id ] ) ) {
 			return false !== $wpdb->update( self::t(), array( 'role' => $role, 'source' => $source ), array( 'user_id' => (int) $user_id, 'term_id' => (int) $term_id ) );
@@ -189,6 +193,14 @@ class CMP_Groups {
 	public static function link( $user_id, $term_id, $role = 'member', $source = 'member' ) {
 		global $wpdb;
 		$role = in_array( $role, self::ROLES, true ) ? $role : 'member';
+		if ( self::is_titleholder_listing( $term_id ) ) {
+			// One person per titleholder listing, and never by self-linking.
+			if ( 'member' === $source ) {
+				return false;
+			}
+			$role = 'titleholder';
+			self::only( $user_id, $term_id );
+		}
 		$have = self::links( $user_id );
 		if ( isset( $have[ $term_id ] ) ) {
 			if ( 'member' === $role || $have[ $term_id ]->role === $role ) {
@@ -213,6 +225,24 @@ class CMP_Groups {
 		return (bool) $wpdb->delete( self::t(), array( 'user_id' => (int) $user_id, 'term_id' => (int) $term_id ), array( '%d', '%d' ) );
 	}
 
+	/**
+	 * A titleholder listing is one person (0.22.0): it has exactly one
+	 * linked member, the Titleholder.
+	 */
+	public static function is_titleholder_listing( $term_id ) {
+		if ( ! self::available() ) {
+			return false;
+		}
+		$p = CEC_Orgs::profile( (int) $term_id );
+		return $p && 'titleholder' === $p['kind'];
+	}
+
+	/** Removes everyone else from a titleholder listing. */
+	private static function only( $user_id, $term_id ) {
+		global $wpdb;
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM ' . self::t() . ' WHERE term_id = %d AND user_id <> %d', $term_id, $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
 	/** A group that may be linked: exists in the events plugin. */
 	private static function group( $term_id ) {
 		if ( ! self::available() || ! $term_id ) {
@@ -228,7 +258,7 @@ class CMP_Groups {
 			return array();
 		}
 		$out = array();
-		foreach ( CEC_Orgs::listed( '' ) as $p ) {
+		foreach ( CEC_Orgs::listed( 'organization' ) as $p ) { // Titleholder listings are one person (0.22.0).
 			$out[ (int) $p['id'] ] = $p['name'];
 		}
 		asort( $out, SORT_NATURAL | SORT_FLAG_CASE );
@@ -346,17 +376,25 @@ class CMP_Groups {
 		if ( ! self::available() ) {
 			return '';
 		}
-		$items = array();
+		$items  = array();
+		$titles = '';
 		foreach ( self::links( $owner_id ) as $term_id => $row ) {
 			$term = self::group( $term_id );
 			if ( ! $term ) {
 				continue;
 			}
-			$link    = get_term_link( $term );
+			$link = get_term_link( $term );
+			// 0.22.0: the titleholder's own listing gets a badge of its own.
+			if ( 'titleholder' === $row->role && self::is_titleholder_listing( $term_id ) ) {
+				$p       = CEC_Orgs::profile( $term );
+				$line    = CEC_Orgs::title_line( $p );
+				$titles .= '<div class="cmp-pv-title"><span class="cmp-pv-title-label">' . esc_html__( 'Titleholder', 'cmp' ) . '</span> <strong>' . esc_html( $line ? $line : $term->name ) . '</strong> <a href="' . esc_url( is_wp_error( $link ) ? '' : $link ) . '">' . esc_html__( 'Titleholder page', 'cmp' ) . '<span class="screen-reader-text">: ' . esc_html( $term->name ) . '</span></a></div>';
+				continue;
+			}
 			$label   = 'member' === $row->role ? $term->name : sprintf( '%1$s (%2$s)', $term->name, self::role_label( $row->role ) );
 			$items[] = '<a href="' . esc_url( is_wp_error( $link ) ? '' : $link ) . '">' . esc_html( $label ) . '</a>';
 		}
-		return $items ? '<p class="cmp-pv-groups"><strong>' . esc_html__( 'Groups:', 'cmp' ) . '</strong> ' . implode( ', ', $items ) . '</p>' : '';
+		return $titles . ( $items ? '<p class="cmp-pv-groups"><strong>' . esc_html__( 'Groups:', 'cmp' ) . '</strong> ' . implode( ', ', $items ) . '</p>' : '' );
 	}
 
 	/**
@@ -367,6 +405,9 @@ class CMP_Groups {
 		$viewer = get_current_user_id();
 		if ( ! $viewer || ! CMP_Access::is_member( $viewer ) || empty( $profile['id'] ) ) {
 			return $html;
+		}
+		if ( 'titleholder' === ( $profile['kind'] ?? '' ) ) {
+			return $html . self::titleholder_profile_html( $profile, $viewer );
 		}
 		$cards = '';
 		$mine  = null;
@@ -399,6 +440,30 @@ class CMP_Groups {
 		$out .= $cards ? '<ul class="cec-org-member-list">' . $cards . '</ul>' : '<p>' . esc_html__( 'No members have linked their profile yet.', 'cmp' ) . '</p>';
 		$out .= '<p><a class="cec-org-btn" href="' . esc_url( $join ) . '">' . esc_html( $mine ? __( 'Manage my groups', 'cmp' ) : __( 'Link my profile', 'cmp' ) ) . '</a></p></section>';
 		return $html . $out;
+	}
+
+	/**
+	 * "My COL&B profile" on a titleholder's page (0.22.0): the one member
+	 * who is that titleholder, for signed-in members only.
+	 */
+	private static function titleholder_profile_html( $profile, $viewer ) {
+		$rows = self::members_of( (int) $profile['id'] );
+		$row  = $rows ? $rows[0] : null;
+		$uid  = $row ? (int) $row->user_id : 0;
+		if ( ! $uid || ! CMP_Access::is_member( $uid ) || ( $uid !== $viewer && CMP_Messages::is_blocked( $viewer, $uid ) ) ) {
+			return '';
+		}
+		$user = get_userdata( $uid );
+		if ( ! $user ) {
+			return '';
+		}
+		$img  = CMP_Profiles::can_view( 'avatar', $uid, $viewer ) ? CMP_Profile_Images::get( $uid, 'avatar', false ) : null;
+		$av   = $img ? CMP_Profile_Images::img_html( $uid, 'avatar', $img ) : esc_html( mb_strtoupper( mb_substr( $user->display_name, 0, 1 ) ) );
+		$you  = $uid === $viewer;
+		$out  = '<section class="cec-org-card cec-org-members is-titleholder" aria-labelledby="cec-org-members-title"><h2 id="cec-org-members-title">' . esc_html__( 'My COL&B profile', 'cmp' ) . '</h2>';
+		$out .= '<p>' . esc_html( $you ? __( 'This is your member profile. Only signed-in members see this.', 'cmp' ) : __( 'Only signed-in members see this.', 'cmp' ) ) . '</p>';
+		$out .= '<ul class="cec-org-member-list"><li class="cec-org-member' . ( $you ? ' is-you' : '' ) . '"><a href="' . esc_url( CMP_Profiles::member_url( $uid ) ) . '"><span class="cec-org-member-av" aria-hidden="true">' . $av . '</span><span class="cec-org-member-name">' . esc_html( $user->display_name ) . '</span><span class="cec-org-member-role">' . esc_html__( 'View profile', 'cmp' ) . '</span></a></li></ul>';
+		return $out . '</section>';
 	}
 
 	/* ------------------------------------------------------------------

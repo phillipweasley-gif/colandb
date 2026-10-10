@@ -25,6 +25,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Gallery: term meta cec_gallery = list of array( id, caption ). Each
  *   image is a media-library attachment marked _cec_org_gallery_term, and
  *   is deleted when removed from the gallery.
+ * - 1.38.0: "Ask for my <network>" (cec_social_ask): the network is shown as
+ *   a tag with no link, and no link is stored.
+ * - 1.38.0: photo shape (circle or 4:5 rectangle, cec_photo_shape) and an
+ *   in-browser cropper; the cropped JPEG replaces the chosen file.
  * - 1.37.1: typed changes are kept as a browser draft (localStorage) and
  *   restored after a refresh; leaving with unsaved changes asks first.
  * - 1.37.1: photos upload one by one as they're picked (cec_org_upload),
@@ -217,6 +221,9 @@ class CEC_Org_Editor {
 						<?php $val = $p['socials'][ $k ] ?? ''; ?>
 						<p class="cec-org-field"><label for="e_s_<?php echo esc_attr( $k ); ?>"><?php echo esc_html( $label ); ?></label>
 							<input type="url" id="e_s_<?php echo esc_attr( $k ); ?>" name="social[<?php echo esc_attr( $k ); ?>]" placeholder="<?php echo esc_attr( 'telegram' === $k ? 'https://t.me/+…' : 'https://' ); ?>" value="<?php echo esc_attr( $val ); ?>" /></p>
+						<?php if ( 'website' !== $k && 'other' !== $k ) : ?>
+							<p class="cec-org-check cec-org-ask-box"><label><input type="checkbox" name="ask[<?php echo esc_attr( $k ); ?>]" value="1" <?php checked( in_array( $k, $p['ask'], true ) ); ?> /> <?php echo esc_html( sprintf( /* translators: %s: network */ $is_title ? __( 'Ask for my %s: I have one but don\'t want the link public (it isn\'t saved)', 'cec' ) : __( 'Ask for our %s: we have one but don\'t want the link public (it isn\'t saved)', 'cec' ), $label ) ); ?></label></p>
+						<?php endif; ?>
 					<?php endforeach; ?>
 					<p class="cec-org-hint"><?php esc_html_e( 'The first link is the big pink button. Leave a box empty to remove that link.', 'cec' ); ?></p>
 				</fieldset>
@@ -224,12 +231,26 @@ class CEC_Org_Editor {
 				<fieldset>
 					<legend><?php echo esc_html( $is_title ? __( 'Photo', 'cec' ) : __( 'Logo', 'cec' ) ); ?></legend>
 					<?php $img = CEC_Orgs::image_html( $p, 'cec-org-edit-thumb' ); ?>
+					<div class="cec-org-kind" role="radiogroup" aria-label="<?php esc_attr_e( 'Shape', 'cec' ); ?>">
+						<label><input type="radio" name="shape" value="circle" <?php checked( 'circle', $p['shape'] ); ?> /> <?php esc_html_e( 'Circle', 'cec' ); ?></label>
+						<label><input type="radio" name="shape" value="rect" <?php checked( 'rect', $p['shape'] ); ?> /> <?php esc_html_e( 'Rectangle (portrait)', 'cec' ); ?></label>
+					</div>
 					<?php if ( $img ) : ?>
 						<div class="cec-org-edit-current"><?php echo $img; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- core image HTML. ?>
-							<p class="cec-org-check"><label><input type="checkbox" name="remove_photo" value="1" /> <?php esc_html_e( 'Remove it', 'cec' ); ?></label></p></div>
+							<div>
+								<button type="button" class="cec-org-remove cec-org-js-only" id="e_recrop" data-src="<?php echo esc_url( $p['logo_id'] ? wp_get_attachment_image_url( $p['logo_id'], 'full' ) : $p['logo'] ); ?>"><?php esc_html_e( 'Adjust crop', 'cec' ); ?></button>
+								<p class="cec-org-check"><label><input type="checkbox" name="remove_photo" value="1" /> <?php esc_html_e( 'Remove it', 'cec' ); ?></label></p>
+							</div></div>
 					<?php endif; ?>
 					<p class="cec-org-field"><label for="e_photo"><?php echo esc_html( $img ? __( 'Replace with a new image (optional)', 'cec' ) : __( 'Add an image (optional)', 'cec' ) ); ?></label>
-						<input type="file" id="e_photo" name="photo" accept="image/jpeg,image/png,image/webp" /><span class="cec-org-hint"><?php esc_html_e( 'JPEG, PNG or WebP, up to 10 MB. Shown in a circle, so a square image works best.', 'cec' ); ?></span></p>
+						<input type="file" id="e_photo" name="photo" accept="image/jpeg,image/png,image/webp" /><span class="cec-org-hint"><?php esc_html_e( 'JPEG, PNG or WebP, up to 10 MB. After choosing one you can drag and zoom to crop it.', 'cec' ); ?></span></p>
+					<div class="cec-org-cropper" id="e_cropper" hidden>
+						<p class="cec-org-hint"><?php esc_html_e( 'Drag the photo to move it; use the slider (or scroll) to zoom. The bright area is what will show.', 'cec' ); ?></p>
+						<canvas id="e_crop_canvas" width="360" height="360" tabindex="0" aria-label="<?php esc_attr_e( 'Crop area. Use arrow keys to move and + or - to zoom.', 'cec' ); ?>"></canvas>
+						<p class="cec-org-field"><label for="e_crop_zoom"><?php esc_html_e( 'Zoom', 'cec' ); ?></label><input type="range" id="e_crop_zoom" min="1" max="4" step="0.01" value="1" /></p>
+						<p><button type="button" class="cec-org-remove cec-org-crop-use" id="e_crop_use"><?php esc_html_e( 'Use this crop', 'cec' ); ?></button> <button type="button" class="cec-org-remove" id="e_crop_cancel"><?php esc_html_e( 'Cancel', 'cec' ); ?></button></p>
+					</div>
+					<p class="cec-org-hint" id="e_crop_status" aria-live="polite"></p>
 				</fieldset>
 
 				<fieldset>
@@ -280,6 +301,80 @@ class CEC_Org_Editor {
 				var form = document.getElementById( 'cec-org-edit-form' );
 				if ( ! form ) { return; }
 				form.classList.add( 'is-js' );
+				// Photo cropper (1.38.0): circle = square crop, rectangle = 4:5.
+				( function () {
+					var file = document.getElementById( 'e_photo' ), wrap = document.getElementById( 'e_cropper' ), cv = document.getElementById( 'e_crop_canvas' );
+					if ( ! file || ! wrap || ! cv || ! window.DataTransfer ) { return; }
+					var ctx = cv.getContext( '2d' ), zoomEl = document.getElementById( 'e_crop_zoom' ), st = document.getElementById( 'e_crop_status' ), recrop = document.getElementById( 'e_recrop' );
+					var C = <?php echo wp_json_encode( array( 'ready' => __( 'Cropped photo ready. It is saved when you click Save changes.', 'cec' ), 'bad' => __( 'That image couldn\'t be opened. Please choose a JPEG, PNG or WebP.', 'cec' ) ) ); ?>;
+					var img = null, zoom = 1, ox = 0, oy = 0, drag = null, name = 'photo.jpg';
+					function shape() { var r = form.querySelector( 'input[name=shape]:checked' ); return r && r.value === 'rect' ? 'rect' : 'circle'; }
+					function frame() { var W = cv.width, H = cv.height, fh = H * 0.86, fw = shape() === 'rect' ? fh * 0.8 : fh; return { x: ( W - fw ) / 2, y: ( H - fh ) / 2, w: fw, h: fh }; }
+					function base() { var f = frame(); return Math.max( f.w / img.width, f.h / img.height ); }
+					function clamp() { var f = frame(), sc = base() * zoom, w = img.width * sc, h = img.height * sc; ox = Math.min( f.x, Math.max( f.x + f.w - w, ox ) ); oy = Math.min( f.y, Math.max( f.y + f.h - h, oy ) ); }
+					function draw() {
+						if ( ! img ) { return; }
+						clamp();
+						var f = frame(), sc = base() * zoom;
+						ctx.fillStyle = '#0f0d16'; ctx.fillRect( 0, 0, cv.width, cv.height );
+						ctx.drawImage( img, ox, oy, img.width * sc, img.height * sc );
+						ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.rect( 0, 0, cv.width, cv.height );
+						if ( shape() === 'circle' ) { ctx.arc( f.x + f.w / 2, f.y + f.h / 2, f.w / 2, 0, Math.PI * 2, true ); } else { ctx.rect( f.x + f.w, f.y, -f.w, f.h ); }
+						ctx.fill( 'evenodd' ); ctx.restore();
+						ctx.strokeStyle = '#E1F577'; ctx.lineWidth = 2; ctx.beginPath();
+						if ( shape() === 'circle' ) { ctx.arc( f.x + f.w / 2, f.y + f.h / 2, f.w / 2, 0, Math.PI * 2 ); } else { ctx.rect( f.x, f.y, f.w, f.h ); }
+						ctx.stroke();
+					}
+					function center() { var f = frame(), sc = base() * zoom; ox = f.x + ( f.w - img.width * sc ) / 2; oy = f.y + ( f.h - img.height * sc ) / 2; }
+					function open( src, fname ) {
+						var i = new Image();
+						i.onload = function () { img = i; zoom = 1; zoomEl.value = 1; name = ( fname || 'photo' ).replace( /\.[^.]+$/, '' ) + '.jpg'; center(); wrap.hidden = false; draw(); cv.focus(); };
+						i.onerror = function () { st.textContent = C.bad; };
+						i.src = src;
+					}
+					file.addEventListener( 'change', function () {
+						if ( file.dataset.cropped === '1' ) { file.dataset.cropped = ''; return; }
+						var f = file.files && file.files[0];
+						if ( f ) { open( URL.createObjectURL( f ), f.name ); }
+					} );
+					if ( recrop ) { recrop.addEventListener( 'click', function () { open( recrop.dataset.src, 'photo' ); } ); }
+					form.querySelectorAll( 'input[name=shape]' ).forEach( function ( r ) { r.addEventListener( 'change', function () { if ( img && ! wrap.hidden ) { center(); draw(); } } ); } );
+					function setZoom( z, cx, cy ) {
+						var f = frame(); cx = cx === undefined ? f.x + f.w / 2 : cx; cy = cy === undefined ? f.y + f.h / 2 : cy;
+						var old = zoom; zoom = Math.min( 4, Math.max( 1, z ) ); zoomEl.value = zoom;
+						ox = cx - ( cx - ox ) * zoom / old; oy = cy - ( cy - oy ) * zoom / old; draw();
+					}
+					zoomEl.addEventListener( 'input', function () { setZoom( parseFloat( zoomEl.value ) ); } );
+					function pt( e ) { var r = cv.getBoundingClientRect(); return { x: ( e.clientX - r.left ) * cv.width / r.width, y: ( e.clientY - r.top ) * cv.height / r.height }; }
+					cv.addEventListener( 'pointerdown', function ( e ) { if ( ! img ) { return; } drag = pt( e ); cv.setPointerCapture( e.pointerId ); } );
+					cv.addEventListener( 'pointermove', function ( e ) { if ( ! drag ) { return; } var q = pt( e ); ox += q.x - drag.x; oy += q.y - drag.y; drag = q; draw(); } );
+					cv.addEventListener( 'pointerup', function () { drag = null; } );
+					cv.addEventListener( 'wheel', function ( e ) { if ( ! img ) { return; } e.preventDefault(); var q = pt( e ); setZoom( zoom * ( e.deltaY < 0 ? 1.08 : 0.926 ), q.x, q.y ); }, { passive: false } );
+					cv.addEventListener( 'keydown', function ( e ) {
+						var k = e.key, m = { ArrowLeft: [ 10, 0 ], ArrowRight: [ -10, 0 ], ArrowUp: [ 0, 10 ], ArrowDown: [ 0, -10 ] };
+						if ( m[ k ] ) { e.preventDefault(); ox += m[ k ][0]; oy += m[ k ][1]; draw(); }
+						if ( k === '+' || k === '=' ) { e.preventDefault(); setZoom( zoom * 1.1 ); }
+						if ( k === '-' ) { e.preventDefault(); setZoom( zoom / 1.1 ); }
+					} );
+					document.getElementById( 'e_crop_cancel' ).addEventListener( 'click', function () { wrap.hidden = true; if ( ! file.dataset.has ) { file.value = ''; } } );
+					document.getElementById( 'e_crop_use' ).addEventListener( 'click', function () {
+						var f = frame(), sc = base() * zoom, outW = shape() === 'rect' ? 960 : 1000, outH = shape() === 'rect' ? 1200 : 1000;
+						var out = document.createElement( 'canvas' ); out.width = outW; out.height = outH;
+						var sx = ( f.x - ox ) / sc, sy = ( f.y - oy ) / sc, sw = f.w / sc, sh = f.h / sc;
+						out.getContext( '2d' ).drawImage( img, sx, sy, sw, sh, 0, 0, outW, outH );
+						out.toBlob( function ( blob ) {
+							var dt = new DataTransfer();
+							dt.items.add( new File( [ blob ], name, { type: 'image/jpeg' } ) );
+							file.dataset.cropped = '1'; file.dataset.has = '1';
+							file.files = dt.files;
+							file.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+							wrap.hidden = true;
+							st.textContent = C.ready;
+							var cur = form.querySelector( '.cec-org-edit-thumb' );
+							if ( cur ) { cur.src = out.toDataURL( 'image/jpeg', 0.8 ); cur.removeAttribute( 'srcset' ); cur.classList.toggle( 'is-rect', shape() === 'rect' ); }
+						}, 'image/jpeg', 0.9 );
+					} );
+				} )();
 				var input = document.getElementById( 'g_bulk' ), list = document.getElementById( 'cec-org-uploads' ), box = document.getElementById( 'cec-org-held' ), status = document.getElementById( 'g_bulk_status' );
 				var each = <?php echo (int) self::PHOTO_BYTES; ?>, queue = [], busy = 0;
 				var T = <?php echo wp_json_encode( array( 'uploading' => __( 'Uploading…', 'cec' ), 'waiting' => __( 'Waiting…', 'cec' ), 'big' => __( 'Larger than 10 MB: not uploaded.', 'cec' ), 'failed' => __( 'Couldn\'t upload:', 'cec' ), 'dismiss' => __( 'Dismiss', 'cec' ), 'left' => __( 'photo(s) still uploading…', 'cec' ), 'done' => __( 'All photos uploaded. Add captions, then tick the box and save.', 'cec' ), 'wait' => __( 'Please wait until the photos finish uploading, then save.', 'cec' ), 'removed' => __( 'Removed.', 'cec' ) ) ); ?>;
@@ -446,6 +541,8 @@ class CEC_Org_Editor {
 			'socials'     => $p['socials'],
 			'logo'        => $p['logo'],
 			'logo_id'     => $p['logo_id'],
+			'shape'       => $p['shape'],
+			'ask'         => $p['ask'],
 			'gallery'     => self::gallery( $term_id ),
 		);
 	}
@@ -586,6 +683,7 @@ class CEC_Org_Editor {
 			'year'        => $is_title ? $s( 'year', 4 ) : $p['year'],
 			'producer'    => $is_title ? $s( 'producer', 120 ) : $p['producer'],
 			'socials'     => array(),
+			'shape'       => isset( $post['shape'] ) && 'rect' === $post['shape'] ? 'rect' : 'circle',
 		);
 		if ( '' === $new['name'] ) {
 			/* translators: %s: current name */
@@ -608,9 +706,14 @@ class CEC_Org_Editor {
 			$notes[]     = sprintf( __( 'Year: "%s" isn\'t a four-digit year, so the previous year was kept.', 'cec' ), $new['year'] );
 			$new['year'] = $p['year'];
 		}
-		$social = isset( $post['social'] ) && is_array( $post['social'] ) ? $post['social'] : array();
-		$labels = CEC_Orgs::socials();
+		$social     = isset( $post['social'] ) && is_array( $post['social'] ) ? $post['social'] : array();
+		$labels     = CEC_Orgs::socials();
+		$ask        = isset( $post['ask'] ) && is_array( $post['ask'] ) ? array_keys( array_filter( $post['ask'] ) ) : array();
+		$new['ask'] = array_values( array_intersect( array_diff( array_keys( $labels ), array( 'website', 'other' ) ), $ask ) );
 		foreach ( array_keys( $labels ) as $k ) {
+			if ( in_array( $k, $new['ask'], true ) ) {
+				continue; // "Ask for my …": the link is never stored or shown.
+			}
 			$raw   = isset( $social[ $k ] ) && is_scalar( $social[ $k ] ) ? (string) $social[ $k ] : '';
 			$clean = CEC_Orgs::clean_social( $k, $raw );
 			if ( is_wp_error( $clean ) ) {
@@ -825,6 +928,8 @@ class CEC_Org_Editor {
 			'producer'    => __( 'Producer', 'cec' ),
 			'socials'     => __( 'Links', 'cec' ),
 			'logo_id'     => __( 'Photo / logo', 'cec' ),
+			'shape'       => __( 'Photo shape', 'cec' ),
+			'ask'         => __( '"Ask for my…" links', 'cec' ),
 		);
 		$changes = array();
 		foreach ( $labels as $k => $label ) {
@@ -913,7 +1018,7 @@ class CEC_Org_Editor {
 		if ( ! empty( $data['name'] ) && get_term( $term_id )->name !== $data['name'] && ! get_term_by( 'name', $data['name'], 'cec_partner_org' ) ) {
 			wp_update_term( $term_id, 'cec_partner_org', array( 'name' => $data['name'] ) );
 		}
-		$fields = array_intersect_key( $data, array_flip( array( 'summary', 'description', 'highlights', 'mission', 'title', 'year', 'producer', 'socials', 'logo', 'logo_id' ) ) );
+		$fields = array_intersect_key( $data, array_flip( array( 'summary', 'description', 'highlights', 'mission', 'title', 'year', 'producer', 'socials', 'logo', 'logo_id', 'shape', 'ask' ) ) );
 		CEC_Orgs::save_profile( $term_id, $fields );
 		update_term_meta( $term_id, 'cec_gallery', $gallery );
 		self::prune( $term_id );
