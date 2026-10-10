@@ -340,12 +340,12 @@ class CEC_Org_Submissions {
 	}
 
 	/** @return true|WP_Error */
-	public static function check_image( $file ) {
+	public static function check_image( $file, $max = self::MAX_BYTES ) {
 		if ( UPLOAD_ERR_OK !== (int) $file['error'] || ! is_uploaded_file( $file['tmp_name'] ) ) {
-			return new WP_Error( 'cec_img', in_array( (int) $file['error'], array( UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE ), true ) ? __( 'That image is larger than 5 MB.', 'cec' ) : __( 'The image didn\'t upload. Please try again.', 'cec' ) );
+			return new WP_Error( 'cec_img', in_array( (int) $file['error'], array( UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE ), true ) ? sprintf( /* translators: %s: size limit */ __( 'That image is larger than %s.', 'cec' ), size_format( $max ) ) : __( 'The image didn\'t upload. Please try again.', 'cec' ) );
 		}
-		if ( (int) $file['size'] > self::MAX_BYTES ) {
-			return new WP_Error( 'cec_img', __( 'That image is larger than 5 MB.', 'cec' ) );
+		if ( (int) $file['size'] > $max ) {
+			return new WP_Error( 'cec_img', sprintf( /* translators: %s: size limit */ __( 'That image is larger than %s.', 'cec' ), size_format( $max ) ) );
 		}
 		$info = @getimagesize( $file['tmp_name'] ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
 		if ( ! $info || ! in_array( $info['mime'], array( 'image/jpeg', 'image/png', 'image/webp' ), true ) ) {

@@ -6,6 +6,26 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.37.0
+
+**The page editor never throws work away, and takes photos in bulk** (owner, 2026-10-10: "because I didn't enter a name it wiped out all my work for editing my profile and that's a problem. I should also be able to upload photos in bulk").
+
+- **What went wrong.** A save with any problem (an empty name, a bad link, a missing consent tick, one bad photo) was rejected as a whole. The text came back, but every photo picked had to be chosen again, and gallery caption and order changes were lost.
+- **Now every save keeps everything that's valid:**
+  - Anything that can't be used keeps its current value: an empty or duplicate name, an empty bio, a bad year, a link that can't work.
+  - The editor then lists exactly what wasn't changed. A bad link is shown as typed, and a bad photo is named.
+- **Photos without the consent box are kept, not dropped.** They stay in the editor under "Uploaded, not on your page yet", with caption boxes and a Delete option. They are not on the page. Ticking the box and saving adds them to the gallery.
+- **Bulk upload:** one "Add photos" field takes many photos at once, up to 15 per save. New photos go at the end of the gallery, and captions and order are set afterwards.
+  - Up to 10 MB per photo (was 5 MB, for phone photos), and the gallery now holds 60.
+  - Before sending, the browser checks the count, each photo's size and the total (90 MB, under the CDN's 100 MB limit). A too-large upload is stopped with a message, so the form is never lost.
+- An edit that changes nothing no longer adds a version or emails the admin.
+- **Verification** (local WordPress 7.1.2):
+  - `tests/org-e2e.sh` 101/101. The editor checks were rewritten for keep-what's-valid: a bad link and a bad photo don't block the rest; the previous link is kept; notes list the typed link and the photo name, once; photos without consent are held, shown with caption boxes, not public; confirming adds them with their caption; many photos at once.
+  - In Chromium on the local site, choosing 16 photos is stopped with "Please choose up to 15…" and the form stays; choosing 3 shows "3 photo(s) ready to add."
+  - `calendar-e2e.sh` 73/73. `php -l` on every changed file.
+
+---
+
 ## 1.36.0
 
 **Titleholders and organizers manage their own homepage card** (owner, 2026-10-10: "I need the titleholders to be able to manage these cards through their logins. Not to be managed by the site admin except for approval").
