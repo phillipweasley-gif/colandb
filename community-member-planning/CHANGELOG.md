@@ -4,6 +4,19 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.21.0
+
+**Titleholders and organizers can edit their group's page** (owner, 2026-10-10; works with Events Calendar 1.35.0).
+
+- A full member linked to a group as **Titleholder** or **Organizer** may use "Edit this page" on the group's page (answers `cec_partner_org_can_edit`). Members linked as Member can't.
+- **Profile tab → Groups and titles** shows an **Edit page** button next to those groups.
+- **wp-admin → Events → Partners & Titleholders → Edit** gains **Linked members**:
+  - change each member's role or remove the link;
+  - link a member by username or email with a role (they're notified).
+- **Verification:** `tests/org-e2e.sh` 90/90 (the editor checks plus admin link/role/remove); `profile-e2e.sh` 84/84; `account-e2e.sh` 69/69; `php -l`.
+
+---
+
 ## 0.20.1
 
 **Your own card on a group's page is easy to find, and the page is never shown stale after signing in** (owner, 2026-10-10: "I added my profile … but I'm not seeing it … All members should be able to see their own profiles … on these pages.").

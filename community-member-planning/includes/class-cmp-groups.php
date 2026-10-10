@@ -32,6 +32,97 @@ class CMP_Groups {
 		add_action( 'cec_partner_org_member_requested', array( __CLASS__, 'on_requested' ), 10, 3 );
 		add_action( 'delete_term', array( __CLASS__, 'on_delete_term' ), 10, 3 );
 		add_action( 'template_redirect', array( __CLASS__, 'no_cache_signed_in' ) );
+		add_filter( 'cec_partner_org_can_edit', array( __CLASS__, 'can_edit' ), 10, 3 );
+		add_action( 'cec_partner_org_edit_form_fields', array( __CLASS__, 'admin_fields' ), 30 );
+		add_action( 'edited_cec_partner_org', array( __CLASS__, 'admin_save' ), 30 );
+	}
+
+	/**
+	 * 0.21.0: a full member linked to the group as Titleholder or Organizer
+	 * may edit its public page (events plugin 1.35.0, "Edit this page").
+	 */
+	public static function can_edit( $allowed, $user_id, $term_id ) {
+		if ( $allowed ) {
+			return true;
+		}
+		$links = self::links( $user_id );
+		return isset( $links[ $term_id ] ) && in_array( $links[ $term_id ]->role, array( 'organizer', 'titleholder' ), true ) && CMP_Access::is_member( $user_id );
+	}
+
+	/**
+	 * Set a member's role directly, including a downgrade (site admin only).
+	 */
+	public static function set_role( $user_id, $term_id, $role, $source = 'admin' ) {
+		global $wpdb;
+		$role = in_array( $role, self::ROLES, true ) ? $role : 'member';
+		$have = self::links( $user_id );
+		if ( isset( $have[ $term_id ] ) ) {
+			return false !== $wpdb->update( self::t(), array( 'role' => $role, 'source' => $source ), array( 'user_id' => (int) $user_id, 'term_id' => (int) $term_id ) );
+		}
+		return self::link( $user_id, $term_id, $role, $source );
+	}
+
+	/* ------------------------------------------------------------------
+	 * wp-admin: Events → Partners & Titleholders → Edit (0.21.0)
+	 * ---------------------------------------------------------------- */
+
+	public static function admin_fields( $term ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		wp_nonce_field( 'cmp_group_admin_' . $term->term_id, 'cmp_group_admin_nonce' );
+		$rows = self::members_of( $term->term_id );
+		?>
+		<tr class="form-field"><th scope="row"><?php esc_html_e( 'Linked members', 'cmp' ); ?></th><td>
+			<p class="description"><?php esc_html_e( 'Members linked to this group (Community Member Planning). Titleholders and Organizers can edit the group\'s page with "Edit this page"; Members can\'t. Members can remove their own link at any time.', 'cmp' ); ?></p>
+			<?php if ( $rows ) : ?>
+				<table class="widefat striped" style="max-width:40rem"><tbody>
+				<?php foreach ( $rows as $r ) : ?>
+					<?php $u = get_userdata( (int) $r->user_id ); ?>
+					<tr><td><?php echo esc_html( $u ? $u->display_name . ' (' . $u->user_login . ')' : '#' . $r->user_id ); ?></td>
+						<td><select name="cmp_group_role[<?php echo (int) $r->user_id; ?>]" aria-label="<?php esc_attr_e( 'Role', 'cmp' ); ?>">
+							<?php foreach ( self::ROLES as $role ) : ?><option value="<?php echo esc_attr( $role ); ?>" <?php selected( $r->role, $role ); ?>><?php echo esc_html( self::role_label( $role ) ); ?></option><?php endforeach; ?>
+							<option value="remove"><?php esc_html_e( 'Remove link', 'cmp' ); ?></option>
+						</select></td></tr>
+				<?php endforeach; ?>
+				</tbody></table>
+			<?php endif; ?>
+			<p><label><?php esc_html_e( 'Link a member (username or email)', 'cmp' ); ?> <input type="text" name="cmp_group_add" style="width:16rem" /></label>
+				<select name="cmp_group_add_role" aria-label="<?php esc_attr_e( 'Role', 'cmp' ); ?>"><?php foreach ( array_reverse( self::ROLES ) as $role ) : ?><option value="<?php echo esc_attr( $role ); ?>"><?php echo esc_html( self::role_label( $role ) ); ?></option><?php endforeach; ?></select></p>
+			<p class="description"><?php esc_html_e( 'The member is told when you link them.', 'cmp' ); ?></p>
+		</td></tr>
+		<?php
+	}
+
+	public static function admin_save( $term_id ) {
+		if ( ! isset( $_POST['cmp_group_admin_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['cmp_group_admin_nonce'] ) ), 'cmp_group_admin_' . $term_id ) || ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		$roles = isset( $_POST['cmp_group_role'] ) && is_array( $_POST['cmp_group_role'] ) ? wp_unslash( $_POST['cmp_group_role'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- checked below.
+		foreach ( $roles as $uid => $role ) {
+			$uid  = absint( $uid );
+			$role = sanitize_key( $role );
+			if ( 'remove' === $role ) {
+				self::unlink( $uid, $term_id );
+			} elseif ( in_array( $role, self::ROLES, true ) ) {
+				self::set_role( $uid, $term_id, $role );
+			}
+		}
+		$ref = isset( $_POST['cmp_group_add'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['cmp_group_add'] ) ) ) : '';
+		if ( '' !== $ref ) {
+			$user = is_email( $ref ) ? get_user_by( 'email', $ref ) : get_user_by( 'login', $ref );
+			$role = isset( $_POST['cmp_group_add_role'] ) ? sanitize_key( wp_unslash( $_POST['cmp_group_add_role'] ) ) : 'member';
+			$term = get_term( $term_id, 'cec_partner_org' );
+			if ( $user && $term && ! is_wp_error( $term ) && self::set_role( $user->ID, $term_id, $role ) ) {
+				CMP_Notifications::add(
+					$user->ID,
+					'account',
+					/* translators: 1: group name, 2: role */
+					sprintf( __( 'Your member profile is now linked to %1$s as %2$s. Members can see it on that page; you can remove the link on your Profile tab.', 'cmp' ), $term->name, self::role_label( in_array( $role, self::ROLES, true ) ? $role : 'member' ) ),
+					CMP_Profiles::url( '', 'cmp-groups' )
+				);
+			}
+		}
 	}
 
 	/**
@@ -231,6 +322,9 @@ class CMP_Groups {
 				}
 				$link  = get_term_link( $term );
 				$html .= '<li><a href="' . esc_url( is_wp_error( $link ) ? '' : $link ) . '">' . esc_html( $term->name ) . '</a> <span class="cmp-muted">' . esc_html( self::role_label( $row->role ) ) . '</span> ';
+				if ( class_exists( 'CEC_Org_Editor' ) && in_array( $row->role, array( 'organizer', 'titleholder' ), true ) ) {
+					$html .= '<a class="cmp-btn cmp-btn-small" href="' . esc_url( CEC_Org_Editor::edit_url( $term ) ) . '">' . esc_html__( 'Edit page', 'cmp' ) . '<span class="screen-reader-text"> ' . esc_html( $term->name ) . '</span></a> ';
+				}
 				$html .= self::form_open( 'remove' ) . '<input type="hidden" name="group" value="' . (int) $term_id . '" /><button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Remove', 'cmp' ) . '<span class="screen-reader-text"> ' . esc_html( $term->name ) . '</span></button></form></li>';
 			}
 			$html .= '</ul>';
