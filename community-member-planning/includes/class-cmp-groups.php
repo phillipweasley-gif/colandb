@@ -31,6 +31,19 @@ class CMP_Groups {
 		add_filter( 'cec_partner_org_page_extra', array( __CLASS__, 'page_html' ), 10, 2 );
 		add_action( 'cec_partner_org_member_requested', array( __CLASS__, 'on_requested' ), 10, 3 );
 		add_action( 'delete_term', array( __CLASS__, 'on_delete_term' ), 10, 3 );
+		add_action( 'template_redirect', array( __CLASS__, 'no_cache_signed_in' ) );
+	}
+
+	/**
+	 * 0.20.1: a group page seen signed in shows the member list, so it must
+	 * never be kept by the browser. Signed-out copies say "public,
+	 * max-age=300", so a page opened before signing in could be shown again
+	 * without the list.
+	 */
+	public static function no_cache_signed_in() {
+		if ( is_user_logged_in() && is_tax( 'cec_partner_org' ) ) {
+			nocache_headers();
+		}
 	}
 
 	public static function notices() {
@@ -262,6 +275,7 @@ class CMP_Groups {
 			return $html;
 		}
 		$cards = '';
+		$mine  = null;
 		foreach ( self::members_of( (int) $profile['id'] ) as $row ) {
 			$uid = (int) $row->user_id;
 			if ( ! CMP_Access::is_member( $uid ) || ( $uid !== $viewer && CMP_Messages::is_blocked( $viewer, $uid ) ) ) {
@@ -273,13 +287,23 @@ class CMP_Groups {
 			}
 			$img    = CMP_Profiles::can_view( 'avatar', $uid, $viewer ) ? CMP_Profile_Images::get( $uid, 'avatar', false ) : null;
 			$av     = $img ? CMP_Profile_Images::img_html( $uid, 'avatar', $img ) : esc_html( mb_strtoupper( mb_substr( $user->display_name, 0, 1 ) ) );
-			$cards .= '<li class="cec-org-member"><a href="' . esc_url( CMP_Profiles::member_url( $uid ) ) . '"><span class="cec-org-member-av" aria-hidden="true">' . $av . '</span><span class="cec-org-member-name">' . esc_html( $user->display_name ) . '</span><span class="cec-org-member-role">' . esc_html( self::role_label( $row->role ) ) . '</span></a></li>';
+			$you  = $uid === $viewer;
+			$card = '<li class="cec-org-member' . ( $you ? ' is-you' : '' ) . '"><a href="' . esc_url( CMP_Profiles::member_url( $uid ) ) . '"><span class="cec-org-member-av" aria-hidden="true">' . $av . '</span><span class="cec-org-member-name">' . esc_html( $user->display_name ) . ( $you ? ' ' . esc_html__( '(you)', 'cmp' ) : '' ) . '</span><span class="cec-org-member-role">' . esc_html( self::role_label( $row->role ) ) . '</span></a></li>';
+			// Your own card comes first (0.20.1).
+			if ( $you ) {
+				$mine  = $row;
+				$cards = $card . $cards;
+			} else {
+				$cards .= $card;
+			}
 		}
 		$join = CMP_Profiles::url( '', 'cmp-groups' );
 		$out  = '<section class="cec-org-card cec-org-members" aria-labelledby="cec-org-members-title"><h2 id="cec-org-members-title">' . esc_html__( 'Members on COL&B', 'cmp' ) . '</h2>';
-		$out .= '<p>' . esc_html__( 'Only signed-in members see this list.', 'cmp' ) . '</p>';
+		$out .= '<p>' . esc_html__( 'Only signed-in members see this list.', 'cmp' ) . ' ';
+		/* translators: %s: role */
+		$out .= esc_html( $mine ? sprintf( __( 'Your profile is listed here as %s.', 'cmp' ), self::role_label( $mine->role ) ) : __( 'Your profile isn\'t linked to this group.', 'cmp' ) ) . '</p>';
 		$out .= $cards ? '<ul class="cec-org-member-list">' . $cards . '</ul>' : '<p>' . esc_html__( 'No members have linked their profile yet.', 'cmp' ) . '</p>';
-		$out .= '<p><a class="cec-org-btn" href="' . esc_url( $join ) . '">' . esc_html__( 'Link my profile', 'cmp' ) . '</a></p></section>';
+		$out .= '<p><a class="cec-org-btn" href="' . esc_url( $join ) . '">' . esc_html( $mine ? __( 'Manage my groups', 'cmp' ) : __( 'Link my profile', 'cmp' ) ) . '</a></p></section>';
 		return $html . $out;
 	}
 

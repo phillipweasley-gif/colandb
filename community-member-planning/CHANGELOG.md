@@ -4,6 +4,16 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.20.1
+
+**Your own card on a group's page is easy to find, and the page is never shown stale after signing in** (owner, 2026-10-10: "I added my profile … but I'm not seeing it … All members should be able to see their own profiles … on these pages.").
+
+- **Your card comes first and says "(you)"**, and the section says "Your profile is listed here as Member" (or Organizer/Titleholder), or that your profile isn't linked to this group. The button reads **Manage my groups** once you're linked, otherwise **Link my profile**. (The owner's display name is the same as a titleholder's, so their card wasn't recognisable.)
+- **Signed-in visits to `/partner/<slug>/` are sent no-cache headers.** Signed-out copies of these pages tell browsers to keep them for 5 minutes, so a page opened before signing in could be shown again without the member list.
+- **Verification** (local WordPress 7.1.2): `tests/org-e2e.sh` 64/64, with 4 new checks (own card first with "(you)", role sentence and button; no-cache signed in, cacheable signed out; "isn't linked" for someone not linked). `php -l` on the changed file.
+
+---
+
 ## 0.20.0
 
 **Members can link their profile to an organization or titleholder** (owner, 2026-10-10: "you should be able to link a member account to an existing group OR enter one when submitting the form so the member profile is visible").
