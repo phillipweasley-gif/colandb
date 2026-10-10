@@ -5,7 +5,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 get_header();
 $term = get_queried_object();
 ?>
-<main class="cec-taxonomy-archive">
+<main class="cec-taxonomy-archive<?php echo 'cec_partner_org' === $term->taxonomy ? ' is-partner-org' : ''; ?>">
+	<?php if ( 'cec_partner_org' === $term->taxonomy ) : ?>
+		<?php echo CEC_Orgs::header_html( $term ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
+		<header class="cec-archive-header cec-org-events-head">
+			<h2><?php esc_html_e( 'Upcoming Events', 'cec' ); ?></h2>
+			<?php echo CEC_Feeds::subscribe_links_html( $term->term_id ); // phpcs:ignore ?>
+		</header>
+	<?php else : ?>
 	<header class="cec-archive-header">
 		<h1><?php echo esc_html( $term->name ); ?></h1>
 		<?php
@@ -15,10 +22,8 @@ $term = get_queried_object();
 			<p><a href="<?php echo esc_url( $org_url ); ?>" target="_blank" rel="noopener"><?php echo esc_html( $org_url ); ?> &rarr;</a></p>
 		<?php endif; ?>
 		<?php if ( $term->description ) : ?><p><?php echo esc_html( $term->description ); ?></p><?php endif; ?>
-		<?php if ( 'cec_partner_org' === $term->taxonomy ) : ?>
-			<?php echo CEC_Feeds::subscribe_links_html( $term->term_id ); // phpcs:ignore ?>
-		<?php endif; ?>
 	</header>
+	<?php endif; ?>
 
 	<div class="cec-events-wrap" data-view="grid">
 		<div class="cec-events-results">

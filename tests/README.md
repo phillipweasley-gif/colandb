@@ -20,6 +20,7 @@ bash tests/nods-e2e.sh               # nods: 20 checks
 bash tests/retention-e2e.sh          # daily data clean-up: 17 checks
 bash tests/setup-e2e.sh              # profiles v2 + step-by-step setup: 32 checks
 bash tests/dob-e2e.sh                # date of birth at sign-up, one-time step, under-18 lock, Show switches: 33 checks
+bash tests/org-e2e.sh                # organization & titleholder submissions, pages, grid, member links: 60 checks
 ```
 
 | File | What it does |
@@ -34,6 +35,7 @@ bash tests/dob-e2e.sh                # date of birth at sign-up, one-time step, 
 | `chastity-e2e.sh` | Chastity (CMP 0.8.0): starting a lock (self / keyholder only from a dynamic), keyholder time and rules, hidden timer, verification codes and photo privacy, hygiene, releases, ask to unlock, profile badge, dynamic ending (self-lock), emergency unlock, export/erase. Needs PHP GD. Empties the lock and dynamics tables before and after. |
 | `feed-e2e.sh` | Feed (CMP 0.9.0): posting rules (empty, length, audience, photos, event window), who sees what (members / connections / signed out / not yet members), photo privacy and re-encoding, likes, reports (admin email), admin hide, delete, profile posts, dynamic ending, export/erase. Needs PHP GD. Creates and removes two test events and an administrator "mod". |
 | `messages-e2e.sh` | Messages (CMP 0.11.0): requests vs. inbox, the 3-message request limit, accepting, connected members, conversation privacy, requests off, the daily limit, deleting, blocking (messages, profiles, feed, dynamics), reports and the admin screen, export/erase. Creates and removes an administrator "mod". |
+| `org-e2e.sh` | Organization & titleholder listings (CEC 1.34.0) and member ↔ group links (CMP 0.20.0): the public form, review (approve/decline/existing group), `/partner/<slug>/` pages, the grid, old-address redirects, member links, export/erase. Switches the test site to pretty permalinks while it runs and restores them. |
 | `follows-e2e.sh` | Follow (CMP 0.12.0 + CEC 1.28.0): following, the opt-in Going to card (upcoming published RSVPs only), the calendar label, RSVP and post notifications, the Following feed filter, blocks, export/erase. Creates and removes three test events. |
 | `directory-e2e.sh` | Members (CMP 0.13.0): who is listed (not self, opted out, blocked, unverified), only shown answers matched, each filter, sort, profile items linking to a filtered list, the cover on profiles, tabs, the opt-out, export/erase. Re-seeds the starter option lists first. |
 | `nods-e2e.sh` | Nods (CMP 0.14.0): sending, taking back, the notification and Nods list, mutual nods (both told; messages go to the inbox), pronoun-free wording, the daily limit, blocks, export/erase. |

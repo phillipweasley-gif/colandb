@@ -4,6 +4,20 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.20.0
+
+**Members can link their profile to an organization or titleholder** (owner, 2026-10-10: "you should be able to link a member account to an existing group OR enter one when submitting the form so the member profile is visible").
+
+- **Profile tab → Groups and titles:** pick any group listed on the site and **Link my profile**; remove a link at any time. A link you add yourself is always **Member**.
+- **Organizer and Titleholder come only from an approved submission.** When the site approves an organization or titleholder listing (Events Calendar 1.34.0) that names a member by username or email, that member is linked with the matching role and gets a notification saying they can remove it. Adding the group yourself never downgrades that role.
+- **On the group's page (`/partner/<slug>/`), signed-in full members see "Members on COL&B":** each linked member's photo, name and role, linking to their member profile. The public, signed-out visitors and people who haven't finished joining never see it, and a block either way hides the member, the same as everywhere else.
+- **Member profiles show "Groups:"** with links to each group's page.
+- Deleting a group removes its links. Data export lists your linked groups; erasure deletes them.
+- **New table `cmp_group_links`** (`CMP_DB_VERSION` 16). Groups are read only through the events plugin (`CEC_Orgs`, its taxonomy); nothing here changes events data. Without Events Calendar 1.34.0 the panel and page section are simply absent.
+- **Verification** (local WordPress 7.1.2): `tests/org-e2e.sh` 60/60, 20 of the checks for this: approval links with the right role and notifies; links by username and by email; no duplicate on re-approval; Profile panel; bad nonce; self-link is Member and never downgrades; unlisted groups refused; signed-out redirect; profile "Groups"; who sees the list on the group page (member yes, unfinished account no, blocked no); remove; export; erase; deleting the group. Also `account-e2e.sh` 69/69, `profile-e2e.sh` 84/84, `messages-e2e.sh` 51/51, `directory-e2e.sh` 21/21, `calendar-e2e.sh` 73/73. `follows-e2e.sh` fails the same 3 checks on unchanged `main` (pre-existing). `php -l` on every changed file.
+
+---
+
 ## 0.19.2
 
 **Chastity: a keyholder who doesn't have an account yet** (member request via the owner, 2026-10-08: "For those whose partners haven't created accounts yet, it would be nice to be able to identify the key holder manually by typing in a name.").

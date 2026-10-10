@@ -130,6 +130,9 @@ class CEC_Privacy {
 			);
 		}
 
+		// 1.34.0: contact details from organization/titleholder submissions.
+		$export_items = array_merge( $export_items, CEC_Org_Submissions::export_items( $email_address ) );
+
 		return array( 'data' => $export_items, 'done' => true );
 	}
 
@@ -193,6 +196,13 @@ class CEC_Privacy {
 
 		if ( $items_retained ) {
 			$messages[] = __( 'Event listings submitted by this email address were kept as public content, but the submitter email and any active guest edit-link were removed.', 'cec' );
+		}
+
+		// 1.34.0: organization/titleholder submissions keep the public listing; the private contact goes.
+		if ( CEC_Org_Submissions::erase( $email_address ) ) {
+			$items_removed += 1;
+			$items_retained = true;
+			$messages[]     = __( 'Organization or titleholder listings submitted with this email address were kept as public content; the private contact details were removed.', 'cec' );
 		}
 
 		return array(

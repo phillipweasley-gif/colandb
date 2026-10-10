@@ -6,6 +6,33 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.34.0
+
+**Organization & titleholder listings people can submit, one page template for every group, and a homepage grid** (owner, 2026-10-10: "a page and form … that will allow people to submit an affiliate organization", "You approve first", "Anyone, with a contact email", "One template at /partner/name/ (old pages redirect)", and titleholders get "photo, year, title, producer, bio, areas of focus/mission, and social links").
+
+- **`[cec_submit_org]`, the public form.** Anyone can send an organization or a titleholder:
+  - name, logo or photo (JPEG/PNG/WebP up to 5 MB, checked by content and renamed), short description or bio, highlights (organizations), mission or areas of focus;
+  - titleholders also give title, year and producer;
+  - links: Telegram, website, Facebook, Instagram, FetLife, X, Bluesky, other. Each is checked against its network's addresses; a Telegram `t.me/c/…` message link is refused with a note asking for the group's invite link (`t.me/+…`), because `/c/` links only open for people already in the group;
+  - a **private contact** (name, email, optional phone), never shown on the site;
+  - optionally a **member username or email** to link to the listing.
+  - Errors send you back with your answers kept. A hidden honeypot field and a limit of 5 submissions per address per day stop bots. Signed-out visitors can use it (no nonce, so cached pages still work).
+- **Nothing is public until approved.** Submissions go to **Events → Org Submissions** as pending, and the site admin is emailed a review link; the contact gets an acknowledgment. The review screen lets you correct anything, then **Approve and publish** or **Decline** (the contact is emailed either way). Approving:
+  - creates the calendar group (or fills in an existing one with the same name, so there's never a duplicate), lists it on the grid, sets its logo and website;
+  - emails the contact the page link (only the first time);
+  - fires `cec_partner_org_member_requested` for the named member, which the member plugin (0.20.0) uses to link their profile.
+- **Every group's page is `/partner/<slug>/`** (the existing calendar group page, now with a full header): logo or photo in a circle, name, the titleholder's title line ("Great Lakes Handler 2026 · Produced by …"), description, highlights, link buttons (Telegram first, as "Join our Telegram", then "Visit Website" and the rest), a Mission / Areas of Focus card, then Upcoming Events with subscribe links. Styled like the homepage (Montserrat 900 pink headings, lime rule, pink square buttons that turn lime). Filter `cec_partner_org_page_extra` lets the member plugin add its section.
+- **Old hand-built pages redirect.** An address like `/ohio-petplay-alliance/` that no longer finds a page sends a 301 to `/partner/ohio-petplay-alliance/`, so links already shared keep working once those pages are unpublished.
+- **`[cec_partner_orgs]`, the homepage grid:** listed groups in the order set on each group, with image, name, title line, highlights (or the description) and a Learn More button to the group's page. `kind="organization"` or `kind="titleholder"` shows just one kind; the default is both.
+- **Admin: Events → Partners & Titleholders** edit screen gains Kind, Listed on the site + order, highlights, mission, title/year/producer, every link, and the private contact (read-only). The list shows Kind and Listed columns.
+- **Privacy:** a submission contact's export includes their submissions; erase removes their contact details from the submission and the group (the group itself stays).
+- **Verification** (local WordPress 7.1.2):
+  - New `tests/org-e2e.sh`: 60/60, covering the form (validation and kept answers, honeypot, image check, rate limit, Telegram invite link, titleholder fields, year), review (non-admin refused, approve, approving again without new email, existing group filled in, decline), the page (contact never shown, Telegram first, titleholder title line), the grid (listed only), old-address 301 and real 404, member links, export/erase, no PHP warnings.
+  - `calendar-e2e.sh` 73/73, `e2e.sh` 60/60, `account-e2e.sh` 69/69, `messages-e2e.sh` 51/51, `directory-e2e.sh` 21/21. `follows-e2e.sh` fails the same 3 checks on unchanged `main`, so that is pre-existing.
+  - `tests/snap.php` month view before/after: identical (12/12). `php -l` on every changed file.
+
+---
+
 ## 1.33.0
 
 **"Next event" links for a Partner Organization or Titleholder** (owner, 2026-10-08: the homepage's event cards "should go to the most recent event for that group").
