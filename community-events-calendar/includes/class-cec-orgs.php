@@ -36,6 +36,62 @@ class CEC_Orgs {
 		add_action( 'edited_cec_partner_org', array( __CLASS__, 'save_edit_fields' ), 20 );
 		add_filter( 'manage_edit-cec_partner_org_columns', array( __CLASS__, 'admin_columns' ) );
 		add_filter( 'manage_cec_partner_org_custom_column', array( __CLASS__, 'admin_column' ), 10, 3 );
+		add_filter( 'wp_get_nav_menu_items', array( __CLASS__, 'menu_children' ), 20, 3 );
+	}
+
+	/**
+	 * Automatic menu dropdowns (1.39.0). A menu item with the CSS class
+	 * cec-partner-orgs-organization (or -titleholder) gets every listed
+	 * organization (or titleholder) as its sub-items, in display order, so
+	 * newly approved listings appear in the menu with no menu editing.
+	 * (Appearance → Menus → Screen Options → CSS Classes to set the class.)
+	 */
+	public static function menu_children( $items, $menu, $args ) {
+		if ( is_admin() || ! $items ) {
+			return $items;
+		}
+		$out = array();
+		foreach ( $items as $item ) {
+			$out[]   = $item;
+			$classes = is_array( $item->classes ) ? $item->classes : array();
+			foreach ( self::KINDS as $kind ) {
+				if ( ! in_array( 'cec-partner-orgs-' . $kind, $classes, true ) ) {
+					continue;
+				}
+				foreach ( self::listed( $kind ) as $p ) {
+					$id    = 1900000000 + 2 * (int) $p['id'] + ( 'titleholder' === $kind ? 1 : 0 ); // Far above real post IDs.
+					$out[] = new WP_Post(
+						(object) array(
+							'ID'               => $id,
+							'db_id'            => $id,
+							'menu_item_parent' => (string) $item->db_id,
+							'object_id'        => (string) $p['id'],
+							'object'           => 'cec_partner_org',
+							'type'             => 'taxonomy',
+							'type_label'       => '',
+							'title'            => $p['name'],
+							'post_title'       => $p['name'],
+							'url'              => $p['url'],
+							'target'           => '',
+							'attr_title'       => '',
+							'description'      => '',
+							'classes'          => array( 'menu-item', 'cec-partner-org-menu-item' ),
+							'xfn'              => '',
+							'status'           => 'publish',
+							'post_status'      => 'publish',
+							'post_type'        => 'nav_menu_item',
+							'post_parent'      => 0,
+							'menu_order'       => 0,
+							'filter'           => 'raw',
+						)
+					);
+				}
+			}
+		}
+		foreach ( $out as $i => $item ) {
+			$item->menu_order = $i + 1;
+		}
+		return $out;
 	}
 
 	public static function register_assets() {

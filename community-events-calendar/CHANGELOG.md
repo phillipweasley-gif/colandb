@@ -6,6 +6,18 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.39.0
+
+**Menu dropdowns for organizations and titleholders; a titleholder's events on their page** (owner, 2026-10-10: "In the header menu there should be a place for MEMBER & AFFILIATED ORGANIZATIONS and TITLEHOLDERS"; "Any events that I'm attending that are publicly available via my calendar as a member should show here").
+
+- **Automatic menu dropdowns.** A menu item with the CSS class `cec-partner-orgs-organization` (or `cec-partner-orgs-titleholder`) gets every listed organization (or titleholder) as its dropdown, in display order, linking to each `/partner/` page. Newly approved or unlisted groups appear or disappear by themselves.
+- **"Upcoming Events" on a group's page can include more events.** New filter `cec_partner_org_event_ids`. The extra events are merged with the group's own, upcoming only, sorted by date, in the same cards. Member Planning 0.23.0 uses it for the events a titleholder is going to.
+- **Verification** (local WordPress 7.1.2):
+  - `tests/org-e2e.sh` 124/124. New checks: the dropdowns list the right groups and links, and an unlisted group drops out by itself. Titleholder events: Public ones for everyone, All members ones for signed-in members, never private or past ones, hidden from someone blocked, other groups unchanged.
+  - `calendar-e2e.sh` 73/73. `php -l` on every changed file.
+
+---
+
 ## 1.38.0
 
 **Photo shape and cropping, tidier tags, "Message me on Telegram", "Ask for my …"** (owner, 2026-10-10, from a screenshot of the Foxxy Force page).

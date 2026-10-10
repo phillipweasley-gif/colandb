@@ -34,6 +34,16 @@ $editing = $is_org && CEC_Org_Editor::is_editing( $term );
 			<div class="cec-events-results">
 				<?php
 				$filters = array( $term->taxonomy => $term->slug );
+				if ( $is_org ) {
+					/**
+					 * More upcoming events to list on a group's page, e.g. the ones a
+					 * titleholder is going to (member plugin 0.23.0). Event IDs.
+					 *
+					 * @param int[] $ids
+					 * @param array $profile CEC_Orgs::profile()
+					 */
+					$filters['cec_or_ids'] = array_map( 'intval', (array) apply_filters( 'cec_partner_org_event_ids', array(), CEC_Orgs::profile( $term ) ) );
+				}
 				echo CEC_Shortcodes::render_events_html( $filters, 'grid', 24 ); // phpcs:ignore
 				?>
 			</div>

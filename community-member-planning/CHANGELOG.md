@@ -4,6 +4,23 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.23.0
+
+**A titleholder's events on their titleholder page** (owner, 2026-10-10: "Any events that I'm attending that are publicly available via my calendar as a member should show here". The owner chose a new Public choice).
+
+- **My calendar gains "Public: my titleholder page"**, offered only to a member who is a titleholder. Anyone else who sends it gets All members instead.
+- **What the titleholder page shows under Upcoming Events:**
+  - Public events: to everyone, signed in or not.
+  - All members events: to signed-in members too.
+  - Dynamic-partner and Only-me events: never.
+  - Nothing for someone in a block with the titleholder.
+- The titleholder sees the page as visitors do. Public entries also count as "all members" everywhere else (their profile's Calendar, followers).
+- **Verification** (local WordPress 7.1.2):
+  - `tests/org-e2e.sh` 124/124, with the new titleholder-events checks.
+  - `calendar-e2e.sh` 73/73, `profile-e2e.sh` 84/84. `follows-e2e.sh` fails the same 3 checks as on unchanged `main` (pre-existing). `php -l`.
+
+---
+
 ## 0.22.0
 
 **A titleholder listing belongs to one person, shown on their member profile** (owner, 2026-10-10: "the bottom should say my COL&B profile because only one person should be assigned to a title holder bio", "once the member is tied to the titleholder it should display on their member profile as well").

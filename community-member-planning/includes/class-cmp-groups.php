@@ -33,6 +33,7 @@ class CMP_Groups {
 		add_action( 'delete_term', array( __CLASS__, 'on_delete_term' ), 10, 3 );
 		add_action( 'template_redirect', array( __CLASS__, 'no_cache_signed_in' ) );
 		add_filter( 'cec_partner_org_can_edit', array( __CLASS__, 'can_edit' ), 10, 3 );
+		add_filter( 'cec_partner_org_event_ids', array( __CLASS__, 'titleholder_event_ids' ), 10, 2 );
 		add_action( 'cec_partner_org_edit_form_fields', array( __CLASS__, 'admin_fields' ), 30 );
 		add_action( 'edited_cec_partner_org', array( __CLASS__, 'admin_save' ), 30 );
 	}
@@ -235,6 +236,42 @@ class CMP_Groups {
 		}
 		$p = CEC_Orgs::profile( (int) $term_id );
 		return $p && 'titleholder' === $p['kind'];
+	}
+
+	/** The titleholder listing this member is the Titleholder of, or 0. */
+	public static function titleholder_term( $user_id ) {
+		foreach ( self::links( $user_id ) as $term_id => $row ) {
+			if ( 'titleholder' === $row->role && self::is_titleholder_listing( $term_id ) ) {
+				return (int) $term_id;
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * Events the titleholder is going to or interested in, as this visitor
+	 * may see them (0.23.0): "Public" ones for everyone, "All members" ones
+	 * for signed-in members too. The events plugin adds them to the page's
+	 * Upcoming Events.
+	 */
+	public static function titleholder_event_ids( $ids, $profile ) {
+		if ( empty( $profile['id'] ) || 'titleholder' !== ( $profile['kind'] ?? '' ) ) {
+			return $ids;
+		}
+		$rows = self::members_of( (int) $profile['id'] );
+		if ( ! $rows || ! CMP_Access::is_member( (int) $rows[0]->user_id ) ) {
+			return $ids;
+		}
+		$viewer = get_current_user_id();
+		$member = $viewer && CMP_Access::is_member( $viewer );
+		// Only what visitors may see, even for the titleholder themselves:
+		// the page shows the public view, never their private plans.
+		foreach ( CMP_Calendar::entries( (int) $rows[0]->user_id, $viewer, true, 50 ) as $e ) {
+			if ( 'public' === $e->audience || ( 'members' === $e->audience && $member ) ) {
+				$ids[] = (int) $e->event_id;
+			}
+		}
+		return array_values( array_unique( array_map( 'intval', $ids ) ) );
 	}
 
 	/** Removes everyone else from a titleholder listing. */
