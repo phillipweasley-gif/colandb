@@ -12,6 +12,7 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 - `[cec_submit_org]` opens on **Titleholder** when linked with `?kind=titleholder`; the Titleholders page's "Submit your title" button uses this.
 - **Signed-in visitors** get their name, email and member username filled in, so an approved listing links to their account. Signed-out visitors see an empty form.
+- **Gallery photos are no longer cropped** (owner: "The crop of these photos is weird"). Every photo was forced into a 4:3 landscape box, cutting heads and feet off portrait phone photos. Each photo now shows at its own shape, left to right in gallery order: 3 columns on wide screens, then 2, then 1.
 - **On the site, outside the code:** links to the form were added in the footer's Resources menu, on the Organizations and Titleholders pages, and as a homepage button under the listings.
 - **Verification** (local WordPress 7.1.2): `tests/org-e2e.sh` 128/128, with new checks for `?kind=titleholder`, no prefill when signed out, and prefill when signed in. `php -l`.
 
