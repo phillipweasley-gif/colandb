@@ -43,7 +43,7 @@ GL=$(ev 'echo CMP_Install::table("group_links");')
 PAGE_ID=$(ev 'echo (int) CMP_Settings::get("member_page_id");')
 
 # Clean slate.
-ev 'foreach ( get_posts( array( "post_type" => "cec_org_submission", "post_status" => "any", "numberposts" => -1 ) ) as $p ) { wp_delete_post( $p->ID, true ); } foreach ( array( "zz-rope-collective", "zz-foxxy-test", "zz-existing-group", "zz-declined-group" ) as $s ) { $t = get_term_by( "slug", $s, "cec_partner_org" ); if ( $t ) { wp_delete_term( $t->term_id, "cec_partner_org" ); } } foreach ( array( "zz-old-page" ) as $s ) { $p = get_page_by_path( $s ); if ( $p ) { wp_delete_post( $p->ID, true ); } } global $wpdb; $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE \"%cec_org_rate_%\" OR option_name LIKE \"%cec_org_form_%\"" );' >/dev/null
+ev 'foreach ( get_posts( array( "post_type" => "cec_org_submission", "post_status" => "any", "numberposts" => -1 ) ) as $p ) { wp_delete_post( $p->ID, true ); } foreach ( array( "zz-rope-collective", "zz-foxxy-test", "zz-existing-group", "zz-declined-group", "zz-second-org" ) as $s ) { $t = get_term_by( "slug", $s, "cec_partner_org" ); if ( $t ) { wp_delete_term( $t->term_id, "cec_partner_org" ); } } foreach ( array( "zz-old-page" ) as $s ) { $p = get_page_by_path( $s ); if ( $p ) { wp_delete_post( $p->ID, true ); } } global $wpdb; $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE \"%cec_org_rate_%\" OR option_name LIKE \"%cec_org_form_%\"" );' >/dev/null
 for u in organn orgbo orgcy orgdee; do $W user delete $u --yes >/dev/null 2>&1; done
 $W user create organn organn@example.com --role=subscriber --user_pass=organnpass123 --display_name="Org Ann" >/dev/null
 $W user create orgbo orgbo@example.com --role=subscriber --user_pass=orgbopass1234 --display_name="Org Bo" >/dev/null
@@ -55,6 +55,7 @@ FORM_ID=$($W post create --post_type=page --post_status=publish --post_title="ZZ
 GRID_ID=$($W post create --post_type=page --post_status=publish --post_title="ZZ Grid" --post_content='[cec_partner_orgs]' --porcelain)
 FORM=$(ev "echo get_permalink($FORM_ID);")
 EXIST=$(ev 'echo wp_insert_term( "ZZ Existing Group", "cec_partner_org", array( "slug" => "zz-existing-group" ) )["term_id"];')
+ORG2=$(ev '$t = wp_insert_term( "ZZ Second Org", "cec_partner_org", array( "slug" => "zz-second-org" ) ); CEC_Orgs::save_profile( $t["term_id"], array( "kind" => "organization", "listed" => "1", "description" => "Second org." ) ); echo $t["term_id"];')
 OLDP=$($W post create --post_type=page --post_status=draft --post_name=zz-existing-group --post_title="Old hand-built page" --porcelain)
 php -r '$i=imagecreatetruecolor(400,400); imagefill($i,0,0,imagecolorallocate($i,255,80,215)); imagepng($i,$argv[1]);' $T/logo.png
 printf 'not an image' > $T/fake.png
@@ -188,10 +189,20 @@ get organn prof "$H/?page_id=$PAGE_ID&cmp_tab=profile"
 ok "Profile tab: Groups and titles lists the link with Remove, and an Add select" $([ "$(has $T/prof.html 'Groups and titles')$(has $T/prof.html 'ZZ Rope Collective')$(has $T/prof.html 'value="remove"')$(has $T/prof.html 'id="cmp-group-pick"')" = 1111 ] && echo 1 || echo 0)
 GN=$(php -r 'preg_match("~name=\"action\" value=\"cmp_group\".*?name=\"_cmp_nonce\" value=\"([^\"]+)\"~s",file_get_contents($argv[1]),$m); echo $m[1]??"";' $T/prof.html)
 gpost(){ curl -s -b $T/$1.jar -c $T/$1.jar -o /dev/null -w '%{redirect_url}' "$H/wp-admin/admin-post.php" --data-urlencode "action=cmp_group" "${@:2}"; }
-r=$(gpost organn --data-urlencode "_cmp_nonce=bad" --data-urlencode "do=add" --data-urlencode "group=$FID")
-ok "bad nonce refused" $([ "$(q "SELECT COUNT(*) FROM $GL WHERE user_id=$ANN AND term_id=$FID")" = 0 ] && echo 1 || echo 0)
+r=$(gpost organn --data-urlencode "_cmp_nonce=bad" --data-urlencode "do=add" --data-urlencode "group=$ORG2")
+ok "bad nonce refused" $([ "$(q "SELECT COUNT(*) FROM $GL WHERE user_id=$ANN AND term_id=$ORG2")" = 0 ] && echo 1 || echo 0)
+r=$(gpost organn --data-urlencode "_cmp_nonce=$GN" --data-urlencode "do=add" --data-urlencode "group=$ORG2")
+ok "a member links themselves to a group, always as Member" $(echo "$r" | grep -q "gr_added" && [ "$(q "SELECT role FROM $GL WHERE user_id=$ANN AND term_id=$ORG2")" = member ] && echo 1 || echo 0)
 r=$(gpost organn --data-urlencode "_cmp_nonce=$GN" --data-urlencode "do=add" --data-urlencode "group=$FID")
-ok "a member links themselves to a group, always as Member" $(echo "$r" | grep -q "gr_added" && [ "$(q "SELECT role FROM $GL WHERE user_id=$ANN AND term_id=$FID")" = member ] && echo 1 || echo 0)
+ok "a titleholder listing can't be self-linked (one person: the titleholder)" $(echo "$r" | grep -q "gr_gone" && [ "$(q "SELECT COUNT(*) FROM $GL WHERE term_id=$FID")" = 1 ] && echo 1 || echo 0)
+ok "...and isn't offered in Add a group" $(get organn profx "$H/?page_id=$PAGE_ID&cmp_tab=profile"; php -r 'echo preg_match("~<select id=\"cmp-group-pick\".*?</select>~s",file_get_contents($argv[1]),$m) && strpos($m[0],"ZZ Foxxy Test")===false ? 1 : 0;' $T/profx.html)
+get organn fxm "$(ev "echo get_term_link($FID,'cec_partner_org');")"
+ok "titleholder page: 'My COL&B profile' with just the titleholder, no Link my profile" $([ "$(has $T/fxm.html 'My COL&amp;B profile')$(has $T/fxm.html 'Org Bo')$(hasnt $T/fxm.html 'Link my profile')$(hasnt $T/fxm.html 'Members on COL')" = 1111 ] && echo 1 || echo 0)
+get organn bop "$H/?page_id=$PAGE_ID&cmp_member=$BO"
+ok "the titleholder's member profile shows a Titleholder badge with the title and a link" $([ "$(has $T/bop.html 'cmp-pv-title')$(has $T/bop.html 'Great Lakes Handler 2026')$(has $T/bop.html 'Titleholder page')" = 111 ] && echo 1 || echo 0)
+ev "CMP_Groups::set_role($CY,$FID,'member');" >/dev/null
+ok "assigning someone else to a titleholder listing replaces the previous person" $([ "$(q "SELECT CONCAT(user_id,':',role) FROM $GL WHERE term_id=$FID")" = "$CY:titleholder" ] && echo 1 || echo 0)
+ev "CMP_Groups::set_role($BO,$FID,'titleholder');" >/dev/null
 r=$(gpost organn --data-urlencode "_cmp_nonce=$GN" --data-urlencode "do=add" --data-urlencode "group=$TID")
 ok "...adding again never downgrades an approved Organizer" $([ "$(q "SELECT role FROM $GL WHERE user_id=$ANN AND term_id=$TID")" = organizer ] && echo 1 || echo 0)
 DG=$(ev 'echo (int) term_exists("ZZ Existing Group","cec_partner_org")["term_id"];')
@@ -199,7 +210,7 @@ ev "update_term_meta($DG,'cec_listed','0');" >/dev/null
 r=$(gpost organn --data-urlencode "_cmp_nonce=$GN" --data-urlencode "do=add" --data-urlencode "group=$DG")
 ok "...an unlisted group can't be linked" $(echo "$r" | grep -q "gr_gone" && [ "$(q "SELECT COUNT(*) FROM $GL WHERE user_id=$ANN AND term_id=$DG")" = 0 ] && echo 1 || echo 0)
 ev "update_term_meta($DG,'cec_listed','1');" >/dev/null
-r=$(curl -s -o /dev/null -w '%{redirect_url}' "$H/wp-admin/admin-post.php" --data-urlencode "action=cmp_group" --data-urlencode "do=add" --data-urlencode "group=$FID")
+r=$(curl -s -o /dev/null -w '%{redirect_url}' "$H/wp-admin/admin-post.php" --data-urlencode "action=cmp_group" --data-urlencode "do=add" --data-urlencode "group=$ORG2")
 ok "signed out: sent to sign in" $(echo "$r" | grep -q "cmp_in" && echo 1 || echo 0)
 get organn mp "$H/?page_id=$PAGE_ID&cmp_member=$ANN"
 ok "member profile shows Groups with links" $([ "$(has $T/mp.html 'cmp-pv-groups')$(has $T/mp.html 'ZZ Rope Collective (Organizer)')" = 11 ] && echo 1 || echo 0)
@@ -214,7 +225,7 @@ ok "a member removes a link (even an approved Organizer one)" $(echo "$r" | grep
 get orgcy pgc2 "$URL"
 ok "...and is gone from the group page" $(hasnt $T/pgc2.html 'Org Ann')
 
-echo "== Page editor (CEC 1.35.0-1.37.0 + CMP 0.21.x)"
+echo "== Page editor (CEC 1.35.0-1.38.0 + CMP 0.21.x-0.22.0)"
 ev "CMP_Groups::set_role($ANN,$TID,'organizer');" >/dev/null
 php -r '$i=imagecreatetruecolor(800,600); imagefill($i,0,0,imagecolorallocate($i,225,245,119)); imagejpeg($i,$argv[1]);' $T/g1.jpg
 php -r '$i=imagecreatetruecolor(800,600); imagefill($i,0,0,imagecolorallocate($i,80,80,255)); imagejpeg($i,$argv[1]);' $T/g2.jpg
@@ -316,13 +327,20 @@ ok "once set back to Member, they can no longer edit" $(echo "$r" | grep -q '^40
 login orgbo orgbo orgbopass1234
 get orgbo tf "$(ev "echo get_term_link($FID,'cec_partner_org');")?cec_org_edit=1"
 TN5=$(php -r 'preg_match("~name=\"_cec_nonce\" value=\"([^\"]+)\"~",file_get_contents($argv[1]),$m); echo $m[1]??"";' $T/tf.html)
-r=$(curl -s -b $T/orgbo.jar -o /dev/null -w '%{redirect_url}' "$H/wp-admin/admin-post.php" -F "action=cec_org_edit" -F "term=$FID" -F "_cec_nonce=$TN5" -F "name=ZZ Foxxy Test" -F "summary=Great Lakes Handler 2026." -F $'highlights=Pup and handler education\nCommunity events' -F "description=Handler and educator." -F "title=Great Lakes Handler" -F "year=2026")
+r=$(curl -s -b $T/orgbo.jar -o /dev/null -w '%{redirect_url}' "$H/wp-admin/admin-post.php" -F "action=cec_org_edit" -F "term=$FID" -F "_cec_nonce=$TN5" -F "name=ZZ Foxxy Test" -F "summary=Great Lakes Handler 2026." -F $'highlights=Pup and handler education\nCommunity events' -F "description=Handler and educator." -F "title=Great Lakes Handler" -F "year=2026" -F "social[telegram]=https://t.me/foxxytest" -F "ask[fetlife]=1" -F "social[fetlife]=https://fetlife.com/users/123" -F "shape=rect")
 get anon gr4 "$H/?page_id=$GRID_ID"
 ok "a titleholder manages their own card: card text and bullet points" $([ "$(has $T/gr4.html 'Great Lakes Handler 2026.')$(has $T/gr4.html '<li>Pup and handler education</li>')" = 11 ] && echo 1 || echo 0)
+get anon fxp "$(ev "echo get_term_link($FID,'cec_partner_org');")"
+ok "titleholder page: 'Message me on Telegram', an 'Ask for my FetLife' tag and no FetLife link" $([ "$(has $T/fxp.html 'Message me on Telegram')$(has $T/fxp.html 'Ask for my FetLife')$(hasnt $T/fxp.html 'fetlife.com/users/123')" = 111 ] && [ "$(ev "echo isset(CEC_Orgs::profile($FID)['socials']['fetlife']) ? 1 : 0;")" = 0 ] && echo 1 || echo 0)
+ok "...photo shape saved as rectangle" $([ "$(ev "echo CEC_Orgs::profile($FID)['shape'];")" = rect ] && echo 1 || echo 0)
+ok "...bullet points are laid out as a grid" $(has $T/fxp.html 'class="cec-org-highlights"')
+ev "CEC_Orgs::save_profile($ORG2,array('socials'=>array('telegram'=>'https://t.me/+OrgTwo')));" >/dev/null
+get anon tp "$(ev "echo get_term_link($ORG2,'cec_partner_org');")"
+ok "organization page keeps 'Join our Telegram'" $([ "$(has $T/tp.html 'Join our Telegram')$(hasnt $T/tp.html 'Message me on Telegram')" = 11 ] && echo 1 || echo 0)
 
 echo "== Privacy"
 X=$(ev "\$r=apply_filters('wp_privacy_personal_data_exporters',array()); \$o=''; foreach(\$r as \$e){ \$d=call_user_func(\$e['callback'],'organn@example.com',1); foreach(\$d['data'] as \$i){ foreach(\$i['data'] as \$f){ \$o.=\$f['name'].'='.\$f['value'].';'; } } } echo \$o;")
-ok "member export lists linked groups" $(echo "$X" | grep -q "Linked group=ZZ Foxxy Test (Member)" && echo 1 || echo 0)
+ok "member export lists linked groups" $(echo "$X" | grep -q "Linked group=ZZ Second Org (Member)" && echo 1 || echo 0)
 X=$(ev "\$r=apply_filters('wp_privacy_personal_data_exporters',array()); \$o=''; foreach(\$r as \$e){ \$d=call_user_func(\$e['callback'],'pat@example.com',1); foreach(\$d['data'] as \$i){ foreach(\$i['data'] as \$f){ \$o.=\$f['name'].'='.\$f['value'].';'; } } } echo \$o;")
 ok "a submission contact's export includes their submission" $(echo "$X" | grep -q "ZZ Rope Collective" && echo 1 || echo 0)
 ev "\$r=apply_filters('wp_privacy_personal_data_erasers',array()); foreach(\$r as \$e){ call_user_func(\$e['callback'],'pat@example.com',1); } foreach(\$r as \$e){ call_user_func(\$e['callback'],'organn@example.com',1); }" >/dev/null

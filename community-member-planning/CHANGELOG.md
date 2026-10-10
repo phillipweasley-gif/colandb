@@ -4,6 +4,21 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.22.0
+
+**A titleholder listing belongs to one person, shown on their member profile** (owner, 2026-10-10: "the bottom should say my COL&B profile because only one person should be assigned to a title holder bio", "once the member is tied to the titleholder it should display on their member profile as well").
+
+- **One person per titleholder listing.**
+  - Assigning someone as Titleholder (from an approved submission or under Linked members) replaces whoever was there.
+  - Members can't link themselves to a titleholder listing, and titleholder listings aren't offered under Add a group.
+- **On a titleholder's page, signed-in members see "My COL&B profile"** with just that one person's card, instead of "Members on COL&B" and the Link my profile button.
+- **On that member's profile in the members area, a Titleholder badge** shows the title line ("Great Lakes Handler 2026 · Produced by …") and a link to the titleholder page. Other groups stay on the Groups line.
+- **Verification** (local WordPress 7.1.2):
+  - `tests/org-e2e.sh` 115/115, with new checks: no self-linking to a titleholder listing and it isn't offered; "My COL&B profile" with only the titleholder; the badge on their profile; reassigning replaces the previous person.
+  - `profile-e2e.sh` 84/84. `php -l`.
+
+---
+
 ## 0.21.1
 
 - **Profile tab → Groups and titles:** the button next to a group you're Titleholder or Organizer of now reads **Edit page & card**, since the homepage card is edited there too (Events Calendar 1.36.0).

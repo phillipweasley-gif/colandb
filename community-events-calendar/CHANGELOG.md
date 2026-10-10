@@ -6,6 +6,27 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.38.0
+
+**Photo shape and cropping, tidier tags, "Message me on Telegram", "Ask for my …"** (owner, 2026-10-10, from a screenshot of the Foxxy Force page).
+
+- **Photo shape:** Circle or Rectangle (portrait, 4:5), chosen in the editor (`cec_photo_shape`). Used on the page, the editor thumbnail and the homepage card. A rectangle gets a lime frame.
+- **Cropping in the browser:**
+  - After choosing a photo, or clicking **Adjust crop** on the current one, a crop box opens. Drag to move; zoom with the slider, the scroll wheel or the + and − keys; the arrow keys also move it.
+  - The bright area matches the chosen shape. **Use this crop** replaces the chosen file with the cropped JPEG (1000×1000, or 960×1200 for a rectangle), saved with **Save changes**.
+- **Tags (bullet points) on the page are a grid:** two even columns, an odd last tag centred, one column on phones.
+- **Titleholder buttons speak for one person:** "Message me on Telegram" and "Visit my website". Organizations keep "Join our Telegram".
+- **"Ask for my <network>"** checkbox under each link except Website and Other. When ticked:
+  - the link is neither saved nor shown;
+  - the page shows a dashed tag, "Ask for my FetLife" (organizations: "Ask for our …").
+  - Stored as `cec_social_ask`; included in history, Restore and the admin email.
+- **Verification** (local WordPress 7.1.2):
+  - `tests/org-e2e.sh` 115/115, with new checks: Message me on Telegram, Ask for my FetLife with no link stored or shown, rectangle shape saved, tag grid, organizations keep Join our Telegram.
+  - In Chromium on the local site: chose Rectangle, picked a 1600×1000 photo, dragged and zoomed, used the crop and saved. The page photo became 960×1200 and the shape was saved. Desktop and phone screenshots of the page checked.
+  - `calendar-e2e.sh` 73/73. `php -l` on every changed file.
+
+---
+
 ## 1.37.1
 
 **Add any number of photos, remove any before saving, and a refresh no longer wipes your work** (owner, 2026-10-10: "I added 17 photos and it says i can only upload 15 but does not give me the option to deselect any", "when i refresh the page everything wipes clear", "This is the same for the text entry fields not just the photos").

@@ -141,6 +141,8 @@ class CEC_Orgs {
 			'highlights' => $highlights,
 			'mission'    => (string) get_term_meta( $id, 'cec_mission', true ),
 			'summary'    => (string) get_term_meta( $id, 'cec_summary', true ),
+			'shape'      => 'rect' === get_term_meta( $id, 'cec_photo_shape', true ) ? 'rect' : 'circle',
+			'ask'        => array_values( array_intersect( array_keys( self::socials() ), (array) get_term_meta( $id, 'cec_social_ask', true ) ) ),
 			'title'      => (string) get_term_meta( $id, 'cec_title', true ),
 			'year'       => (string) get_term_meta( $id, 'cec_title_year', true ),
 			'producer'   => (string) get_term_meta( $id, 'cec_title_producer', true ),
@@ -163,6 +165,8 @@ class CEC_Orgs {
 			'kind'       => 'cec_kind',
 			'mission'    => 'cec_mission',
 			'summary'    => 'cec_summary',
+			'shape'      => 'cec_photo_shape',
+			'ask'        => 'cec_social_ask',
 			'title'      => 'cec_title',
 			'year'       => 'cec_title_year',
 			'producer'   => 'cec_title_producer',
@@ -277,8 +281,9 @@ class CEC_Orgs {
 			/* translators: %s: organization name */
 			: sprintf( __( '%s logo', 'cec' ), $p['name'] );
 		if ( $p['logo_id'] && wp_attachment_is_image( $p['logo_id'] ) ) {
-			return wp_get_attachment_image( $p['logo_id'], 'medium_large', false, array( 'class' => $class, 'alt' => $alt, 'loading' => 'lazy' ) );
+			return wp_get_attachment_image( $p['logo_id'], 'medium_large', false, array( 'class' => $class . ( 'rect' === ( $p['shape'] ?? '' ) ? ' is-rect' : '' ), 'alt' => $alt, 'loading' => 'lazy' ) );
 		}
+		$class .= 'rect' === ( $p['shape'] ?? '' ) ? ' is-rect' : '';
 		return '<img class="' . esc_attr( $class ) . '" src="' . esc_url( $p['logo'] ) . '" alt="' . esc_attr( $alt ) . '" loading="lazy" />';
 	}
 
@@ -303,11 +308,16 @@ class CEC_Orgs {
 		}
 		wp_enqueue_style( 'cec-orgs' );
 		$labels = self::socials();
-		$button = array(
-			/* translators: %s: Telegram */
-			'telegram' => __( 'Join our Telegram', 'cec' ),
-			'website'  => __( 'Visit Website', 'cec' ),
-		);
+		// A titleholder is one person: "Message me"; a group: "Join our" (1.38.0).
+		$button = 'titleholder' === $p['kind']
+			? array(
+				'telegram' => __( 'Message me on Telegram', 'cec' ),
+				'website'  => __( 'Visit my website', 'cec' ),
+			)
+			: array(
+				'telegram' => __( 'Join our Telegram', 'cec' ),
+				'website'  => __( 'Visit Website', 'cec' ),
+			);
 		$html  = class_exists( 'CEC_Org_Editor' ) ? CEC_Org_Editor::edit_button_html( $p ) : '';
 		$html .= '<section class="cec-org-hero' . ( $p['logo'] || $p['logo_id'] ? ' has-image' : '' ) . ' is-' . esc_attr( $p['kind'] ) . '">';
 		$html .= '<div class="cec-org-main">';
@@ -335,10 +345,24 @@ class CEC_Orgs {
 			}
 			$html .= '</div>';
 		}
+		// 1.38.0: networks they have but share only on request.
+		if ( $p['ask'] ) {
+			$html .= '<ul class="cec-org-ask">';
+			foreach ( $p['ask'] as $k ) {
+				$html .= '<li>' . esc_html(
+					'titleholder' === $p['kind']
+						/* translators: %s: network, e.g. FetLife */
+						? sprintf( __( 'Ask for my %s', 'cec' ), $labels[ $k ] )
+						/* translators: %s: network, e.g. FetLife */
+						: sprintf( __( 'Ask for our %s', 'cec' ), $labels[ $k ] )
+				) . '</li>';
+			}
+			$html .= '</ul>';
+		}
 		$html .= '</div>';
 		$image = self::image_html( $p, 'cec-org-image' );
 		if ( $image ) {
-			$html .= '<div class="cec-org-media">' . $image . '</div>';
+			$html .= '<div class="cec-org-media' . ( 'rect' === $p['shape'] ? ' is-rect' : '' ) . '">' . $image . '</div>';
 		}
 		$html .= '</section>';
 		if ( $p['mission'] ) {
