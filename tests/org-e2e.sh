@@ -338,6 +338,36 @@ ev "CEC_Orgs::save_profile($ORG2,array('socials'=>array('telegram'=>'https://t.m
 get anon tp "$(ev "echo get_term_link($ORG2,'cec_partner_org');")"
 ok "organization page keeps 'Join our Telegram'" $([ "$(has $T/tp.html 'Join our Telegram')$(hasnt $T/tp.html 'Message me on Telegram')" = 11 ] && echo 1 || echo 0)
 
+echo "== Titleholder's events (CEC 1.39.0 + CMP 0.23.0)"
+mkev(){ local id; id=$($W post create --post_type=cec_event --post_status=publish --post_title="$1" --porcelain 2>/dev/null); ev "update_post_meta($id,'_cec_start',wp_date('Y-m-d\\T19:00',time()+($2)*DAY_IN_SECONDS)); update_post_meta($id,'_cec_end',wp_date('Y-m-d\\T21:00',time()+($2)*DAY_IN_SECONDS));" >/dev/null; echo $id; }
+EP=$(mkev "ZZ Public Appearance" 5); EM=$(mkev "ZZ Members Social" 6); EX=$(mkev "ZZ Private Plans" 7); EO=$(mkev "ZZ Past Event" -5)
+ok "only a titleholder is offered the Public choice on My calendar" $([ "$(ev "echo isset(CMP_Calendar::audience_labels($BO)['public']) ? 1 : 0;")$(ev "echo isset(CMP_Calendar::audience_labels($ANN)['public']) ? 1 : 0;")" = 10 ] && echo 1 || echo 0)
+ev "CMP_Calendar::save($BO,$EP,'going','public',false); CMP_Calendar::save($BO,$EM,'going','members',false); CMP_Calendar::save($BO,$EX,'going','private',false); CMP_Calendar::save($BO,$EO,'going','public',false);" >/dev/null
+FURL=$(ev "echo get_term_link($FID,'cec_partner_org');")
+get anon fev "$FURL"
+ok "signed out: the titleholder page lists their Public events under Upcoming Events" $([ "$(has $T/fev.html 'ZZ Public Appearance')$(hasnt $T/fev.html 'ZZ Members Social')$(hasnt $T/fev.html 'ZZ Private Plans')$(hasnt $T/fev.html 'ZZ Past Event')" = 1111 ] && echo 1 || echo 0)
+get organn fev2 "$FURL"
+ok "a signed-in member also sees the All members ones (still not private ones)" $([ "$(has $T/fev2.html 'ZZ Public Appearance')$(has $T/fev2.html 'ZZ Members Social')$(hasnt $T/fev2.html 'ZZ Private Plans')" = 111 ] && echo 1 || echo 0)
+get orgbo fev3 "$FURL"
+ok "the titleholder sees the page as visitors do (their private plans aren't on it)" $([ "$(has $T/fev3.html 'ZZ Public Appearance')$(hasnt $T/fev3.html 'ZZ Private Plans')" = 11 ] && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->insert(CMP_Install::table('blocks'),array('blocker_id'=>$BO,'blocked_id'=>$ANN,'created_at'=>gmdate('Y-m-d H:i:s')));" >/dev/null
+get organn fev4 "$FURL"
+ok "someone the titleholder blocked doesn't see their events there" $([ "$(hasnt $T/fev4.html 'ZZ Public Appearance')$(hasnt $T/fev4.html 'ZZ Members Social')" = 11 ] && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->delete(CMP_Install::table('blocks'),array('blocker_id'=>$BO,'blocked_id'=>$ANN));" >/dev/null
+get anon org2ev "$(ev "echo get_term_link($ORG2,'cec_partner_org');")"
+ok "other groups' pages are unchanged" $(hasnt $T/org2ev.html 'ZZ Public Appearance')
+$W post delete $EP $EM $EX $EO --force >/dev/null 2>&1
+
+echo "== Menu dropdowns (CEC 1.39.0)"
+MENU=$(ev '$m = wp_get_nav_menu_object("ZZ Test Menu"); if ( $m ) { wp_delete_nav_menu( $m->term_id ); } $id = wp_create_nav_menu("ZZ Test Menu"); wp_update_nav_menu_item( $id, 0, array( "menu-item-title" => "Member & Affiliated Organizations", "menu-item-url" => home_url("/organizations/"), "menu-item-status" => "publish", "menu-item-classes" => "cec-partner-orgs-organization" ) ); wp_update_nav_menu_item( $id, 0, array( "menu-item-title" => "Titleholders", "menu-item-url" => home_url("/titleholders/"), "menu-item-status" => "publish", "menu-item-classes" => "cec-partner-orgs-titleholder" ) ); echo $id;')
+NAV=$(ev "echo wp_nav_menu( array( 'menu' => $MENU, 'echo' => false, 'container' => false ) );")
+ok "menu: organizations dropdown lists listed organizations, with links to their pages" $(echo "$NAV" | php -r '$h=stream_get_contents(STDIN); preg_match("~Affiliated Organizations</a>\s*<ul class=\"sub-menu\">(.*?)</ul>~s",$h,$m); echo (isset($m[1]) && strpos($m[1],"ZZ Rope Collective")!==false && strpos($m[1],"zz-rope-collective")!==false && strpos($m[1],"ZZ Foxxy Test")===false) ? 1 : 0;')
+ok "menu: titleholders dropdown lists titleholders only" $(echo "$NAV" | php -r '$h=stream_get_contents(STDIN); preg_match("~Titleholders</a>\s*<ul class=\"sub-menu\">(.*?)</ul>~s",$h,$m); echo (isset($m[1]) && strpos($m[1],"ZZ Foxxy Test")!==false && strpos($m[1],"ZZ Rope")===false) ? 1 : 0;')
+ev "update_term_meta($FID,'cec_listed','0');" >/dev/null
+NAV2=$(ev "echo wp_nav_menu( array( 'menu' => $MENU, 'echo' => false, 'container' => false ) );")
+ok "menu: an unlisted titleholder drops out of the menu by itself" $(echo "$NAV2" | grep -q 'ZZ Foxxy Test' && echo 0 || echo 1)
+ev "update_term_meta($FID,'cec_listed','1'); wp_delete_nav_menu($MENU);" >/dev/null
+
 echo "== Privacy"
 X=$(ev "\$r=apply_filters('wp_privacy_personal_data_exporters',array()); \$o=''; foreach(\$r as \$e){ \$d=call_user_func(\$e['callback'],'organn@example.com',1); foreach(\$d['data'] as \$i){ foreach(\$i['data'] as \$f){ \$o.=\$f['name'].'='.\$f['value'].';'; } } } echo \$o;")
 ok "member export lists linked groups" $(echo "$X" | grep -q "Linked group=ZZ Second Org (Member)" && echo 1 || echo 0)

@@ -261,6 +261,14 @@ class CEC_Shortcodes {
 			}
 		}
 
+		// 1.39.0: a group's page also lists events passed in by ID (the ones
+		// its titleholder is going to), merged with its own, still upcoming only.
+		if ( ! empty( $filters['cec_or_ids'] ) ) {
+			$own              = get_posts( array_merge( $args, array( 'fields' => 'ids', 'posts_per_page' => -1, 'paged' => 1 ) ) );
+			$args['tax_query'] = array();
+			$args['post__in']  = array_values( array_unique( array_merge( array_map( 'intval', $own ), array_map( 'intval', $filters['cec_or_ids'] ) ) ) );
+		}
+
 		$query = new WP_Query( $args );
 
 		if ( ! $query->have_posts() ) {

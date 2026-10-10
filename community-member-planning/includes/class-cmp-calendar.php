@@ -28,7 +28,7 @@ class CMP_Calendar {
 	const NONCE        = 'cmp_calendar';
 	const META_DEFAULT = 'cmp_cal_default';
 	const MIGRATED     = 'cmp_calendar_migrated';
-	const AUDIENCES    = array( 'members', 'partners', 'private' );
+	const AUDIENCES    = array( 'public', 'members', 'partners', 'private' );
 	const RESPONSES    = array( 'going', 'interested' );
 	const META_FEED    = 'cmp_cal_feed_token';
 
@@ -88,12 +88,32 @@ class CMP_Calendar {
 		);
 	}
 
-	public static function audience_labels() {
-		return array(
+	/**
+	 * Audience choices. "Public" (0.23.0) is offered only to a member who is
+	 * a titleholder: those events also show to everyone on their titleholder
+	 * page. Pass a user ID to get only the choices that user may pick.
+	 */
+	public static function audience_labels( $user_id = null ) {
+		$all = array(
+			'public'   => __( 'Public: my titleholder page', 'cmp' ),
 			'members'  => __( 'All members', 'cmp' ),
 			'partners' => __( 'Dynamic partners', 'cmp' ),
 			'private'  => __( 'Only me', 'cmp' ),
 		);
+		if ( null !== $user_id && ! self::may_publish( $user_id ) ) {
+			unset( $all['public'] );
+		}
+		return $all;
+	}
+
+	/** Only a titleholder has a public page to show events on. */
+	public static function may_publish( $user_id ) {
+		return class_exists( 'CMP_Groups' ) && (bool) CMP_Groups::titleholder_term( (int) $user_id );
+	}
+
+	/** An audience this user may pick; "public" falls back to all members. */
+	private static function allowed_audience( $user_id, $audience ) {
+		return 'public' === $audience && ! self::may_publish( $user_id ) ? 'members' : $audience;
 	}
 
 	public static function response_labels() {
@@ -135,6 +155,10 @@ class CMP_Calendar {
 		$viewer_id = (int) $viewer_id;
 		if ( $owner_id && $owner_id === $viewer_id ) {
 			return true;
+		}
+		if ( 'public' === $audience ) {
+			// Anyone, signed in or not, except someone in a block with the owner.
+			return ! ( $viewer_id && CMP_Messages::is_blocked( $owner_id, $viewer_id ) );
 		}
 		if ( ! $viewer_id || ! CMP_Access::is_member( $viewer_id ) || CMP_Messages::is_blocked( $owner_id, $viewer_id ) ) {
 			return false;
@@ -271,7 +295,7 @@ class CMP_Calendar {
 		// phpcs:enable
 		if ( 'default' === $do ) {
 			if ( in_array( $audience, self::AUDIENCES, true ) ) {
-				update_user_meta( $user_id, self::META_DEFAULT, $audience );
+				update_user_meta( $user_id, self::META_DEFAULT, self::allowed_audience( $user_id, $audience ) );
 			}
 			$go( 'cal_default' );
 		}
@@ -289,7 +313,7 @@ class CMP_Calendar {
 			self::remove( $user_id, $event_id );
 			$go( 'cal_removed' );
 		}
-		$result = 'save' === $do ? self::save( $user_id, $event_id, $response, $audience ) : 'gone';
+		$result = 'save' === $do ? self::save( $user_id, $event_id, $response, self::allowed_audience( $user_id, $audience ) ) : 'gone';
 		$go( 'ok' === $result ? 'cal_saved' : ( 'full' === $result ? 'cal_full' : 'cal_gone' ) );
 	}
 
@@ -311,7 +335,7 @@ class CMP_Calendar {
 			$html .= '<span class="cmp-cal-pill"><input type="radio" id="' . esc_attr( $id ) . '" name="response" value="' . esc_attr( $k ) . '"' . checked( $response, $k, false ) . ' /><label for="' . esc_attr( $id ) . '">' . esc_html( $l ) . '</label></span>';
 		}
 		$html .= '</div></fieldset><fieldset class="cmp-cal-choice"><legend>' . esc_html__( 'Who can see it on your profile', 'cmp' ) . '</legend><div class="cmp-cal-pills">';
-		foreach ( self::audience_labels() as $k => $l ) {
+		foreach ( self::audience_labels( get_current_user_id() ) as $k => $l ) {
 			$id    = $prefix . '_a_' . $k;
 			$html .= '<span class="cmp-cal-pill"><input type="radio" id="' . esc_attr( $id ) . '" name="audience" value="' . esc_attr( $k ) . '"' . checked( $audience, $k, false ) . ' /><label for="' . esc_attr( $id ) . '">' . esc_html( $l ) . '</label></span>';
 		}
@@ -377,7 +401,7 @@ class CMP_Calendar {
 			$html .= '<div class="cmp-cal-row-acts">' . self::form_open( 'save', (int) $entry->event_id, 'tab', 'cmp-form cmp-cal-inline' )
 				. '<input type="hidden" name="response" value="' . esc_attr( $entry->response ) . '" />'
 				. '<label class="screen-reader-text" for="' . esc_attr( $id ) . '">' . esc_html__( 'Who can see it', 'cmp' ) . '</label><select id="' . esc_attr( $id ) . '" name="audience" class="cmp-cal-aud is-' . esc_attr( $entry->audience ) . '" data-cmp-autosave>';
-			foreach ( self::audience_labels() as $k => $l ) {
+			foreach ( self::audience_labels( get_current_user_id() ) as $k => $l ) {
 				$html .= '<option value="' . esc_attr( $k ) . '"' . selected( $entry->audience, $k, false ) . '>' . esc_html( $l ) . '</option>';
 			}
 			$html .= '</select><button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline" data-cmp-autosave-btn>' . esc_html__( 'Save', 'cmp' ) . '</button></form>'
@@ -533,7 +557,7 @@ class CMP_Calendar {
 	public static function profile_html( $owner_id, $viewer_id, $as_members = false ) {
 		$self    = (int) $owner_id === (int) $viewer_id;
 		$entries = $self && $as_members
-			? array_values( array_filter( self::entries( $owner_id, $owner_id, true, 20 ), function ( $e ) { return 'members' === $e->audience; } ) )
+			? array_values( array_filter( self::entries( $owner_id, $owner_id, true, 20 ), function ( $e ) { return in_array( $e->audience, array( 'members', 'public' ), true ); } ) )
 			: self::entries( $owner_id, $viewer_id, true, 20 );
 		if ( ! $entries ) {
 			return '';
