@@ -323,7 +323,7 @@ class CMP_Groups {
 				$link  = get_term_link( $term );
 				$html .= '<li><a href="' . esc_url( is_wp_error( $link ) ? '' : $link ) . '">' . esc_html( $term->name ) . '</a> <span class="cmp-muted">' . esc_html( self::role_label( $row->role ) ) . '</span> ';
 				if ( class_exists( 'CEC_Org_Editor' ) && in_array( $row->role, array( 'organizer', 'titleholder' ), true ) ) {
-					$html .= '<a class="cmp-btn cmp-btn-small" href="' . esc_url( CEC_Org_Editor::edit_url( $term ) ) . '">' . esc_html__( 'Edit page', 'cmp' ) . '<span class="screen-reader-text"> ' . esc_html( $term->name ) . '</span></a> ';
+					$html .= '<a class="cmp-btn cmp-btn-small" href="' . esc_url( CEC_Org_Editor::edit_url( $term ) ) . '">' . esc_html__( 'Edit page & card', 'cmp' ) . '<span class="screen-reader-text"> ' . esc_html( $term->name ) . '</span></a> ';
 				}
 				$html .= self::form_open( 'remove' ) . '<input type="hidden" name="group" value="' . (int) $term_id . '" /><button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Remove', 'cmp' ) . '<span class="screen-reader-text"> ' . esc_html( $term->name ) . '</span></button></form></li>';
 			}

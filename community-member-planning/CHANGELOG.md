@@ -4,6 +4,13 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.21.1
+
+- **Profile tab → Groups and titles:** the button next to a group you're Titleholder or Organizer of now reads **Edit page & card**, since the homepage card is edited there too (Events Calendar 1.36.0).
+- **Verification:** `tests/org-e2e.sh` 96/96; `php -l`.
+
+---
+
 ## 0.21.0
 
 **Titleholders and organizers can edit their group's page** (owner, 2026-10-10; works with Events Calendar 1.35.0).

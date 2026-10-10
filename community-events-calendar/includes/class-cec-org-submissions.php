@@ -594,6 +594,7 @@ class CEC_Org_Submissions {
 		update_post_meta( $submission_id, '_cec_org_contact_email', $c['contact_email'] );
 		wp_update_post( array( 'ID' => $submission_id, 'post_status' => 'publish', 'post_title' => $c['name'] ) );
 
+		CEC_Orgs::refresh_pages();
 		$member = self::find_member( $c['member'] );
 		if ( $member ) {
 			/**

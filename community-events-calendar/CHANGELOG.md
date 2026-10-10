@@ -6,6 +6,23 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.36.0
+
+**Titleholders and organizers manage their own homepage card** (owner, 2026-10-10: "I need the titleholders to be able to manage these cards through their logins. Not to be managed by the site admin except for approval").
+
+- **"Your homepage card" at the top of "Edit this page":**
+  - **Name.** Renaming keeps the page address. A name another group already uses is refused.
+  - **Card text** (optional, up to 200 characters). Shown on the card instead of the start of the bio.
+  - **Bullet points**, now for titleholders too (up to 8).
+  - Together with the photo and title line already in the editor, everything on the card is theirs to change. The site admin keeps approval of new listings, kind, listing on/off and the private contact.
+- **Cards update for everyone right away.** After an editor save, a Restore, an approval or a save on the group's admin screen, the pages that show `[cec_partner_orgs]` (the homepage) are re-saved and Elementor's cache is cleared, so the host's CDN stops serving the old cards. New action `cec_partner_orgs_changed` for other caches.
+- History, Restore and the admin email now include name, card text and bullet points.
+- **Verification** (local WordPress 7.1.2):
+  - `tests/org-e2e.sh` 96/96, with 6 new checks: name, card text and bullets on the grid; page address unchanged; grid page re-saved; a duplicate name and an empty name refused; a titleholder's own card text and bullets; Restore brings back the name.
+  - `calendar-e2e.sh` 73/73. `php -l` on every changed file. The month view is untouched.
+
+---
+
 ## 1.35.0
 
 **Titleholders and organizers edit their own page, with an event gallery** (owner, 2026-10-10: "I also need a way as the titleholder to update that page including text, info, external links, and photos. There should also be an option for gallery uploads so I can showcase events I've been to and add captions". The owner chose: edits go live right away, the gallery is public).

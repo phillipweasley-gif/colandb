@@ -140,6 +140,7 @@ class CEC_Orgs {
 			'description' => $term->description,
 			'highlights' => $highlights,
 			'mission'    => (string) get_term_meta( $id, 'cec_mission', true ),
+			'summary'    => (string) get_term_meta( $id, 'cec_summary', true ),
 			'title'      => (string) get_term_meta( $id, 'cec_title', true ),
 			'year'       => (string) get_term_meta( $id, 'cec_title_year', true ),
 			'producer'   => (string) get_term_meta( $id, 'cec_title_producer', true ),
@@ -161,6 +162,7 @@ class CEC_Orgs {
 		$map = array(
 			'kind'       => 'cec_kind',
 			'mission'    => 'cec_mission',
+			'summary'    => 'cec_summary',
 			'title'      => 'cec_title',
 			'year'       => 'cec_title_year',
 			'producer'   => 'cec_title_producer',
@@ -185,6 +187,28 @@ class CEC_Orgs {
 		if ( array_key_exists( 'description', $fields ) ) {
 			wp_update_term( $term_id, 'cec_partner_org', array( 'description' => $fields['description'] ) );
 		}
+	}
+
+	/**
+	 * 1.36.0: after a group's listing changes, re-save the pages that show
+	 * the [cec_partner_orgs] grid (e.g. the homepage) and clear Elementor's
+	 * cache, so the host's CDN serves the new cards instead of a stored copy.
+	 */
+	public static function refresh_pages() {
+		global $wpdb;
+		$ids = $wpdb->get_col( "SELECT DISTINCT p.ID FROM {$wpdb->posts} p LEFT JOIN {$wpdb->postmeta} m ON m.post_id = p.ID AND m.meta_key = '_elementor_data' WHERE p.post_status = 'publish' AND p.post_type IN ('page','post') AND ( p.post_content LIKE '%[cec_partner_orgs%' OR m.meta_value LIKE '%cec_partner_orgs%' )" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		foreach ( array_map( 'intval', $ids ) as $id ) {
+			delete_post_meta( $id, '_elementor_element_cache' );
+			clean_post_cache( $id );
+			wp_update_post( array( 'ID' => $id ) );
+		}
+		if ( did_action( 'elementor/loaded' ) && class_exists( '\Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->files_manager ) ) {
+			\Elementor\Plugin::$instance->files_manager->clear_cache();
+		}
+		/**
+		 * A group's public listing changed; purge any other caches here.
+		 */
+		do_action( 'cec_partner_orgs_changed' );
 	}
 
 	public static function next_order() {
@@ -353,13 +377,18 @@ class CEC_Orgs {
 			if ( 'titleholder' === $p['kind'] && self::title_line( $p ) ) {
 				$html .= '<p class="cec-org-tile-title">' . esc_html( self::title_line( $p ) ) . '</p>';
 			}
+			// 1.36.0: the card text the group wrote for the card, then its
+			// bullet points; without either, the start of the description.
+			if ( '' !== $p['summary'] ) {
+				$html .= '<p class="cec-org-tile-desc">' . esc_html( $p['summary'] ) . '</p>';
+			}
 			if ( $p['highlights'] ) {
 				$html .= '<ul class="cec-org-tile-list">';
 				foreach ( $p['highlights'] as $h ) {
 					$html .= '<li>' . esc_html( $h ) . '</li>';
 				}
 				$html .= '</ul>';
-			} elseif ( $p['description'] ) {
+			} elseif ( '' === $p['summary'] && $p['description'] ) {
 				$html .= '<p class="cec-org-tile-desc">' . esc_html( wp_trim_words( $p['description'], 28 ) ) . '</p>';
 			}
 			$html .= '<a class="cec-org-tile-btn" href="' . esc_url( $p['url'] ) . '">' . esc_html( $atts['button'] ) . '<span class="screen-reader-text">: ' . esc_html( $p['name'] ) . '</span></a>';
@@ -466,6 +495,7 @@ class CEC_Orgs {
 		// A logo picked from the media library by URL: remember its ID too.
 		$logo = (string) get_term_meta( $term_id, 'cec_logo', true );
 		update_term_meta( $term_id, 'cec_logo_id', $logo ? (int) attachment_url_to_postid( $logo ) : 0 );
+		self::refresh_pages();
 	}
 
 	public static function admin_columns( $cols ) {

@@ -226,12 +226,12 @@ ok "the group's Organizer sees Edit this page" $(has $T/e1.html 'cec_org_edit=1'
 get orgcy e2 "$URL?cec_org_edit=1"
 ok "a member who isn't Organizer/Titleholder gets no button and no editor" $([ "$(hasnt $T/e2.html 'Edit this page')$(hasnt $T/e2.html 'name="_cec_nonce"')$(has $T/e2.html 'class="cec-org-name"')" = 111 ] && echo 1 || echo 0)
 get organn prof2 "$H/?page_id=$PAGE_ID&cmp_tab=profile"
-ok "Profile tab: Edit page next to the group you organize" $(has $T/prof2.html '>Edit page<')
+ok "Profile tab: Edit page next to the group you organize" $(has $T/prof2.html '>Edit page &amp; card<')
 get organn ed "$URL?cec_org_edit=1"
 EN2=$(php -r 'preg_match("~name=\"_cec_nonce\" value=\"([^\"]+)\"~",file_get_contents($argv[1]),$m); echo $m[1]??"";' $T/ed.html)
-ok "editor: bio, links, photo, gallery slots, consent; no name or contact fields" $([ "$(has $T/ed.html 'name="description"')$(has $T/ed.html 'name="social\[telegram\]"')$(has $T/ed.html 'name="photo"')$(has $T/ed.html 'name="new_photo_6"')$(has $T/ed.html 'name="consent"')$(hasnt $T/ed.html 'name="name"')$(hasnt $T/ed.html 'pat@example.com')" = 1111111 ] && echo 1 || echo 0)
+ok "editor: card (name, card text, bullets), bio, links, photo, gallery slots, consent; no contact fields" $([ "$(has $T/ed.html 'name="description"')$(has $T/ed.html 'name="social\[telegram\]"')$(has $T/ed.html 'name="photo"')$(has $T/ed.html 'name="new_photo_6"')$(has $T/ed.html 'name="consent"')$(has $T/ed.html 'name="name"')$(has $T/ed.html 'name="summary"')$(hasnt $T/ed.html 'pat@example.com')" = 11111111 ] && echo 1 || echo 0)
 ok "editor page is never cached" $(grep -qi '^cache-control:.*no-cache' $T/ed.h && echo 1 || echo 0)
-edit(){ curl -s -b $T/$1.jar -c $T/$1.jar -o /dev/null -w '%{http_code} %{redirect_url}' "$H/wp-admin/admin-post.php" -F "action=cec_org_edit" -F "term=$TID" "${@:2}"; }
+edit(){ curl -s -b $T/$1.jar -c $T/$1.jar -o /dev/null -w '%{http_code} %{redirect_url}' "$H/wp-admin/admin-post.php" -F "action=cec_org_edit" -F "term=$TID" -F "name=${NAME-ZZ Rope Collective}" "${@:2}"; }
 r=$(edit orgcy -F "_cec_nonce=$EN2" -F "description=Hijacked")
 ok "someone who can't edit is refused (403), nothing changes" $(echo "$r" | grep -q '^403' && [ "$(ev "echo get_term($TID)->description;")" != Hijacked ] && echo 1 || echo 0)
 r=$(edit organn -F "_cec_nonce=bad" -F "description=Bad nonce")
@@ -250,6 +250,17 @@ ok "...the site admin is emailed what changed with an undo link" $(tail -n $(( $
 ok "...the previous version is kept" $([ "$(ev "echo count(get_term_meta($TID,'cec_profile_history',true));")" = 1 ] && echo 1 || echo 0)
 get anon pub "$URL"
 ok "public page shows the gallery with captions, linked to the full image" $([ "$(has $T/pub.html 'cec-org-gallery')$(has $T/pub.html '<figcaption>First jam</figcaption>')$(has $T/pub.html 'alt="Rope 101 night"')$(has $T/pub.html 'New rope bio.')$(has $T/pub.html 't.me/+NewInvite')" = 11111 ] && echo 1 || echo 0)
+GRID_MOD=$(ev "echo get_post_modified_time('U',true,$GRID_ID);")
+sleep 1
+r=$(edit organn -F "_cec_nonce=$EN2" -F "name=ZZ Rope Collective Renamed" -F "summary=Rope nights for everyone." -F "description=New rope bio." -F "mission=New mission." -F $'highlights=Rope Education\nPeer Support' -F "social[telegram]=https://t.me/+NewInvite")
+get anon gr3 "$H/?page_id=$GRID_ID"
+ok "card: new name, card text and bullets show on the homepage grid" $([ "$(has $T/gr3.html 'ZZ Rope Collective Renamed')$(has $T/gr3.html 'Rope nights for everyone.')$(has $T/gr3.html '<li>Peer Support</li>')" = 111 ] && echo 1 || echo 0)
+ok "...the page address stays the same" $([ "$(ev "echo get_term_link($TID,'cec_partner_org');")" = "$URL" ] && echo 1 || echo 0)
+ok "...pages showing the grid are re-saved so the CDN refreshes" $([ "$(ev "echo get_post_modified_time('U',true,$GRID_ID);")" -gt "$GRID_MOD" ] && echo 1 || echo 0)
+r=$(NAME="ZZ Existing Group" edit organn -F "_cec_nonce=$EN2" -F "description=New rope bio.")
+ok "...a name another group already uses is refused" $([ "$(ev "echo get_term($TID)->name;")" = "ZZ Rope Collective Renamed" ] && echo 1 || echo 0)
+r=$(NAME="" edit organn -F "_cec_nonce=$EN2" -F "description=New rope bio.")
+ok "...an empty name is refused" $([ "$(ev "echo get_term($TID)->name;")" = "ZZ Rope Collective Renamed" ] && echo 1 || echo 0)
 get organn ed3 "$URL?cec_org_edit=1"
 EN3=$(php -r 'preg_match("~name=\"_cec_nonce\" value=\"([^\"]+)\"~",file_get_contents($argv[1]),$m); echo $m[1]??"";' $T/ed3.html)
 G1=$(ev "echo CEC_Org_Editor::gallery($TID)[0]['id'];"); G2=$(ev "echo CEC_Org_Editor::gallery($TID)[1]['id'];")
@@ -263,7 +274,7 @@ get admin term "$H/wp-admin/term.php?taxonomy=cec_partner_org&tag_ID=$TID"
 ok "admin edit screen: Page edits with Restore, and Linked members with roles" $([ "$(has $T/term.html 'Page edits')$(has $T/term.html 'action=cec_org_restore')$(has $T/term.html 'Linked members')$(has $T/term.html 'cmp_group_role\[')" = 1111 ] && echo 1 || echo 0)
 RL=$(php -r 'preg_match_all("~href=\"([^\"]*action=cec_org_restore[^\"]*)\"~",file_get_contents($argv[1]),$m); echo html_entity_decode(end($m[1]));' $T/term.html)
 curl -s -b $T/admin.jar -o /dev/null "$RL"
-ok "Restore puts back the oldest kept version (before the first edit)" $([ "$(ev "echo get_term($TID)->description.'|'.count(CEC_Org_Editor::gallery($TID));")" = "Columbus rope education and social nights.|0" ] && echo 1 || echo 0)
+ok "Restore puts back the oldest kept version (before the first edit), name included" $([ "$(ev "echo get_term($TID)->name.'|'.get_term($TID)->description.'|'.count(CEC_Org_Editor::gallery($TID));")" = "ZZ Rope Collective|Columbus rope education and social nights.|0" ] && echo 1 || echo 0)
 ev "update_term_meta($TID,'cec_profile_history',array()); CEC_Org_Editor::init(); \$m=new ReflectionMethod('CEC_Org_Editor','prune'); \$m->setAccessible(true); \$m->invoke(null,$TID);" >/dev/null
 ok "photos no version uses any more are deleted" $([ "$(ev "echo (get_post($G1)?1:0).(get_post($G2)?1:0);")" = 00 ] && echo 1 || echo 0)
 M0=$(mails)
@@ -278,6 +289,13 @@ ev "wp_set_current_user(1); \$_POST=array('cmp_group_admin_nonce'=>wp_create_non
 ok "admin: remove a link" $([ "$(q "SELECT COUNT(*) FROM $GL WHERE user_id=$CY AND term_id=$TID")" = 0 ] && echo 1 || echo 0)
 r=$(edit organn -F "_cec_nonce=$EN3" -F "description=After downgrade")
 ok "once set back to Member, they can no longer edit" $(echo "$r" | grep -q '^403' && echo 1 || echo 0)
+
+login orgbo orgbo orgbopass1234
+get orgbo tf "$(ev "echo get_term_link($FID,'cec_partner_org');")?cec_org_edit=1"
+TN5=$(php -r 'preg_match("~name=\"_cec_nonce\" value=\"([^\"]+)\"~",file_get_contents($argv[1]),$m); echo $m[1]??"";' $T/tf.html)
+r=$(curl -s -b $T/orgbo.jar -o /dev/null -w '%{redirect_url}' "$H/wp-admin/admin-post.php" -F "action=cec_org_edit" -F "term=$FID" -F "_cec_nonce=$TN5" -F "name=ZZ Foxxy Test" -F "summary=Great Lakes Handler 2026." -F $'highlights=Pup and handler education\nCommunity events' -F "description=Handler and educator." -F "title=Great Lakes Handler" -F "year=2026")
+get anon gr4 "$H/?page_id=$GRID_ID"
+ok "a titleholder manages their own card: card text and bullet points" $([ "$(has $T/gr4.html 'Great Lakes Handler 2026.')$(has $T/gr4.html '<li>Pup and handler education</li>')" = 11 ] && echo 1 || echo 0)
 
 echo "== Privacy"
 X=$(ev "\$r=apply_filters('wp_privacy_personal_data_exporters',array()); \$o=''; foreach(\$r as \$e){ \$d=call_user_func(\$e['callback'],'organn@example.com',1); foreach(\$d['data'] as \$i){ foreach(\$i['data'] as \$f){ \$o.=\$f['name'].'='.\$f['value'].';'; } } } echo \$o;")

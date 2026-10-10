@@ -14,10 +14,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Who may edit: anyone who can manage partner groups in wp-admin, plus
  *   whoever the filter cec_partner_org_can_edit allows. The member plugin
  *   answers it for members linked to the group as Titleholder or Organizer.
- * - What they edit, at /partner/<slug>/?cec_org_edit=1: description or bio,
+ * - What they edit, at /partner/<slug>/?cec_org_edit=1 (1.36.0: everything
+ *   on their homepage card too: name, card text, bullet points):
+ *   description or bio,
  *   highlights, mission / areas of focus, title / year / producer, links,
- *   the photo or logo, and a gallery of photos with captions. The name,
- *   kind, listing and private contact stay with the site admin.
+ *   the photo or logo, and a gallery of photos with captions. Kind,
+ *   listing (approval) and the private contact stay with the site admin.
  * - Every save keeps the previous version (last 10) in cec_profile_history;
  *   the group's wp-admin edit screen lists them with a Restore button.
  * - Gallery: term meta cec_gallery = list of array( id, caption ). Each
@@ -167,6 +169,17 @@ class CEC_Org_Editor {
 				<input type="hidden" name="term" value="<?php echo (int) $p['id']; ?>" />
 				<?php wp_nonce_field( 'cec_org_edit_' . $p['id'], '_cec_nonce' ); ?>
 
+				<fieldset>
+					<legend><?php esc_html_e( 'Your homepage card', 'cec' ); ?></legend>
+					<p class="cec-org-hint"><?php esc_html_e( 'Your card on the homepage shows your photo, name, title line (titleholders), the card text and bullet points below. Changes show there as soon as you save.', 'cec' ); ?></p>
+					<p class="cec-org-field"><label for="e_name"><?php esc_html_e( 'Name (required)', 'cec' ); ?></label>
+						<input type="text" id="e_name" name="name" maxlength="120" required value="<?php echo esc_attr( $v( 'name', $p['name'] ) ); ?>" /><span class="cec-org-hint"><?php esc_html_e( 'Your page address stays the same if you change it.', 'cec' ); ?></span></p>
+					<p class="cec-org-field"><label for="e_summary"><?php esc_html_e( 'Card text (optional)', 'cec' ); ?></label>
+						<textarea id="e_summary" name="summary" rows="2" maxlength="200"><?php echo esc_textarea( $v( 'summary', $p['summary'] ) ); ?></textarea><span class="cec-org-hint"><?php esc_html_e( 'One or two sentences, up to 200 characters. Leave empty to show the start of your bio instead.', 'cec' ); ?></span></p>
+					<p class="cec-org-field"><label for="e_hl"><?php esc_html_e( 'Bullet points (optional)', 'cec' ); ?></label>
+						<textarea id="e_hl" name="highlights" rows="3" maxlength="600"><?php echo esc_textarea( $v( 'highlights', implode( "\n", $p['highlights'] ) ) ); ?></textarea><span class="cec-org-hint"><?php esc_html_e( 'One per line, up to 8, e.g. "Pup and handler education". Shown on the card and your page.', 'cec' ); ?></span></p>
+				</fieldset>
+
 				<?php if ( $is_title ) : ?>
 					<fieldset>
 						<legend><?php esc_html_e( 'Title', 'cec' ); ?></legend>
@@ -182,10 +195,6 @@ class CEC_Org_Editor {
 					<legend><?php esc_html_e( 'About', 'cec' ); ?></legend>
 					<p class="cec-org-field"><label for="e_desc"><?php echo esc_html( $is_title ? __( 'Bio (required)', 'cec' ) : __( 'Short description (required)', 'cec' ) ); ?></label>
 						<textarea id="e_desc" name="description" rows="5" maxlength="600" required><?php echo esc_textarea( $v( 'description', $p['description'] ) ); ?></textarea><span class="cec-org-hint"><?php esc_html_e( 'Up to 600 characters.', 'cec' ); ?></span></p>
-					<?php if ( ! $is_title ) : ?>
-						<p class="cec-org-field"><label for="e_hl"><?php esc_html_e( 'Highlights (optional)', 'cec' ); ?></label>
-							<textarea id="e_hl" name="highlights" rows="3" maxlength="600"><?php echo esc_textarea( $v( 'highlights', implode( "\n", $p['highlights'] ) ) ); ?></textarea><span class="cec-org-hint"><?php esc_html_e( 'One per line, up to 8. Shown as bullet points on the homepage card.', 'cec' ); ?></span></p>
-					<?php endif; ?>
 					<p class="cec-org-field"><label for="e_mission"><?php echo esc_html( $is_title ? __( 'Areas of focus / mission (optional)', 'cec' ) : __( 'Mission (optional)', 'cec' ) ); ?></label>
 						<textarea id="e_mission" name="mission" rows="6" maxlength="2000"><?php echo esc_textarea( $v( 'mission', $p['mission'] ) ); ?></textarea></p>
 				</fieldset>
@@ -266,6 +275,8 @@ class CEC_Org_Editor {
 	private static function snapshot( $term_id ) {
 		$p = CEC_Orgs::profile( $term_id );
 		return array(
+			'name'        => $p['name'],
+			'summary'     => $p['summary'],
 			'description' => $p['description'],
 			'highlights'  => $p['highlights'],
 			'mission'     => $p['mission'],
@@ -302,14 +313,25 @@ class CEC_Org_Editor {
 		};
 		$is_title = 'titleholder' === $p['kind'];
 		$new      = array(
+			'name'        => $s( 'name', 120 ),
+			'summary'     => $s( 'summary', 200 ),
 			'description' => $s( 'description', 600, true ),
 			'mission'     => $s( 'mission', 2000, true ),
-			'highlights'  => $is_title ? $p['highlights'] : array_slice( array_values( array_filter( array_map( 'trim', preg_split( '/\r\n|\r|\n/', $s( 'highlights', 600, true ) ) ) ) ), 0, 8 ),
+			'highlights'  => array_slice( array_values( array_filter( array_map( 'trim', preg_split( '/\r\n|\r|\n/', $s( 'highlights', 600, true ) ) ) ) ), 0, 8 ),
 			'title'       => $is_title ? $s( 'title', 120 ) : $p['title'],
 			'year'        => $is_title ? $s( 'year', 4 ) : $p['year'],
 			'producer'    => $is_title ? $s( 'producer', 120 ) : $p['producer'],
 			'socials'     => array(),
 		);
+		if ( '' === $new['name'] ) {
+			$e[] = __( 'Please enter a name.', 'cec' );
+		} else {
+			$same = get_term_by( 'name', $new['name'], 'cec_partner_org' );
+			if ( $same && (int) $same->term_id !== (int) $term_id ) {
+				/* translators: %s: name */
+				$e[] = sprintf( __( '"%s" is already the name of another group on the site. Please choose a different name.', 'cec' ), $new['name'] );
+			}
+		}
 		if ( '' === $new['description'] ) {
 			$e[] = $is_title ? __( 'Please write a short bio.', 'cec' ) : __( 'Please write a short description.', 'cec' );
 		}
@@ -415,8 +437,13 @@ class CEC_Org_Editor {
 				$gallery[] = array( 'id' => $att, 'caption' => $a['caption'] );
 			}
 		}
+		if ( $new['name'] !== $term->name ) {
+			wp_update_term( $term_id, 'cec_partner_org', array( 'name' => $new['name'] ) );
+		}
+		unset( $new['name'] );
 		CEC_Orgs::save_profile( $term_id, $new );
 		update_term_meta( $term_id, 'cec_gallery', $gallery );
+		CEC_Orgs::refresh_pages();
 		// Removed gallery photos stay in the history snapshot until it rolls
 		// over, so Restore can bring them back; deleted then (see prune()).
 		self::prune( $term_id );
@@ -469,8 +496,10 @@ class CEC_Org_Editor {
 		}
 		$user    = wp_get_current_user();
 		$labels  = array(
+			'name'        => __( 'Name', 'cec' ),
+			'summary'     => __( 'Card text', 'cec' ),
 			'description' => __( 'Description / bio', 'cec' ),
-			'highlights'  => __( 'Highlights', 'cec' ),
+			'highlights'  => __( 'Bullet points', 'cec' ),
 			'mission'     => __( 'Mission / areas of focus', 'cec' ),
 			'title'       => __( 'Title', 'cec' ),
 			'year'        => __( 'Year', 'cec' ),
@@ -562,10 +591,14 @@ class CEC_Org_Editor {
 				$gallery[] = array( 'id' => (int) $g['id'], 'caption' => (string) $g['caption'] );
 			}
 		}
-		$fields = array_intersect_key( $data, array_flip( array( 'description', 'highlights', 'mission', 'title', 'year', 'producer', 'socials', 'logo', 'logo_id' ) ) );
+		if ( ! empty( $data['name'] ) && get_term( $term_id )->name !== $data['name'] && ! get_term_by( 'name', $data['name'], 'cec_partner_org' ) ) {
+			wp_update_term( $term_id, 'cec_partner_org', array( 'name' => $data['name'] ) );
+		}
+		$fields = array_intersect_key( $data, array_flip( array( 'summary', 'description', 'highlights', 'mission', 'title', 'year', 'producer', 'socials', 'logo', 'logo_id' ) ) );
 		CEC_Orgs::save_profile( $term_id, $fields );
 		update_term_meta( $term_id, 'cec_gallery', $gallery );
 		self::prune( $term_id );
+		CEC_Orgs::refresh_pages();
 		wp_safe_redirect( add_query_arg( 'message', 3, admin_url( 'term.php?taxonomy=cec_partner_org&tag_ID=' . $term_id ) ) );
 		exit;
 	}
