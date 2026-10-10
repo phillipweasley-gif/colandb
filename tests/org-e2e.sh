@@ -252,6 +252,20 @@ ok "...the editor shows them as waiting, with a caption box" $([ "$(has $T/ed3h.
 get anon pubh "$URL"
 ok "...and they aren't on the public page" $(hasnt $T/pubh.html "wp-content/uploads/.*$(ev "echo pathinfo(get_attached_file($HID),PATHINFO_FILENAME);")")
 ok "the editor takes many photos at once" $(has $T/ed3h.html 'name="photos\[\]" multiple')
+UPN=$(php -r 'preg_match("~data-nonce=\"([^\"]+)\"~",file_get_contents($argv[1]),$m); echo $m[1]??"";' $T/ed3h.html)
+up(){ curl -s -b $T/$1.jar "$H/wp-admin/admin-post.php" -F "action=cec_org_upload" -F "term=$TID" "${@:2}"; }
+R=$(up organn -F "_cec_up=$UPN" -F "photo=@$T/g2.jpg;type=image/jpeg")
+UID1=$(echo "$R" | php -r '$j=json_decode(stream_get_contents(STDIN),true); echo $j["data"]["id"]??0;')
+ok "one-by-one upload: a photo uploads on its own and is kept as a new photo (not on the page)" $([ "$UID1" -gt 0 ] && echo "$R" | grep -q 'held\[' && [ "$(ev "echo count(CEC_Org_Editor::held($TID,$ANN));")" = 2 ] && echo 1 || echo 0)
+R=$(up organn -F "_cec_up=$UPN" -F "photo=@$T/fake.png;type=image/png")
+ok "...a file that isn't an image gets a clear error" $(echo "$R" | grep -q '"success":false' && echo "$R" | grep -q 'JPEG, PNG or WebP' && echo 1 || echo 0)
+R=$(up orgcy -F "_cec_up=$UPN" -F "photo=@$T/g2.jpg;type=image/jpeg")
+ok "...someone who can't edit can't upload" $(echo "$R" | grep -q '"success":false' && echo 1 || echo 0)
+R=$(up organn -F "_cec_up=bad" -F "photo=@$T/g2.jpg;type=image/jpeg")
+ok "...a bad nonce is refused" $(echo "$R" | grep -q 'expired' && echo 1 || echo 0)
+R=$(curl -s "$H/wp-admin/admin-post.php" -F "action=cec_org_upload" -F "term=$TID" -F "_cec_up=$UPN" -F "photo=@$T/g2.jpg;type=image/jpeg")
+ok "...signed out is refused" $(echo "$R" | grep -q 'sign in' && echo 1 || echo 0)
+ev "wp_delete_attachment($UID1,true);" >/dev/null
 r=$(edit organn -F "_cec_nonce=$EN2" -F "description=New rope bio." -F "mission=New mission." -F $'highlights=Rope Education\nSocial Nights\nPeer Support' -F "social[telegram]=https://t.me/+NewInvite" -F "social[website]=https://example.org/rope" -F "gallery[$G1][caption]=First jam" -F "held[$HID][caption]=Rope 101 night" -F "consent=1")
 ok "saved: back on the page, live right away" $(echo "$r" | grep -q 'cec_org_msg=saved' && echo 1 || echo 0)
 ok "...confirming adds the waiting photo with its caption, after the others" $([ "$(ev "echo implode(',',wp_list_pluck(CEC_Org_Editor::gallery($TID),'caption'));")" = "First jam,Rope 101 night" ] && [ "$(ev "echo count(CEC_Org_Editor::held($TID,$ANN));")" = 0 ] && echo 1 || echo 0)

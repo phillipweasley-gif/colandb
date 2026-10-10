@@ -25,6 +25,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Gallery: term meta cec_gallery = list of array( id, caption ). Each
  *   image is a media-library attachment marked _cec_org_gallery_term, and
  *   is deleted when removed from the gallery.
+ * - 1.37.1: typed changes are kept as a browser draft (localStorage) and
+ *   restored after a refresh; leaving with unsaved changes asks first.
+ * - 1.37.1: photos upload one by one as they're picked (cec_org_upload),
+ *   with no per-save limit, and each can be removed before saving.
  * - 1.37.0: a save keeps every valid change and lists what it couldn't use
  *   (nothing is thrown away); photos are added many at a time (photos[]);
  *   photos added without the consent box wait, marked _cec_org_held_term /
@@ -34,6 +38,7 @@ class CEC_Org_Editor {
 
 	const ACTION      = 'cec_org_edit';
 	const RESTORE     = 'cec_org_restore';
+	const UPLOAD      = 'cec_org_upload';
 	const MAX_GALLERY = 60;
 	const BULK_MAX    = 15;          // Photos per save (the server takes 20 files per request).
 	const PHOTO_BYTES = 10485760;    // 10 MB each.
@@ -44,6 +49,8 @@ class CEC_Org_Editor {
 		add_action( 'admin_post_' . self::ACTION, array( __CLASS__, 'handle' ) );
 		add_action( 'admin_post_nopriv_' . self::ACTION, array( __CLASS__, 'to_login' ) );
 		add_action( 'admin_post_' . self::RESTORE, array( __CLASS__, 'handle_restore' ) );
+		add_action( 'admin_post_' . self::UPLOAD, array( __CLASS__, 'handle_upload' ) );
+		add_action( 'admin_post_nopriv_' . self::UPLOAD, array( __CLASS__, 'upload_signed_out' ) );
 		add_action( 'template_redirect', array( __CLASS__, 'no_cache' ) );
 		add_action( 'cec_partner_org_edit_form_fields', array( __CLASS__, 'history_fields' ), 40 );
 		add_action( 'pre_delete_term', array( __CLASS__, 'on_delete_term' ), 10, 2 );
@@ -246,63 +253,167 @@ class CEC_Org_Editor {
 							<?php endforeach; ?>
 						</ul>
 					<?php endif; ?>
-					<?php if ( $held ) : ?>
-						<div class="cec-org-held">
-							<p><strong><?php esc_html_e( 'Uploaded, not on your page yet', 'cec' ); ?></strong> <span class="cec-org-hint"><?php esc_html_e( 'Tick the box below and save to add these to your gallery.', 'cec' ); ?></span></p>
-							<ul class="cec-org-edit-gallery">
-								<?php foreach ( $held as $h ) : ?>
-									<li>
-										<?php echo wp_get_attachment_image( $h['id'], 'thumbnail', false, array( 'alt' => '' ) ); ?>
-										<div>
-											<p class="cec-org-field"><label for="h_cap_<?php echo (int) $h['id']; ?>"><?php esc_html_e( 'Caption', 'cec' ); ?></label>
-												<input type="text" id="h_cap_<?php echo (int) $h['id']; ?>" name="held[<?php echo (int) $h['id']; ?>][caption]" maxlength="200" value="<?php echo esc_attr( $h['caption'] ); ?>" /></p>
-											<p class="cec-org-check"><label><input type="checkbox" name="held[<?php echo (int) $h['id']; ?>][remove]" value="1" /> <?php esc_html_e( 'Delete this photo', 'cec' ); ?></label></p>
-										</div>
-									</li>
-								<?php endforeach; ?>
-							</ul>
-						</div>
-					<?php endif; ?>
+					<div class="cec-org-held"<?php echo $held ? '' : ' hidden'; ?> id="cec-org-held">
+						<p><strong><?php esc_html_e( 'New photos', 'cec' ); ?></strong> <span class="cec-org-hint"><?php esc_html_e( 'Uploaded but not on your page yet. Add captions, remove any you don\'t want, then tick the box below and save.', 'cec' ); ?></span></p>
+						<ul class="cec-org-edit-gallery" id="cec-org-uploads">
+							<?php foreach ( $held as $h ) : ?>
+								<?php echo self::held_item_html( $h['id'], $h['caption'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
+							<?php endforeach; ?>
+						</ul>
+					</div>
 					<?php if ( count( $gallery ) < self::MAX_GALLERY ) : ?>
 						<p class="cec-org-field"><label for="g_bulk"><?php esc_html_e( 'Add photos', 'cec' ); ?></label>
-							<input type="file" id="g_bulk" name="photos[]" multiple accept="image/jpeg,image/png,image/webp" />
-							<span class="cec-org-hint"><?php echo esc_html( sprintf( /* translators: 1: photos per save, 2: total photos */ __( 'Select several at once (hold Ctrl or ⌘, or pick several on your phone): up to %1$d per save, %2$d in the gallery. JPEG, PNG or WebP, up to 10 MB each. They\'re added at the end; add captions and change the order after saving.', 'cec' ), self::BULK_MAX, self::MAX_GALLERY ) ); ?></span>
+							<input type="file" id="g_bulk" name="photos[]" multiple accept="image/jpeg,image/png,image/webp" data-term="<?php echo (int) $p['id']; ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'cec_org_upload_' . $p['id'] ) ); ?>" data-url="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" />
+							<span class="cec-org-hint"><?php echo esc_html( sprintf( /* translators: %d: total photos */ __( 'Select as many as you like at once (hold Ctrl or ⌘, or pick several on your phone). Each one uploads on its own and shows up above, where you can add a caption or remove it. JPEG, PNG or WebP, up to 10 MB each; the gallery holds %d.', 'cec' ), self::MAX_GALLERY ) ); ?></span>
 							<span class="cec-org-hint" id="g_bulk_status" aria-live="polite"></span></p>
 					<?php endif; ?>
-					<?php if ( $held || count( $gallery ) < self::MAX_GALLERY ) : ?>
-						<p class="cec-org-check"><label><input type="checkbox" name="consent" value="1" /> <?php esc_html_e( 'Everyone who can be recognised in the photos I\'m adding agreed to be shown publicly on this site.', 'cec' ); ?></label></p>
-						<p class="cec-org-hint"><?php esc_html_e( 'Without this box ticked, new photos are kept here (not on your page) until you confirm.', 'cec' ); ?></p>
-					<?php endif; ?>
+					<p class="cec-org-check"><label><input type="checkbox" name="consent" value="1" /> <?php esc_html_e( 'Everyone who can be recognised in the photos I\'m adding agreed to be shown publicly on this site.', 'cec' ); ?></label></p>
+					<p class="cec-org-hint"><?php esc_html_e( 'Without this box ticked, new photos stay here (not on your page) until you confirm.', 'cec' ); ?></p>
 				</fieldset>
 
 				<p><button type="submit" class="cec-org-submit"><?php esc_html_e( 'Save changes', 'cec' ); ?></button></p>
 			</form>
 			<script>
 			( function () {
-				// Check photos before sending, so a too-big upload never loses the
-				// rest of the form (the CDN refuses requests over 100 MB).
+				// Photos upload one at a time as soon as they're picked (1.37.1),
+				// so any number can be added and each can be removed before saving.
 				var form = document.getElementById( 'cec-org-edit-form' );
 				if ( ! form ) { return; }
-				var bulk = document.getElementById( 'g_bulk' ), status = document.getElementById( 'g_bulk_status' );
-				var max = <?php echo (int) self::BULK_MAX; ?>, each = <?php echo (int) self::PHOTO_BYTES; ?>, total = <?php echo (int) self::SAVE_BYTES; ?>;
-				function problem() {
-					var files = [], sum = 0, big = [];
-					form.querySelectorAll( 'input[type=file]' ).forEach( function ( i ) { Array.prototype.forEach.call( i.files || [], function ( f ) { files.push( f ); } ); } );
-					files.forEach( function ( f ) { sum += f.size; if ( f.size > each ) { big.push( f.name ); } } );
-					if ( bulk && bulk.files && bulk.files.length > max ) { return <?php echo wp_json_encode( sprintf( /* translators: %d: photos per save */ __( 'Please choose up to %d photos per save. Save, then add the rest.', 'cec' ), self::BULK_MAX ) ); ?>; }
-					if ( big.length ) { return <?php echo wp_json_encode( __( 'These photos are larger than 10 MB:', 'cec' ) ); ?> + ' ' + big.join( ', ' ); }
-					if ( sum > total ) { return <?php echo wp_json_encode( __( 'These photos add up to more than 90 MB. Please save fewer at a time.', 'cec' ) ); ?>; }
-					return '';
-				}
-				if ( bulk ) {
-					bulk.addEventListener( 'change', function () {
-						var msg = problem();
-						status.textContent = msg || ( bulk.files.length ? bulk.files.length + ' ' + <?php echo wp_json_encode( __( 'photo(s) ready to add.', 'cec' ) ); ?> : '' );
+				form.classList.add( 'is-js' );
+				var input = document.getElementById( 'g_bulk' ), list = document.getElementById( 'cec-org-uploads' ), box = document.getElementById( 'cec-org-held' ), status = document.getElementById( 'g_bulk_status' );
+				var each = <?php echo (int) self::PHOTO_BYTES; ?>, queue = [], busy = 0;
+				var T = <?php echo wp_json_encode( array( 'uploading' => __( 'Uploading…', 'cec' ), 'waiting' => __( 'Waiting…', 'cec' ), 'big' => __( 'Larger than 10 MB: not uploaded.', 'cec' ), 'failed' => __( 'Couldn\'t upload:', 'cec' ), 'dismiss' => __( 'Dismiss', 'cec' ), 'left' => __( 'photo(s) still uploading…', 'cec' ), 'done' => __( 'All photos uploaded. Add captions, then tick the box and save.', 'cec' ), 'wait' => __( 'Please wait until the photos finish uploading, then save.', 'cec' ), 'removed' => __( 'Removed.', 'cec' ) ) ); ?>;
+				function bindRemove( li ) {
+					var b = li.querySelector( '.cec-org-remove' ), c = li.querySelector( 'input[type=checkbox]' );
+					if ( ! b ) { return; }
+					b.addEventListener( 'click', function () {
+						if ( c ) { c.checked = true; }
+						li.hidden = true;
+						status.textContent = T.removed;
+						form.dispatchEvent( new Event( 'change' ) );
 					} );
 				}
+				Array.prototype.forEach.call( list ? list.children : [], bindRemove );
+				function pending( file ) {
+					var li = document.createElement( 'li' );
+					li.className = 'cec-org-upload-pending';
+					var img = document.createElement( 'img' );
+					img.alt = '';
+					try { img.src = URL.createObjectURL( file ); } catch ( e ) {}
+					var info = document.createElement( 'div' );
+					var name = document.createElement( 'p' );
+					name.textContent = file.name;
+					var st = document.createElement( 'p' );
+					st.className = 'cec-org-hint';
+					info.appendChild( name ); info.appendChild( st );
+					li.appendChild( img ); li.appendChild( info );
+					list.appendChild( li );
+					box.hidden = false;
+					return { li: li, st: st };
+				}
+				function failed( row, msg ) {
+					row.li.classList.add( 'is-failed' );
+					row.st.textContent = msg;
+					var d = document.createElement( 'button' );
+					d.type = 'button'; d.className = 'cec-org-remove'; d.textContent = T.dismiss;
+					d.addEventListener( 'click', function () { row.li.remove(); } );
+					row.st.parentNode.appendChild( d );
+				}
+				function progress() {
+					var left = queue.length + busy;
+					status.textContent = left ? left + ' ' + T.left : T.done;
+				}
+				function next() {
+					if ( busy || ! queue.length ) { progress(); return; }
+					var job = queue.shift();
+					busy = 1;
+					job.row.st.textContent = T.uploading;
+					progress();
+					var fd = new FormData();
+					fd.append( 'action', 'cec_org_upload' );
+					fd.append( 'term', input.dataset.term );
+					fd.append( '_cec_up', input.dataset.nonce );
+					fd.append( 'photo', job.file );
+					fetch( input.dataset.url, { method: 'POST', body: fd, credentials: 'same-origin' } )
+						.then( function ( r ) { return r.json(); } )
+						.then( function ( res ) {
+							if ( res && res.success && res.data && res.data.html ) {
+								var tmp = document.createElement( 'ul' );
+								tmp.innerHTML = res.data.html;
+								var li = tmp.firstElementChild;
+								job.row.li.replaceWith( li );
+								bindRemove( li );
+							} else {
+								failed( job.row, T.failed + ' ' + ( res && res.data && res.data.message ? res.data.message : '' ) );
+							}
+						} )
+						.catch( function () { failed( job.row, T.failed + ' ' + job.file.name ); } )
+						.then( function () { busy = 0; next(); } );
+				}
+				if ( input && list ) {
+					input.addEventListener( 'change', function () {
+						Array.prototype.forEach.call( input.files, function ( f ) {
+							var row = pending( f );
+							if ( f.size > each ) { failed( row, T.big ); return; }
+							row.st.textContent = T.waiting;
+							queue.push( { file: f, row: row } );
+						} );
+						input.value = ''; // Uploaded separately: never sent again with Save.
+						next();
+					} );
+				}
+				// Draft (1.37.1): everything typed is kept in this browser as you go
+				// and comes back after a refresh, until you save or discard it.
+				var key = 'cec_org_draft_<?php echo (int) $p['id']; ?>_<?php echo (int) get_current_user_id(); ?>', dirty = false, saving = false, timer = null;
+				var D = <?php echo wp_json_encode( array( 'restored' => __( 'Your unsaved changes from earlier were brought back. They aren\'t live until you save.', 'cec' ), 'discard' => __( 'Discard them', 'cec' ), 'leave' => __( 'You have unsaved changes.', 'cec' ) ) ); ?>;
+				function fields() {
+					return Array.prototype.filter.call( form.elements, function ( el ) {
+						return el.name && el.type !== 'file' && el.type !== 'hidden' && el.type !== 'submit' && el.type !== 'button';
+					} );
+				}
+				function snapshot() {
+					var d = {};
+					fields().forEach( function ( el ) { d[ el.name ] = ( el.type === 'checkbox' || el.type === 'radio' ) ? el.checked : el.value; } );
+					return d;
+				}
+				function store() {
+					try { localStorage.setItem( key, JSON.stringify( { at: Date.now(), v: snapshot() } ) ); } catch ( e ) {}
+				}
+				var original = JSON.stringify( snapshot() );
+				try {
+					var saved = JSON.parse( localStorage.getItem( key ) || 'null' );
+					if ( saved && saved.v && Date.now() - saved.at < 14 * 864e5 && JSON.stringify( saved.v ) !== original ) {
+						fields().forEach( function ( el ) {
+							if ( ! Object.prototype.hasOwnProperty.call( saved.v, el.name ) ) { return; }
+							if ( el.type === 'checkbox' || el.type === 'radio' ) { el.checked = !! saved.v[ el.name ]; } else { el.value = saved.v[ el.name ]; }
+							if ( el.type === 'checkbox' && el.checked && /^held\[\d+\]\[remove\]$/.test( el.name ) ) { var li = el.closest( 'li' ); if ( li ) { li.hidden = true; } }
+						} );
+						dirty = true;
+						var n = document.createElement( 'div' );
+						n.className = 'cec-org-notice cec-org-draft'; n.setAttribute( 'role', 'status' );
+						var t = document.createElement( 'p' ); t.textContent = D.restored + ' ';
+						var x = document.createElement( 'button' ); x.type = 'button'; x.className = 'cec-org-remove'; x.textContent = D.discard;
+						x.addEventListener( 'click', function () { try { localStorage.removeItem( key ); } catch ( e ) {} dirty = false; location.reload(); } );
+						t.appendChild( x ); n.appendChild( t );
+						form.parentNode.insertBefore( n, form );
+					} else if ( saved ) {
+						localStorage.removeItem( key );
+					}
+				} catch ( e ) {}
+				function changed() {
+					dirty = true;
+					clearTimeout( timer );
+					timer = setTimeout( store, 400 );
+				}
+				form.addEventListener( 'input', changed );
+				form.addEventListener( 'change', changed );
+				window.addEventListener( 'beforeunload', function ( ev ) {
+					if ( dirty && ! saving ) { store(); ev.preventDefault(); ev.returnValue = D.leave; return D.leave; }
+				} );
 				form.addEventListener( 'submit', function ( ev ) {
-					var msg = problem();
-					if ( msg ) { ev.preventDefault(); window.alert( msg ); }
+					if ( busy || queue.length ) { ev.preventDefault(); window.alert( T.wait ); return; }
+					saving = true;
+					try { localStorage.removeItem( key ); } catch ( e ) {}
 				} );
 			} )();
 			</script>
@@ -366,6 +477,57 @@ class CEC_Org_Editor {
 			);
 		}
 		return $out;
+	}
+
+	/** One "new photo" row in the editor (also returned by the upload endpoint). */
+	public static function held_item_html( $id, $caption ) {
+		$id   = (int) $id;
+		$html = '<li>' . wp_get_attachment_image( $id, 'thumbnail', false, array( 'alt' => '' ) ) . '<div>';
+		$html .= '<p class="cec-org-field"><label for="h_cap_' . $id . '">' . esc_html__( 'Caption', 'cec' ) . '</label><input type="text" id="h_cap_' . $id . '" name="held[' . $id . '][caption]" maxlength="200" value="' . esc_attr( $caption ) . '" /></p>';
+		$html .= '<p class="cec-org-check cec-org-nojs"><label><input type="checkbox" name="held[' . $id . '][remove]" value="1" /> ' . esc_html__( 'Delete this photo', 'cec' ) . '</label></p>';
+		$html .= '<button type="button" class="cec-org-remove cec-org-js-only">' . esc_html__( 'Remove', 'cec' ) . '</button>';
+		return $html . '</div></li>';
+	}
+
+	public static function upload_signed_out() {
+		wp_send_json_error( array( 'message' => __( 'Please sign in again, then reload this page.', 'cec' ) ), 401 );
+	}
+
+	/**
+	 * One photo, uploaded on its own from the editor (1.37.1). It is kept as
+	 * a "new photo" (not on the page) until the uploader saves with the
+	 * consent box ticked.
+	 */
+	public static function handle_upload() {
+		$term_id = isset( $_POST['term'] ) ? absint( $_POST['term'] ) : 0;
+		$nonce   = isset( $_POST['_cec_up'] ) ? sanitize_text_field( wp_unslash( $_POST['_cec_up'] ) ) : '';
+		$term    = $term_id ? get_term( $term_id, 'cec_partner_org' ) : null;
+		if ( ! $term || is_wp_error( $term ) || ! self::can_edit( $term_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'You can\'t edit this page.', 'cec' ) ), 403 );
+		}
+		if ( ! wp_verify_nonce( $nonce, 'cec_org_upload_' . $term_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'This page has expired. Save your changes, then reload it.', 'cec' ) ), 403 );
+		}
+		if ( count( self::held( $term_id ) ) + count( self::gallery( $term_id ) ) >= self::MAX_GALLERY ) {
+			/* translators: %d: maximum photos */
+			wp_send_json_error( array( 'message' => sprintf( __( 'The gallery holds up to %d photos. Remove some first.', 'cec' ), self::MAX_GALLERY ) ) );
+		}
+		$f = self::file( 'photo' );
+		if ( ! $f ) {
+			wp_send_json_error( array( 'message' => __( 'No photo was received.', 'cec' ) ) );
+		}
+		$c = CEC_Org_Submissions::check_image( $f, self::PHOTO_BYTES );
+		if ( is_wp_error( $c ) ) {
+			wp_send_json_error( array( 'message' => $c->get_error_message() ) );
+		}
+		$att = CEC_Org_Submissions::store_image( $f, 0, $term->name );
+		if ( ! $att ) {
+			wp_send_json_error( array( 'message' => __( 'It couldn\'t be saved. Please try again.', 'cec' ) ) );
+		}
+		update_post_meta( $att, '_cec_org_held_term', $term_id );
+		update_post_meta( $att, '_cec_org_held_by', get_current_user_id() );
+		update_post_meta( $att, '_cec_org_held_caption', '' );
+		wp_send_json_success( array( 'id' => $att, 'html' => self::held_item_html( $att, '' ) ) );
 	}
 
 	/**

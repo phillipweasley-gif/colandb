@@ -146,6 +146,16 @@ button.cec-org-submit:hover, button.cec-org-submit:focus-visible { background: v
 .cec-org-edit-gallery li > img { width: 96px; height: 96px; object-fit: cover; flex: 0 0 auto; }
 .cec-org-edit-gallery li > div { flex: 1 1 auto; min-width: 0; }
 .cec-org-new-photo { border-top: 1px dashed rgba(255, 255, 255, 0.2); padding-top: 0.5rem; }
+.cec-org-js-only { display: none !important; }
+.cec-org-form.is-js .cec-org-js-only { display: inline-flex !important; }
+.cec-org-form.is-js .cec-org-nojs { display: none !important; }
+button.cec-org-remove { min-height: 44px; margin-top: 0.25rem; padding: 0.5rem 1rem !important; background: transparent !important; color: #E1F577 !important; border: 1px solid #E1F577 !important; border-radius: 0 !important; font-weight: 700; cursor: pointer; }
+button.cec-org-remove:hover, button.cec-org-remove:focus-visible { background: #E1F577 !important; color: #100F0F !important; }
+.cec-org-held[hidden] { display: none !important; }
+.cec-org-draft { border-left-color: #FF50D7; color: #FFFFFF; }
+.cec-org-draft p { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+.cec-org-upload-pending img { width: 96px; height: 96px; object-fit: cover; flex: 0 0 auto; opacity: 0.6; }
+.cec-org-upload-pending.is-failed .cec-org-hint { color: #ff6b6b; }
 
 @media (max-width: 1024px) {
 	.cec-org-gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
