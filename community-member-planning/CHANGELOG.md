@@ -4,6 +4,13 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.23.1
+
+- **Profile tab → Groups and titles:** "Run a group or hold a title? **Submit it to be listed**" links to the submission page (the published page with the slug `submit-organization`).
+- **Verification:** `tests/org-e2e.sh` 128/128; `php -l`.
+
+---
+
 ## 0.23.0
 
 **A titleholder's events on their titleholder page** (owner, 2026-10-10: "Any events that I'm attending that are publicly available via my calendar as a member should show here". The owner chose a new Public choice).

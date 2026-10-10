@@ -100,6 +100,14 @@ ok "a titleholder submission keeps title, year and producer" $([ "$(ev "\$c=get_
 r=$(submit 10.0.0.5 -F "kind=titleholder" -F "name=ZZ Bad Year" -F "year=26" -F "description=x" -F "contact_name=F" -F "contact_email=f@example.com" -F "authorized=1")
 ok "a two-digit year is refused" $(echo "$r" | grep -q "cec_org=error" && echo 1 || echo 0)
 
+get anon fk "$(ev "echo add_query_arg('kind','titleholder',get_permalink($FORM_ID));")"
+[ -f $T/fk.html ] || true
+ok "a link with ?kind=titleholder opens the form on Titleholder" $(grep -q "value=\"titleholder\"  *checked=.checked." $T/fk.html && echo 1 || echo 0)
+ok "signed out: nothing is prefilled" $(hasnt $T/fk.html 'organn@example.com')
+login organn organn organnpass123
+get organn fm "$FORM"
+ok "signed-in member: name, email and username are filled in" $([ "$(has $T/fm.html 'value="Org Ann"')$(has $T/fm.html 'value="organn@example.com"')$(has $T/fm.html 'id="cec_org_member" name="member" maxlength="100" value="organn"')" = 111 ] && echo 1 || echo 0)
+
 echo "== Review"
 login admin admin admin
 get admin rv "$H/wp-admin/post.php?post=$SUB&action=edit"
@@ -187,6 +195,9 @@ get orgdee pgd "$URL"
 ok "signed in but not a full member: no member list" $(hasnt $T/pgd.html 'Org Ann')
 get organn prof "$H/?page_id=$PAGE_ID&cmp_tab=profile"
 ok "Profile tab: Groups and titles lists the link with Remove, and an Add select" $([ "$(has $T/prof.html 'Groups and titles')$(has $T/prof.html 'ZZ Rope Collective')$(has $T/prof.html 'value="remove"')$(has $T/prof.html 'id="cmp-group-pick"')" = 1111 ] && echo 1 || echo 0)
+SUBP=$(ev '$p = get_page_by_path("submit-organization"); echo $p ? $p->ID : wp_insert_post( array( "post_type" => "page", "post_status" => "publish", "post_title" => "Submit", "post_name" => "submit-organization", "post_content" => "[cec_submit_org]" ) );')
+get organn prof3 "$H/?page_id=$PAGE_ID&cmp_tab=profile"
+ok "Profile tab: 'Submit it to be listed' links to the submission page" $(has $T/prof3.html 'Submit it to be listed')
 GN=$(php -r 'preg_match("~name=\"action\" value=\"cmp_group\".*?name=\"_cmp_nonce\" value=\"([^\"]+)\"~s",file_get_contents($argv[1]),$m); echo $m[1]??"";' $T/prof.html)
 gpost(){ curl -s -b $T/$1.jar -c $T/$1.jar -o /dev/null -w '%{redirect_url}' "$H/wp-admin/admin-post.php" --data-urlencode "action=cmp_group" "${@:2}"; }
 r=$(gpost organn --data-urlencode "_cmp_nonce=bad" --data-urlencode "do=add" --data-urlencode "group=$ORG2")
