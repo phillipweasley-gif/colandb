@@ -295,6 +295,8 @@ ok "...the site admin is emailed what changed with an undo link" $(tail -n $(( $
 ok "...previous versions are kept" $([ "$(ev "echo count(get_term_meta($TID,'cec_profile_history',true));")" -ge 1 ] && echo 1 || echo 0)
 get anon pub "$URL"
 ok "public page shows the gallery with captions, linked to the full image" $([ "$(has $T/pub.html 'cec-org-gallery')$(has $T/pub.html '<figcaption>First jam</figcaption>')$(has $T/pub.html 'alt="Rope 101 night"')$(has $T/pub.html 'New rope bio.')$(has $T/pub.html 't.me/+NewInvite')" = 11111 ] && echo 1 || echo 0)
+ok "the gallery groups photos by shape (both test photos are landscape)" $([ "$(has $T/pub.html 'cec-org-gallery-grid is-landscape')$(hasnt $T/pub.html 'is-portrait')" = 11 ] && echo 1 || echo 0)
+ok "a 'See our events' shortcut jumps to Upcoming Events" $([ "$(has $T/pub.html 'href="#cec-org-events"')$(has $T/pub.html 'id="cec-org-events"')" = 11 ] && echo 1 || echo 0)
 GRID_MOD=$(ev "echo get_post_modified_time('U',true,$GRID_ID);")
 sleep 1
 r=$(edit organn -F "_cec_nonce=$EN2" -F "name=ZZ Rope Collective Renamed" -F "summary=Rope nights for everyone." -F "description=New rope bio." -F "mission=New mission." -F $'highlights=Rope Education\nPeer Support' -F "social[telegram]=https://t.me/+NewInvite")

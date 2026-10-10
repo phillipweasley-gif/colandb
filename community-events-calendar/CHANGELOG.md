@@ -6,6 +6,24 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.40.0
+
+**A shortcut to the page's events, and the gallery grouped by photo shape** (owner, 2026-10-10: "Add a shortcut at the top to my events of the template and organize the photos by format because it looks messy").
+
+- **"See my events ↓"** (organizations: "See our events ↓") in the top section of every `/partner/` page. It jumps to Upcoming Events (`#cec-org-events`), scrolling smoothly unless the visitor has asked for reduced motion.
+- **The gallery groups photos by shape:**
+  - landscape: 4:3 tiles, about 3 across;
+  - portrait: 3:4 tiles, about 4 across, framed toward the top so faces stay in view;
+  - square: 1:1 tiles.
+  - Each group is an even grid, so rows line up; order within a group follows the gallery order.
+  - Phone photos are 4:3 or 3:4, so they aren't cropped. Wider or taller photos are trimmed slightly at the edges, and the full photo opens on click.
+- **Verification** (local WordPress 7.1.2):
+  - `tests/org-e2e.sh` 130/130, with 2 new checks (grouping, the shortcut).
+  - In Chromium, a gallery of 3 landscape, 3 portrait and 1 square photo showed three even groups. The shortcut scrolled to Upcoming Events.
+  - `php -l` on every changed file.
+
+---
+
 ## 1.39.1
 
 **The submission form is easier to reach and quicker to fill in** (owner, 2026-10-10: "how will new members/titleholders submit their information? It needs to be available to them to submit").

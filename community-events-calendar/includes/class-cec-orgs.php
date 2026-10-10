@@ -401,6 +401,8 @@ class CEC_Orgs {
 			}
 			$html .= '</div>';
 		}
+		// 1.40.0: a shortcut down to the events listed on this page.
+		$html .= '<p class="cec-org-jump"><a class="cec-org-btn" href="#cec-org-events">' . esc_html( 'titleholder' === $p['kind'] ? __( 'See my events', 'cec' ) : __( 'See our events', 'cec' ) ) . ' &darr;</a></p>';
 		// 1.38.0: networks they have but share only on request.
 		if ( $p['ask'] ) {
 			$html .= '<ul class="cec-org-ask">';
