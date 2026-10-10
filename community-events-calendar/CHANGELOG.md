@@ -6,6 +6,29 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.37.1
+
+**Add any number of photos, remove any before saving, and a refresh no longer wipes your work** (owner, 2026-10-10: "I added 17 photos and it says i can only upload 15 but does not give me the option to deselect any", "when i refresh the page everything wipes clear", "This is the same for the text entry fields not just the photos").
+
+- **Photos upload one at a time as soon as they're picked.** There's no per-save limit any more; the gallery still holds 60.
+  - Each photo appears under **New photos** with a thumbnail, a caption box and a **Remove** button, and shows its progress.
+  - A photo that's too large or isn't an image is marked on its own row with the reason, and the others carry on.
+  - New endpoint `admin-post.php?action=cec_org_upload`, one photo per request, with the editor's own nonce. The old one-request upload stays as the no-JavaScript fallback.
+- **Uploaded photos survive a refresh**: they're stored on the server, not on the page, until you save with the consent box ticked.
+- **Everything typed is kept as a draft in your browser:** name, card text, bullet points, bio, mission, title, links, captions and photo removals.
+  - After a refresh it's brought back with a note ("…They aren't live until you save.") and a **Discard them** button.
+  - Saving clears the draft. Drafts older than 14 days are ignored.
+  - Leaving or refreshing with unsaved changes asks first.
+- **Verification** (local WordPress 7.1.2):
+  - `tests/org-e2e.sh` 106/106, with 5 new checks for the upload endpoint: a photo is stored and kept off the page; a non-image gets a clear error; non-editors, a bad nonce and signed-out requests are refused.
+  - In Chromium on the local site:
+    - Typed bio, card text and an Instagram link survived a refresh, with the notice shown.
+    - 17 photos uploaded one by one ("All photos uploaded…"). After removing 2 and typing a caption, a second refresh kept 15 photos and the caption.
+    - Saving with the box ticked put exactly those 15 in the gallery with the caption, deleted the 2 removed photos and cleared the draft.
+  - `calendar-e2e.sh` 73/73. `php -l` on every changed file.
+
+---
+
 ## 1.37.0
 
 **The page editor never throws work away, and takes photos in bulk** (owner, 2026-10-10: "because I didn't enter a name it wiped out all my work for editing my profile and that's a problem. I should also be able to upload photos in bulk").
