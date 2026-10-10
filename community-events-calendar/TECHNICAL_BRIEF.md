@@ -257,7 +257,7 @@ This appendix exists because the main body of this document describes architectu
 | `cec_country` | string (free text) | |
 | `cec_timezone` | string | A valid IANA timezone name, or empty. If empty, an event at this venue falls back to the site's own timezone. |
 
-(Pre-existing term meta on `cec_venue`, unchanged: `cec_url`, `cec_address`. Pre-existing term meta on `cec_partner_org`, unchanged: `cec_url`, `cec_logo`, `cec_default_coc`, `cec_default_rsvp_mode`, `cec_default_rsvp_url`.)
+(Pre-existing term meta on `cec_venue`, unchanged: `cec_url`, `cec_address`. Pre-existing term meta on `cec_partner_org`, unchanged: `cec_url`, `cec_logo`, `cec_default_coc`, `cec_default_rsvp_mode`, `cec_default_rsvp_url`. 1.34.0 adds `cec_kind` (organization|titleholder), `cec_listed`, `cec_order`, `cec_highlights`, `cec_mission`, `cec_title`, `cec_title_year`, `cec_title_producer`, `cec_socials` (array; `cec_url` mirrors its website), `cec_logo_id`, `cec_contact` (private: name/email/phone) — see `includes/class-cec-orgs.php`; submissions are the non-public `cec_org_submission` post type in `includes/class-cec-org-submissions.php`.)
 
 ### A4. Plugin settings added in Phase 1 (stored inside the single `cec_settings` option, under `CEC_Admin_Settings`)
 

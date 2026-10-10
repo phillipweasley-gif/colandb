@@ -771,3 +771,11 @@
 .cmp-member-area .cmp-app-done { color: var(--cmp-primary); font-weight: 600; }
 .cmp-member-area #cmp-app .cmp-app-install { margin: 0 0 16px; }
 .cmp-member-area button.cmp-app-later { all: unset; box-sizing: border-box; min-height: 44px; padding: 0 8px; display: inline-flex; align-items: center; color: var(--cmp-muted) !important; text-decoration: underline !important; cursor: pointer; font-size: 14px; }
+
+/* Groups and titles (0.20.0) */
+.cmp-member-area .cmp-group-list { list-style: none; margin: 0 0 14px; padding: 0; }
+.cmp-member-area .cmp-group-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+.cmp-member-area .cmp-group-list form { margin: 0 0 0 auto; }
+.cmp-member-area .cmp-group-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cmp-member-area .cmp-group-add select { min-height: 44px; max-width: 100%; }
+.cmp-member-area .cmp-pv-groups { margin: 4px 0 0; }

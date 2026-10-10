@@ -1,0 +1,137 @@
+/* Community Events Calendar 1.34.0: organization & titleholder pages
+   (/partner/<slug>/), the [cec_partner_orgs] grid and the [cec_submit_org]
+   form. Matches the homepage's look (Montserrat 900 pink headings, lime
+   rules, pink square buttons that turn lime, #100F0F / #1A1A1A surfaces).
+   Visual properties of links and buttons use !important because the theme
+   styles them globally (same rule as frontend.css). */
+
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&family=Inter:wght@400;600;700&display=swap');
+
+.cec-org-hero, .cec-org-card, .cec-org-grid, .cec-org-form-wrap, .cec-org-events-head {
+	--org-pink: #FF50D7;
+	--org-lime: #E1F577;
+	--org-ink: #100F0F;
+	--org-panel: #1A1A1A;
+	--org-text: #FFFFFF;
+	--org-muted: #CCCCCC;
+	box-sizing: border-box;
+	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.cec-org-hero *, .cec-org-grid *, .cec-org-form-wrap * { box-sizing: border-box; }
+
+/* ---- Page: hero ---- */
+.cec-taxonomy-archive.is-partner-org { padding-top: 0; }
+.cec-org-hero {
+	display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2.5rem 3rem;
+	padding: 5rem 2rem; background: var(--org-ink); color: var(--org-text);
+}
+.cec-org-main { flex: 1 1 26rem; max-width: 52rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1.25rem; }
+.cec-org-eyebrow { margin: 0; font-weight: 800; font-size: 0.875rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--org-lime); }
+.cec-org-name {
+	margin: 0; font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 900 !important;
+	font-size: clamp(2.2rem, 6vw, 3.5rem); line-height: 1.1; letter-spacing: 0.05em; text-transform: uppercase; color: var(--org-pink) !important;
+	overflow-wrap: anywhere;
+}
+.cec-org-rule { width: 120px; margin: 0; border: 0; border-top: 4px solid var(--org-lime); }
+.cec-org-desc p { margin: 0 0 0.75em; font-size: 1.125rem; line-height: 1.6; color: var(--org-text); }
+.cec-org-highlights { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
+.cec-org-highlights li { padding: 0.4rem 0.9rem; border: 1px solid var(--org-pink); color: var(--org-text); font-weight: 600; font-size: 0.95rem; }
+.cec-org-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; margin-top: 0.5rem; }
+.cec-org-btn, a.cec-org-btn {
+	display: inline-flex !important; align-items: center; justify-content: center; min-height: 44px;
+	padding: 0.85rem 1.75rem !important; border: 2px solid var(--org-lime) !important; border-radius: 0 !important;
+	background: transparent !important; color: var(--org-lime) !important;
+	font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 900 !important; font-size: 0.85rem !important;
+	letter-spacing: 0.05em; text-transform: uppercase; text-decoration: none !important; box-shadow: none !important;
+}
+.cec-org-btn:hover, .cec-org-btn:focus-visible { background: var(--org-lime) !important; color: var(--org-ink) !important; }
+.cec-org-btn.is-primary { background: var(--org-pink) !important; border-color: var(--org-pink) !important; color: var(--org-ink) !important; }
+.cec-org-btn.is-primary:hover, .cec-org-btn.is-primary:focus-visible { background: var(--org-lime) !important; border-color: var(--org-lime) !important; }
+.cec-org-btn:focus-visible { outline: 3px solid var(--org-pink) !important; outline-offset: 2px; }
+.cec-org-media { flex: 0 0 auto; width: 320px; max-width: 100%; }
+.cec-org-image { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 50%; }
+
+/* ---- Page: mission card ---- */
+.cec-org-card {
+	max-width: 52rem; margin: 0 auto 3rem; padding: 2.5rem 2rem; background: var(--org-panel);
+	border: 3px solid var(--org-lime); color: var(--org-muted);
+}
+.cec-org-card h2 { margin: 0 0 1rem; font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 900 !important; font-size: 1.75rem; text-transform: uppercase; color: var(--org-text) !important; }
+.cec-org-card p { margin: 0 0 0.75em; line-height: 1.6; }
+.cec-org-member-list { list-style: none; margin: 0 0 1.25rem; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.75rem; }
+.cec-org-member a { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; padding: 1rem; border: 1px solid var(--org-pink); color: var(--org-text) !important; text-decoration: none !important; text-align: center; }
+.cec-org-member a:hover, .cec-org-member a:focus-visible { border-color: var(--org-lime); }
+.cec-org-member-av { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #2a2a2a; font-weight: 900; font-size: 1.5rem; color: var(--org-pink); }
+.cec-org-member-av img { width: 100%; height: 100%; object-fit: cover; }
+.cec-org-member-name { font-weight: 700; overflow-wrap: anywhere; }
+.cec-org-member-role { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--org-lime); }
+.cec-org-events-head { text-align: center; }
+.cec-org-events-head h2 { font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 900 !important; text-transform: uppercase; color: var(--org-pink) !important; letter-spacing: 0.05em; }
+
+/* ---- [cec_partner_orgs] grid (homepage) ---- */
+.cec-org-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; width: 100%; max-width: 75rem; margin: 0 auto; }
+.cec-org-tile {
+	display: flex; flex-direction: column; gap: 0.75rem; padding: 2rem; background: var(--org-panel);
+	border: 1px solid var(--org-pink); color: var(--org-muted); transition: border-color .15s, background-color .15s;
+}
+.cec-org-tile:hover, .cec-org-tile:focus-within { border-color: var(--org-lime); background: #221321; }
+.cec-org-tile-head { display: flex; align-items: center; gap: 0.85rem; }
+.cec-org-tile-media { flex: 0 0 auto; width: 56px; height: 56px; }
+.cec-org-tile-image { width: 56px !important; height: 56px !important; object-fit: cover; border-radius: 50%; display: block; }
+.cec-org-tile h3 { margin: 0; font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 800 !important; font-size: 1.25rem; text-transform: uppercase; color: var(--org-text) !important; overflow-wrap: anywhere; }
+.cec-org-tile-title { margin: 0; font-weight: 800; font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--org-lime); }
+.cec-org-tile-desc { margin: 0; font-size: 0.95rem; line-height: 1.5; }
+.cec-org-tile-list { margin: 0; padding-left: 1.1rem; font-size: 0.95rem; line-height: 1.6; }
+.cec-org-tile-list li::marker { color: var(--org-lime); }
+a.cec-org-tile-btn, .cec-org-tile-btn {
+	margin-top: auto; align-self: flex-start; display: inline-block !important;
+	padding: 0.75rem 1.25rem !important; background: var(--org-pink) !important; color: var(--org-ink) !important;
+	font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 900 !important; font-size: 0.8rem !important;
+	letter-spacing: 0.05em; text-transform: uppercase; text-decoration: none !important; border: 0 !important; border-radius: 0 !important;
+}
+a.cec-org-tile-btn:hover, a.cec-org-tile-btn:focus-visible { background: var(--org-lime) !important; }
+.cec-org-grid .screen-reader-text, .cec-org-form-wrap .screen-reader-text {
+	border: 0; clip: rect(1px, 1px, 1px, 1px); clip-path: inset(50%); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute !important; width: 1px;
+}
+
+/* ---- [cec_submit_org] form ---- */
+.cec-org-form-wrap { max-width: 46rem; margin: 0 auto; padding: 2rem; background: var(--org-panel); border: 1px solid var(--org-pink); color: var(--org-text); }
+.cec-org-form fieldset { border: 0; margin: 0 0 1.25rem; padding: 0; }
+.cec-org-form legend { font-family: 'Montserrat', 'Arial Black', sans-serif; font-weight: 900; text-transform: uppercase; color: var(--org-pink); margin-bottom: 0.75rem; letter-spacing: 0.04em; }
+.cec-org-kind label { display: inline-flex; align-items: center; gap: 0.5rem; margin: 0 1.5rem 0.5rem 0; min-height: 44px; font-weight: 600; }
+.cec-org-field { display: flex; flex-direction: column; gap: 0.35rem; margin: 0 0 1rem; }
+.cec-org-field label { font-weight: 700; }
+.cec-org-field input[type="text"], .cec-org-field input[type="email"], .cec-org-field input[type="tel"], .cec-org-field input[type="url"], .cec-org-field input[type="number"], .cec-org-field textarea {
+	width: 100%; min-height: 44px; padding: 0.65rem 0.85rem !important; background: #0f0d16 !important; color: var(--org-text) !important;
+	border: 1px solid rgba(255, 255, 255, 0.35) !important; border-radius: 0 !important; font: inherit; font-size: 16px !important;
+}
+.cec-org-field input:focus-visible, .cec-org-field textarea:focus-visible { outline: 3px solid var(--org-lime); outline-offset: 1px; }
+.cec-org-field input[type="file"] { color: var(--org-text); }
+.cec-org-hint { font-size: 0.875rem; color: var(--org-muted); }
+.cec-org-row { display: flex; flex-wrap: wrap; gap: 0 1rem; }
+.cec-org-row .cec-org-field { flex: 1 1 12rem; }
+.cec-org-row .cec-org-year { flex: 0 0 7rem; }
+.cec-org-check label { display: flex; gap: 0.6rem; align-items: flex-start; font-weight: 600; }
+.cec-org-check input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--org-lime); flex: 0 0 auto; }
+.cec-org-hp { position: absolute !important; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+button.cec-org-submit {
+	min-height: 48px; padding: 0.9rem 2.5rem !important; background: var(--org-pink) !important; color: var(--org-ink) !important; border: 0 !important; border-radius: 0 !important;
+	font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 900 !important; font-size: 0.9rem !important; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer;
+}
+button.cec-org-submit:hover, button.cec-org-submit:focus-visible { background: var(--org-lime) !important; }
+.cec-org-notice { padding: 1rem 1.25rem; margin: 0 0 1.5rem; border-left: 4px solid var(--org-lime); background: #0f0d16; }
+.cec-org-notice.is-error { border-left-color: #ff6b6b; }
+.cec-org-notice h2 { margin: 0 0 0.5rem; color: var(--org-lime) !important; font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 900 !important; text-transform: uppercase; font-size: 1.25rem; }
+.cec-org-notice ul { margin: 0.25rem 0 0; padding-left: 1.2rem; }
+[data-cec-kind][hidden] { display: none !important; }
+
+@media (max-width: 1024px) {
+	.cec-org-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+	.cec-org-hero { flex-direction: column-reverse; padding: 3.5rem 1rem; }
+	.cec-org-media { width: 220px; }
+	.cec-org-grid { grid-template-columns: 1fr; }
+	.cec-org-card { margin: 0 1rem 2rem; padding: 2rem 1.25rem; }
+	.cec-org-form-wrap { padding: 1.25rem; }
+}

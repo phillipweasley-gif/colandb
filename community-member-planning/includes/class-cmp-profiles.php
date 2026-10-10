@@ -645,6 +645,7 @@ class CMP_Profiles {
 		<?php echo CMP_Profile_Images::render_panels( $user_id, $rows ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 
 		<?php echo CMP_Follows::settings_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
+		<?php echo CMP_Groups::settings_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 		<?php echo CMP_Directory::settings_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 
 		<section class="cmp-panel" id="cmp-about">
@@ -938,7 +939,7 @@ class CMP_Profiles {
 				$user_id,
 				true,
 				array(
-					'counts' => CMP_Follows::counts_html( $user_id ),
+					'counts' => CMP_Follows::counts_html( $user_id ) . CMP_Groups::profile_html( $user_id ),
 					'going'  => CMP_Calendar::profile_html( $user_id, $user_id, true ),
 					'posts'  => CMP_Feed::profile_html( $user_id, $user_id, true ),
 				)
@@ -973,7 +974,7 @@ class CMP_Profiles {
 					false,
 					array(
 						'actions' => CMP_Messages::profile_actions_html( $viewer, $owner_id, false ),
-						'counts'  => CMP_Follows::counts_html( $owner_id ),
+						'counts'  => CMP_Follows::counts_html( $owner_id ) . CMP_Groups::profile_html( $owner_id ),
 						'going'   => CMP_Calendar::profile_html( $owner_id, $viewer ),
 						'posts'   => CMP_Feed::profile_html( $owner_id, $viewer ),
 					)
