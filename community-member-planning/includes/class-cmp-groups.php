@@ -405,6 +405,11 @@ class CMP_Groups {
 			$html .= '</select> <button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Link my profile', 'cmp' ) . '</button></form>';
 		}
 		$html .= '<p class="cmp-muted">' . esc_html__( 'Organizer and Titleholder are added when the site approves a group\'s submission that names you.', 'cmp' ) . '</p>';
+		// 0.23.1: where to send a new organization or title.
+		$submit = get_page_by_path( 'submit-organization' );
+		if ( $submit && 'publish' === $submit->post_status ) {
+			$html .= '<p>' . esc_html__( 'Run a group or hold a title?', 'cmp' ) . ' <a class="cmp-btn cmp-btn-small" href="' . esc_url( get_permalink( $submit ) ) . '">' . esc_html__( 'Submit it to be listed', 'cmp' ) . '</a></p>';
+		}
 		return $html . '</section>';
 	}
 

@@ -99,6 +99,17 @@ class CEC_Org_Submissions {
 			$errors = $saved ? $saved['errors'] : array( __( 'Your session expired. Please fill in the form again.', 'cec' ) );
 			$old    = $saved ? $saved['old'] : array();
 		}
+		// 1.39.1: a fresh form opens on ?kind=titleholder when linked that way,
+		// and a signed-in member's contact details and username are filled in.
+		if ( ! $old ) {
+			$old['kind'] = isset( $_GET['kind'] ) && 'titleholder' === $_GET['kind'] ? 'titleholder' : 'organization'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$me          = wp_get_current_user();
+			if ( $me && $me->exists() ) {
+				$old['contact_name']  = $me->display_name;
+				$old['contact_email'] = $me->user_email;
+				$old['member']        = $me->user_login;
+			}
+		}
 		$v = function ( $k ) use ( $old ) {
 			return isset( $old[ $k ] ) && is_string( $old[ $k ] ) ? $old[ $k ] : '';
 		};

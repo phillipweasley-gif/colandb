@@ -6,6 +6,18 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.39.1
+
+**The submission form is easier to reach and quicker to fill in** (owner, 2026-10-10: "how will new members/titleholders submit their information? It needs to be available to them to submit").
+
+- `[cec_submit_org]` opens on **Titleholder** when linked with `?kind=titleholder`; the Titleholders page's "Submit your title" button uses this.
+- **Signed-in visitors** get their name, email and member username filled in, so an approved listing links to their account. Signed-out visitors see an empty form.
+- **Gallery photos are no longer cropped** (owner: "The crop of these photos is weird"). Every photo was forced into a 4:3 landscape box, cutting heads and feet off portrait phone photos. Each photo now shows at its own shape, left to right in gallery order: 3 columns on wide screens, then 2, then 1.
+- **On the site, outside the code:** links to the form were added in the footer's Resources menu, on the Organizations and Titleholders pages, and as a homepage button under the listings.
+- **Verification** (local WordPress 7.1.2): `tests/org-e2e.sh` 128/128, with new checks for `?kind=titleholder`, no prefill when signed out, and prefill when signed in. `php -l`.
+
+---
+
 ## 1.39.0
 
 **Menu dropdowns for organizations and titleholders; a titleholder's events on their page** (owner, 2026-10-10: "In the header menu there should be a place for MEMBER & AFFILIATED ORGANIZATIONS and TITLEHOLDERS"; "Any events that I'm attending that are publicly available via my calendar as a member should show here").
