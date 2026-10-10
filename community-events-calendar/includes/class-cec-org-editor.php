@@ -25,13 +25,19 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Gallery: term meta cec_gallery = list of array( id, caption ). Each
  *   image is a media-library attachment marked _cec_org_gallery_term, and
  *   is deleted when removed from the gallery.
+ * - 1.37.0: a save keeps every valid change and lists what it couldn't use
+ *   (nothing is thrown away); photos are added many at a time (photos[]);
+ *   photos added without the consent box wait, marked _cec_org_held_term /
+ *   _cec_org_held_by, until the uploader confirms.
  */
 class CEC_Org_Editor {
 
 	const ACTION      = 'cec_org_edit';
 	const RESTORE     = 'cec_org_restore';
-	const MAX_GALLERY = 30;
-	const NEW_SLOTS   = 6;
+	const MAX_GALLERY = 60;
+	const BULK_MAX    = 15;          // Photos per save (the server takes 20 files per request).
+	const PHOTO_BYTES = 10485760;    // 10 MB each.
+	const SAVE_BYTES  = 94371840;    // 90 MB per save (the CDN refuses requests over 100 MB).
 	const HISTORY     = 10;
 
 	public static function init() {
@@ -142,15 +148,14 @@ class CEC_Org_Editor {
 			return '';
 		}
 		wp_enqueue_style( 'cec-orgs' );
-		$saved  = get_transient( self::err_key( $p['id'] ) );
-		$errors = $saved ? (array) $saved['errors'] : array();
-		$old    = $saved ? (array) $saved['old'] : array();
-		if ( $saved ) {
-			delete_transient( self::err_key( $p['id'] ) );
-		}
-		$v = function ( $k, $current ) use ( $old ) {
-			return array_key_exists( $k, $old ) && is_string( $old[ $k ] ) ? $old[ $k ] : $current;
+		$notes = (array) get_transient( self::err_key( $p['id'] ) );
+		$notes = array_values( array_filter( $notes, 'is_string' ) );
+		delete_transient( self::err_key( $p['id'] ) );
+		$old = array();
+		$v   = function ( $k, $current ) {
+			return $current;
 		};
+		$held = self::held( $p['id'] );
 		$is_title = 'titleholder' === $p['kind'];
 		$gallery  = self::gallery( $p['id'] );
 		ob_start();
@@ -158,13 +163,13 @@ class CEC_Org_Editor {
 		<section class="cec-org-form-wrap cec-org-editor" aria-labelledby="cec-org-edit-title">
 			<h1 id="cec-org-edit-title" class="cec-org-edit-title"><?php echo esc_html( sprintf( /* translators: %s: group name */ __( 'Edit: %s', 'cec' ), $p['name'] ) ); ?></h1>
 			<p><?php esc_html_e( 'Changes go live as soon as you save. The COL&B team is told about each change. To change the name or ask for anything else, contact the team.', 'cec' ); ?> <a href="<?php echo esc_url( $p['url'] ); ?>"><?php esc_html_e( 'Back to the page', 'cec' ); ?></a></p>
-			<?php if ( $errors ) : ?>
+			<?php if ( $notes ) : ?>
 				<div class="cec-org-notice is-error" role="alert" tabindex="-1" id="cec-org-errors">
-					<p><strong><?php esc_html_e( 'Nothing was saved. Please fix the following:', 'cec' ); ?></strong></p>
-					<ul><?php foreach ( $errors as $e ) : ?><li><?php echo esc_html( $e ); ?></li><?php endforeach; ?></ul>
+					<p><strong><?php esc_html_e( 'Your other changes were saved and are live. These weren\'t changed:', 'cec' ); ?></strong></p>
+					<ul><?php foreach ( $notes as $e ) : ?><li><?php echo esc_html( $e ); ?></li><?php endforeach; ?></ul>
 				</div>
 			<?php endif; ?>
-			<form class="cec-org-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
+			<form class="cec-org-form" id="cec-org-edit-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
 				<input type="hidden" name="action" value="<?php echo esc_attr( self::ACTION ); ?>" />
 				<input type="hidden" name="term" value="<?php echo (int) $p['id']; ?>" />
 				<?php wp_nonce_field( 'cec_org_edit_' . $p['id'], '_cec_nonce' ); ?>
@@ -202,7 +207,7 @@ class CEC_Org_Editor {
 				<fieldset>
 					<legend><?php esc_html_e( 'Links', 'cec' ); ?></legend>
 					<?php foreach ( CEC_Orgs::socials() as $k => $label ) : ?>
-						<?php $val = isset( $old['social'][ $k ] ) && is_string( $old['social'][ $k ] ) ? $old['social'][ $k ] : ( $p['socials'][ $k ] ?? '' ); ?>
+						<?php $val = $p['socials'][ $k ] ?? ''; ?>
 						<p class="cec-org-field"><label for="e_s_<?php echo esc_attr( $k ); ?>"><?php echo esc_html( $label ); ?></label>
 							<input type="url" id="e_s_<?php echo esc_attr( $k ); ?>" name="social[<?php echo esc_attr( $k ); ?>]" placeholder="<?php echo esc_attr( 'telegram' === $k ? 'https://t.me/+…' : 'https://' ); ?>" value="<?php echo esc_attr( $val ); ?>" /></p>
 					<?php endforeach; ?>
@@ -217,7 +222,7 @@ class CEC_Org_Editor {
 							<p class="cec-org-check"><label><input type="checkbox" name="remove_photo" value="1" /> <?php esc_html_e( 'Remove it', 'cec' ); ?></label></p></div>
 					<?php endif; ?>
 					<p class="cec-org-field"><label for="e_photo"><?php echo esc_html( $img ? __( 'Replace with a new image (optional)', 'cec' ) : __( 'Add an image (optional)', 'cec' ) ); ?></label>
-						<input type="file" id="e_photo" name="photo" accept="image/jpeg,image/png,image/webp" /><span class="cec-org-hint"><?php esc_html_e( 'JPEG, PNG or WebP, up to 5 MB. Shown in a circle, so a square image works best.', 'cec' ); ?></span></p>
+						<input type="file" id="e_photo" name="photo" accept="image/jpeg,image/png,image/webp" /><span class="cec-org-hint"><?php esc_html_e( 'JPEG, PNG or WebP, up to 10 MB. Shown in a circle, so a square image works best.', 'cec' ); ?></span></p>
 				</fieldset>
 
 				<fieldset>
@@ -241,22 +246,66 @@ class CEC_Org_Editor {
 							<?php endforeach; ?>
 						</ul>
 					<?php endif; ?>
+					<?php if ( $held ) : ?>
+						<div class="cec-org-held">
+							<p><strong><?php esc_html_e( 'Uploaded, not on your page yet', 'cec' ); ?></strong> <span class="cec-org-hint"><?php esc_html_e( 'Tick the box below and save to add these to your gallery.', 'cec' ); ?></span></p>
+							<ul class="cec-org-edit-gallery">
+								<?php foreach ( $held as $h ) : ?>
+									<li>
+										<?php echo wp_get_attachment_image( $h['id'], 'thumbnail', false, array( 'alt' => '' ) ); ?>
+										<div>
+											<p class="cec-org-field"><label for="h_cap_<?php echo (int) $h['id']; ?>"><?php esc_html_e( 'Caption', 'cec' ); ?></label>
+												<input type="text" id="h_cap_<?php echo (int) $h['id']; ?>" name="held[<?php echo (int) $h['id']; ?>][caption]" maxlength="200" value="<?php echo esc_attr( $h['caption'] ); ?>" /></p>
+											<p class="cec-org-check"><label><input type="checkbox" name="held[<?php echo (int) $h['id']; ?>][remove]" value="1" /> <?php esc_html_e( 'Delete this photo', 'cec' ); ?></label></p>
+										</div>
+									</li>
+								<?php endforeach; ?>
+							</ul>
+						</div>
+					<?php endif; ?>
 					<?php if ( count( $gallery ) < self::MAX_GALLERY ) : ?>
-						<p><strong><?php esc_html_e( 'Add photos', 'cec' ); ?></strong> <span class="cec-org-hint"><?php echo esc_html( sprintf( /* translators: %d: photos per save */ __( 'Up to %d at a time; JPEG, PNG or WebP, up to 5 MB each.', 'cec' ), self::NEW_SLOTS ) ); ?></span></p>
-						<?php for ( $n = 1; $n <= self::NEW_SLOTS; $n++ ) : ?>
-							<div class="cec-org-row cec-org-new-photo">
-								<p class="cec-org-field"><label for="g_new_<?php echo (int) $n; ?>"><?php echo esc_html( sprintf( /* translators: %d: slot number */ __( 'New photo %d', 'cec' ), $n ) ); ?></label>
-									<input type="file" id="g_new_<?php echo (int) $n; ?>" name="new_photo_<?php echo (int) $n; ?>" accept="image/jpeg,image/png,image/webp" /></p>
-								<p class="cec-org-field"><label for="g_newcap_<?php echo (int) $n; ?>"><?php esc_html_e( 'Caption', 'cec' ); ?></label>
-									<input type="text" id="g_newcap_<?php echo (int) $n; ?>" name="new_caption_<?php echo (int) $n; ?>" maxlength="200" placeholder="<?php esc_attr_e( 'e.g. Judging at Great Lakes Leather 2026', 'cec' ); ?>" /></p>
-							</div>
-						<?php endfor; ?>
+						<p class="cec-org-field"><label for="g_bulk"><?php esc_html_e( 'Add photos', 'cec' ); ?></label>
+							<input type="file" id="g_bulk" name="photos[]" multiple accept="image/jpeg,image/png,image/webp" />
+							<span class="cec-org-hint"><?php echo esc_html( sprintf( /* translators: 1: photos per save, 2: total photos */ __( 'Select several at once (hold Ctrl or ⌘, or pick several on your phone): up to %1$d per save, %2$d in the gallery. JPEG, PNG or WebP, up to 10 MB each. They\'re added at the end; add captions and change the order after saving.', 'cec' ), self::BULK_MAX, self::MAX_GALLERY ) ); ?></span>
+							<span class="cec-org-hint" id="g_bulk_status" aria-live="polite"></span></p>
+					<?php endif; ?>
+					<?php if ( $held || count( $gallery ) < self::MAX_GALLERY ) : ?>
 						<p class="cec-org-check"><label><input type="checkbox" name="consent" value="1" /> <?php esc_html_e( 'Everyone who can be recognised in the photos I\'m adding agreed to be shown publicly on this site.', 'cec' ); ?></label></p>
+						<p class="cec-org-hint"><?php esc_html_e( 'Without this box ticked, new photos are kept here (not on your page) until you confirm.', 'cec' ); ?></p>
 					<?php endif; ?>
 				</fieldset>
 
 				<p><button type="submit" class="cec-org-submit"><?php esc_html_e( 'Save changes', 'cec' ); ?></button></p>
 			</form>
+			<script>
+			( function () {
+				// Check photos before sending, so a too-big upload never loses the
+				// rest of the form (the CDN refuses requests over 100 MB).
+				var form = document.getElementById( 'cec-org-edit-form' );
+				if ( ! form ) { return; }
+				var bulk = document.getElementById( 'g_bulk' ), status = document.getElementById( 'g_bulk_status' );
+				var max = <?php echo (int) self::BULK_MAX; ?>, each = <?php echo (int) self::PHOTO_BYTES; ?>, total = <?php echo (int) self::SAVE_BYTES; ?>;
+				function problem() {
+					var files = [], sum = 0, big = [];
+					form.querySelectorAll( 'input[type=file]' ).forEach( function ( i ) { Array.prototype.forEach.call( i.files || [], function ( f ) { files.push( f ); } ); } );
+					files.forEach( function ( f ) { sum += f.size; if ( f.size > each ) { big.push( f.name ); } } );
+					if ( bulk && bulk.files && bulk.files.length > max ) { return <?php echo wp_json_encode( sprintf( /* translators: %d: photos per save */ __( 'Please choose up to %d photos per save. Save, then add the rest.', 'cec' ), self::BULK_MAX ) ); ?>; }
+					if ( big.length ) { return <?php echo wp_json_encode( __( 'These photos are larger than 10 MB:', 'cec' ) ); ?> + ' ' + big.join( ', ' ); }
+					if ( sum > total ) { return <?php echo wp_json_encode( __( 'These photos add up to more than 90 MB. Please save fewer at a time.', 'cec' ) ); ?>; }
+					return '';
+				}
+				if ( bulk ) {
+					bulk.addEventListener( 'change', function () {
+						var msg = problem();
+						status.textContent = msg || ( bulk.files.length ? bulk.files.length + ' ' + <?php echo wp_json_encode( __( 'photo(s) ready to add.', 'cec' ) ); ?> : '' );
+					} );
+				}
+				form.addEventListener( 'submit', function ( ev ) {
+					var msg = problem();
+					if ( msg ) { ev.preventDefault(); window.alert( msg ); }
+				} );
+			} )();
+			</script>
 		</section>
 		<?php
 		return ob_get_clean();
@@ -297,6 +346,59 @@ class CEC_Org_Editor {
 		update_term_meta( $term_id, 'cec_profile_history', array_slice( $h, 0, self::HISTORY ) );
 	}
 
+	/** Uploaded files of a multiple <input name="photos[]">, one array per file. */
+	private static function files( $field ) {
+		$out = array();
+		$f   = isset( $_FILES[ $field ] ) && is_array( $_FILES[ $field ] ) ? $_FILES[ $field ] : null; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput,WordPress.Security.NonceVerification.Missing
+		if ( ! $f || ! is_array( $f['name'] ?? null ) ) {
+			return $out;
+		}
+		foreach ( array_keys( $f['name'] ) as $i ) {
+			if ( UPLOAD_ERR_NO_FILE === (int) $f['error'][ $i ] ) {
+				continue;
+			}
+			$out[] = array(
+				'name'     => (string) $f['name'][ $i ],
+				'type'     => (string) $f['type'][ $i ],
+				'tmp_name' => (string) $f['tmp_name'][ $i ],
+				'error'    => (int) $f['error'][ $i ],
+				'size'     => (int) $f['size'][ $i ],
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Photos this user uploaded for this group without confirming consent
+	 * (1.37.0): kept out of the gallery until they tick the box.
+	 */
+	public static function held( $term_id, $user_id = 0 ) {
+		$ids = get_posts(
+			array(
+				'post_type'      => 'attachment',
+				'post_status'    => 'inherit',
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
+				'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+					array( 'key' => '_cec_org_held_term', 'value' => (int) $term_id ),
+					array( 'key' => '_cec_org_held_by', 'value' => (int) ( $user_id ? $user_id : get_current_user_id() ) ),
+				),
+			)
+		);
+		$out = array();
+		foreach ( $ids as $id ) {
+			$out[] = array( 'id' => (int) $id, 'caption' => (string) get_post_meta( $id, '_cec_org_held_caption', true ) );
+		}
+		return $out;
+	}
+
+	/**
+	 * Saves what is valid and keeps the current value of anything that
+	 * isn't, then lists what wasn't changed (1.37.0). Nothing typed or
+	 * uploaded is thrown away because of one bad field.
+	 */
 	public static function handle() {
 		$term_id = isset( $_POST['term'] ) ? absint( $_POST['term'] ) : 0;
 		$term    = $term_id ? get_term( $term_id, 'cec_partner_org' ) : null;
@@ -304,10 +406,10 @@ class CEC_Org_Editor {
 			wp_die( esc_html__( 'You can\'t edit this page.', 'cec' ), 403 );
 		}
 		check_admin_referer( 'cec_org_edit_' . $term_id, '_cec_nonce' );
-		$post = wp_unslash( $_POST );
-		$p    = CEC_Orgs::profile( $term );
-		$e    = array();
-		$s    = function ( $k, $max, $multi = false ) use ( $post ) {
+		$post  = wp_unslash( $_POST );
+		$p     = CEC_Orgs::profile( $term );
+		$notes = array();
+		$s     = function ( $k, $max, $multi = false ) use ( $post ) {
 			$raw = isset( $post[ $k ] ) && is_scalar( $post[ $k ] ) ? (string) $post[ $k ] : '';
 			return mb_substr( trim( $multi ? sanitize_textarea_field( $raw ) : sanitize_text_field( $raw ) ), 0, $max );
 		};
@@ -324,47 +426,51 @@ class CEC_Org_Editor {
 			'socials'     => array(),
 		);
 		if ( '' === $new['name'] ) {
-			$e[] = __( 'Please enter a name.', 'cec' );
+			/* translators: %s: current name */
+			$notes[]     = sprintf( __( 'Name: it can\'t be empty, so it stays "%s".', 'cec' ), $p['name'] );
+			$new['name'] = $p['name'];
 		} else {
 			$same = get_term_by( 'name', $new['name'], 'cec_partner_org' );
 			if ( $same && (int) $same->term_id !== (int) $term_id ) {
-				/* translators: %s: name */
-				$e[] = sprintf( __( '"%s" is already the name of another group on the site. Please choose a different name.', 'cec' ), $new['name'] );
+				/* translators: 1: wanted name, 2: current name */
+				$notes[]     = sprintf( __( 'Name: "%1$s" is already the name of another group on the site, so it stays "%2$s".', 'cec' ), $new['name'], $p['name'] );
+				$new['name'] = $p['name'];
 			}
 		}
 		if ( '' === $new['description'] ) {
-			$e[] = $is_title ? __( 'Please write a short bio.', 'cec' ) : __( 'Please write a short description.', 'cec' );
+			$notes[]            = $is_title ? __( 'Bio: it can\'t be empty, so the previous bio was kept.', 'cec' ) : __( 'Description: it can\'t be empty, so the previous description was kept.', 'cec' );
+			$new['description'] = $p['description'];
 		}
 		if ( '' !== $new['year'] && ! preg_match( '/^(19|20|21)\d{2}$/', $new['year'] ) ) {
-			$e[] = __( 'The year should be four digits, e.g. 2026.', 'cec' );
+			/* translators: %s: what was typed */
+			$notes[]     = sprintf( __( 'Year: "%s" isn\'t a four-digit year, so the previous year was kept.', 'cec' ), $new['year'] );
+			$new['year'] = $p['year'];
 		}
 		$social = isset( $post['social'] ) && is_array( $post['social'] ) ? $post['social'] : array();
-		foreach ( array_keys( CEC_Orgs::socials() ) as $k ) {
-			$clean = CEC_Orgs::clean_social( $k, isset( $social[ $k ] ) && is_scalar( $social[ $k ] ) ? $social[ $k ] : '' );
+		$labels = CEC_Orgs::socials();
+		foreach ( array_keys( $labels ) as $k ) {
+			$raw   = isset( $social[ $k ] ) && is_scalar( $social[ $k ] ) ? (string) $social[ $k ] : '';
+			$clean = CEC_Orgs::clean_social( $k, $raw );
 			if ( is_wp_error( $clean ) ) {
-				$e[] = $clean->get_error_message();
+				/* translators: 1: link name, 2: what was typed, 3: problem */
+				$notes[] = sprintf( __( '%1$s link "%2$s": %3$s The previous link was kept.', 'cec' ), $labels[ $k ], sanitize_text_field( $raw ), $clean->get_error_message() );
+				if ( ! empty( $p['socials'][ $k ] ) ) {
+					$new['socials'][ $k ] = $p['socials'][ $k ];
+				}
 			} elseif ( '' !== $clean ) {
 				$new['socials'][ $k ] = $clean;
 			}
 		}
 
-		// Images: check everything before storing anything.
-		$photo = self::file( 'photo' );
-		if ( $photo ) {
-			$c = CEC_Org_Submissions::check_image( $photo );
-			if ( is_wp_error( $c ) ) {
-				/* translators: %s: problem */
-				$e[] = sprintf( __( 'Photo: %s', 'cec' ), $c->get_error_message() );
-			}
-		}
+		// Existing gallery: captions, order, removals.
 		$current = self::gallery( $term_id );
 		$posted  = isset( $post['gallery'] ) && is_array( $post['gallery'] ) ? $post['gallery'] : array();
 		$keep    = array();
-		$removed = array();
+		$removed = 0;
 		foreach ( $current as $i => $item ) {
 			$row = isset( $posted[ $item['id'] ] ) && is_array( $posted[ $item['id'] ] ) ? $posted[ $item['id'] ] : array();
 			if ( ! empty( $row['remove'] ) ) {
-				$removed[] = $item['id'];
+				++$removed;
 				continue;
 			}
 			$keep[] = array(
@@ -380,63 +486,102 @@ class CEC_Org_Editor {
 				return ( $a['order'] <=> $b['order'] ) ?: ( $a['i'] <=> $b['i'] );
 			}
 		);
-		$adds = array();
-		for ( $n = 1; $n <= self::NEW_SLOTS; $n++ ) {
-			$f = self::file( 'new_photo_' . $n );
-			if ( ! $f ) {
+		$gallery = array();
+		foreach ( $keep as $k ) {
+			$gallery[] = array( 'id' => $k['id'], 'caption' => $k['caption'] );
+		}
+
+		// Photos waiting for consent: caption edits and deletions.
+		$held_post = isset( $post['held'] ) && is_array( $post['held'] ) ? $post['held'] : array();
+		$held      = array();
+		foreach ( self::held( $term_id ) as $h ) {
+			$row = isset( $held_post[ $h['id'] ] ) && is_array( $held_post[ $h['id'] ] ) ? $held_post[ $h['id'] ] : array();
+			if ( ! empty( $row['remove'] ) ) {
+				wp_delete_attachment( $h['id'], true );
 				continue;
 			}
-			$c = CEC_Org_Submissions::check_image( $f );
-			if ( is_wp_error( $c ) ) {
-				/* translators: 1: slot number, 2: problem */
-				$e[] = sprintf( __( 'New photo %1$d: %2$s', 'cec' ), $n, $c->get_error_message() );
+			if ( isset( $row['caption'] ) && is_scalar( $row['caption'] ) ) {
+				$h['caption'] = mb_substr( trim( sanitize_text_field( (string) $row['caption'] ) ), 0, 200 );
+				update_post_meta( $h['id'], '_cec_org_held_caption', $h['caption'] );
 			}
-			$adds[] = array( 'file' => $f, 'caption' => $s( 'new_caption_' . $n, 200 ) );
-		}
-		if ( $adds && empty( $post['consent'] ) ) {
-			$e[] = __( 'Please confirm that everyone recognisable in the new photos agreed to be shown publicly.', 'cec' );
-		}
-		if ( count( $keep ) + count( $adds ) > self::MAX_GALLERY ) {
-			/* translators: %d: maximum photos */
-			$e[] = sprintf( __( 'The gallery holds up to %d photos. Remove some before adding more.', 'cec' ), self::MAX_GALLERY );
+			$held[] = $h;
 		}
 
-		if ( $e ) {
-			$old = array_merge( $new, array( 'highlights' => isset( $post['highlights'] ) && is_scalar( $post['highlights'] ) ? (string) $post['highlights'] : '', 'social' => $social ) );
-			unset( $old['socials'] );
-			set_transient( self::err_key( $term_id ), array( 'errors' => $e, 'old' => $old ), 30 * MINUTE_IN_SECONDS );
-			wp_safe_redirect( self::edit_url( $term ) . '#cec-org-errors' );
-			exit;
+		// New photos: store every good one; a bad one is skipped and named.
+		$uploads = self::files( 'photos' );
+		if ( count( $uploads ) > self::BULK_MAX ) {
+			/* translators: 1: photos per save, 2: skipped */
+			$notes[] = sprintf( __( 'Photos: up to %1$d can be added per save, so the last %2$d weren\'t uploaded. Please add them again.', 'cec' ), self::BULK_MAX, count( $uploads ) - self::BULK_MAX );
+			$uploads = array_slice( $uploads, 0, self::BULK_MAX );
+		}
+		$stored = array();
+		foreach ( $uploads as $f ) {
+			$c = CEC_Org_Submissions::check_image( $f, self::PHOTO_BYTES );
+			if ( is_wp_error( $c ) ) {
+				/* translators: 1: file name, 2: problem */
+				$notes[] = sprintf( __( 'Photo "%1$s" wasn\'t added: %2$s', 'cec' ), sanitize_file_name( $f['name'] ), $c->get_error_message() );
+				continue;
+			}
+			$att = CEC_Org_Submissions::store_image( $f, 0, $p['name'] );
+			if ( $att ) {
+				$stored[] = $att;
+			} else {
+				/* translators: %s: file name */
+				$notes[] = sprintf( __( 'Photo "%s" couldn\'t be saved. Please try it again.', 'cec' ), sanitize_file_name( $f['name'] ) );
+			}
+		}
+		$consent = ! empty( $post['consent'] );
+		$waiting = array_merge( $held, array_map( function ( $id ) { return array( 'id' => $id, 'caption' => '' ); }, $stored ) );
+		$added   = 0;
+		if ( $consent ) {
+			foreach ( $waiting as $w ) {
+				if ( count( $gallery ) >= self::MAX_GALLERY ) {
+					break;
+				}
+				delete_post_meta( $w['id'], '_cec_org_held_term' );
+				delete_post_meta( $w['id'], '_cec_org_held_by' );
+				delete_post_meta( $w['id'], '_cec_org_held_caption' );
+				update_post_meta( $w['id'], '_cec_org_gallery_term', $term_id );
+				$gallery[] = array( 'id' => $w['id'], 'caption' => $w['caption'] );
+				$waiting   = array_slice( $waiting, 1 );
+				++$added;
+			}
+			if ( $waiting ) {
+				/* translators: 1: maximum, 2: number waiting */
+				$notes[] = sprintf( __( 'Gallery: it holds up to %1$d photos, so %2$d are kept below, not on your page. Remove some gallery photos to make room.', 'cec' ), self::MAX_GALLERY, count( $waiting ) );
+			}
+		} elseif ( $waiting ) {
+			/* translators: %d: number of photos */
+			$notes[] = sprintf( _n( '%d new photo is uploaded but not on your page yet: tick "Everyone who can be recognised… agreed" and save to add it.', '%d new photos are uploaded but not on your page yet: tick "Everyone who can be recognised… agreed" and save to add them.', count( $waiting ), 'cec' ), count( $waiting ) );
+		}
+		foreach ( $waiting as $w ) {
+			if ( in_array( $w['id'], $stored, true ) ) {
+				update_post_meta( $w['id'], '_cec_org_held_term', $term_id );
+				update_post_meta( $w['id'], '_cec_org_held_by', get_current_user_id() );
+				update_post_meta( $w['id'], '_cec_org_held_caption', '' );
+			}
 		}
 
-		$before = self::snapshot( $term_id );
-		self::remember( $term_id, $before );
-
+		// Page photo / logo.
+		$photo = self::file( 'photo' );
 		if ( $photo ) {
-			$att = CEC_Org_Submissions::store_image( $photo, 0, $p['name'] );
+			$c = CEC_Org_Submissions::check_image( $photo, self::PHOTO_BYTES );
+			$att = is_wp_error( $c ) ? 0 : CEC_Org_Submissions::store_image( $photo, 0, $p['name'] );
 			if ( $att ) {
 				$new['logo_id'] = $att;
 				$new['logo']    = (string) wp_get_attachment_url( $att );
 				update_post_meta( $att, '_cec_org_photo_term', $term_id );
+			} else {
+				/* translators: %s: problem */
+				$notes[] = sprintf( __( 'Photo / logo wasn\'t changed: %s', 'cec' ), is_wp_error( $c ) ? $c->get_error_message() : __( 'it couldn\'t be saved. Please try again.', 'cec' ) );
 			}
 		} elseif ( ! empty( $post['remove_photo'] ) ) {
 			$new['logo_id'] = 0;
 			$new['logo']    = '';
 		}
-		$gallery = array();
-		foreach ( $keep as $k ) {
-			$gallery[] = array( 'id' => $k['id'], 'caption' => $k['caption'] );
-		}
-		foreach ( $adds as $a ) {
-			$att = CEC_Org_Submissions::store_image( $a['file'], 0, $p['name'] );
-			if ( $att ) {
-				update_post_meta( $att, '_cec_org_gallery_term', $term_id );
-				if ( '' !== $a['caption'] ) {
-					update_post_meta( $att, '_wp_attachment_image_alt', $a['caption'] );
-				}
-				$gallery[] = array( 'id' => $att, 'caption' => $a['caption'] );
-			}
-		}
+
+		$before = self::snapshot( $term_id );
+		self::remember( $term_id, $before );
 		if ( $new['name'] !== $term->name ) {
 			wp_update_term( $term_id, 'cec_partner_org', array( 'name' => $new['name'] ) );
 		}
@@ -448,8 +593,20 @@ class CEC_Org_Editor {
 		// over, so Restore can bring them back; deleted then (see prune()).
 		self::prune( $term_id );
 
-		self::notify( $term, $before, self::snapshot( $term_id ), count( $adds ), count( $removed ) );
-		wp_safe_redirect( add_query_arg( 'cec_org_msg', 'saved', get_term_link( $term ) ) );
+		$after = self::snapshot( $term_id );
+		if ( $after === $before ) {
+			// Nothing changed: don't keep an identical version.
+			$h = get_term_meta( $term_id, 'cec_profile_history', true );
+			update_term_meta( $term_id, 'cec_profile_history', array_slice( (array) $h, 1 ) );
+		} else {
+			self::notify( get_term( $term_id, 'cec_partner_org' ), $before, $after, $added, $removed );
+		}
+		if ( $notes ) {
+			set_transient( self::err_key( $term_id ), $notes, HOUR_IN_SECONDS );
+			wp_safe_redirect( self::edit_url( $term_id ) . '#cec-org-errors' );
+			exit;
+		}
+		wp_safe_redirect( add_query_arg( 'cec_org_msg', 'saved', get_term_link( $term_id, 'cec_partner_org' ) ) );
 		exit;
 	}
 
@@ -611,5 +768,9 @@ class CEC_Org_Editor {
 		delete_term_meta( $term_id, 'cec_profile_history' );
 		delete_term_meta( $term_id, 'cec_gallery' );
 		self::prune( $term_id );
+		$held = get_posts( array( 'post_type' => 'attachment', 'post_status' => 'inherit', 'posts_per_page' => -1, 'fields' => 'ids', 'meta_key' => '_cec_org_held_term', 'meta_value' => (int) $term_id ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
+		foreach ( $held as $id ) {
+			wp_delete_attachment( $id, true );
+		}
 	}
 }

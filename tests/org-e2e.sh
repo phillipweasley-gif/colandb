@@ -214,7 +214,7 @@ ok "a member removes a link (even an approved Organizer one)" $(echo "$r" | grep
 get orgcy pgc2 "$URL"
 ok "...and is gone from the group page" $(hasnt $T/pgc2.html 'Org Ann')
 
-echo "== Page editor (CEC 1.35.0 + CMP 0.21.0)"
+echo "== Page editor (CEC 1.35.0-1.37.0 + CMP 0.21.x)"
 ev "CMP_Groups::set_role($ANN,$TID,'organizer');" >/dev/null
 php -r '$i=imagecreatetruecolor(800,600); imagefill($i,0,0,imagecolorallocate($i,225,245,119)); imagejpeg($i,$argv[1]);' $T/g1.jpg
 php -r '$i=imagecreatetruecolor(800,600); imagefill($i,0,0,imagecolorallocate($i,80,80,255)); imagejpeg($i,$argv[1]);' $T/g2.jpg
@@ -229,7 +229,7 @@ get organn prof2 "$H/?page_id=$PAGE_ID&cmp_tab=profile"
 ok "Profile tab: Edit page next to the group you organize" $(has $T/prof2.html '>Edit page &amp; card<')
 get organn ed "$URL?cec_org_edit=1"
 EN2=$(php -r 'preg_match("~name=\"_cec_nonce\" value=\"([^\"]+)\"~",file_get_contents($argv[1]),$m); echo $m[1]??"";' $T/ed.html)
-ok "editor: card (name, card text, bullets), bio, links, photo, gallery slots, consent; no contact fields" $([ "$(has $T/ed.html 'name="description"')$(has $T/ed.html 'name="social\[telegram\]"')$(has $T/ed.html 'name="photo"')$(has $T/ed.html 'name="new_photo_6"')$(has $T/ed.html 'name="consent"')$(has $T/ed.html 'name="name"')$(has $T/ed.html 'name="summary"')$(hasnt $T/ed.html 'pat@example.com')" = 11111111 ] && echo 1 || echo 0)
+ok "editor: card (name, card text, bullets), bio, links, photo, gallery slots, consent; no contact fields" $([ "$(has $T/ed.html 'name="description"')$(has $T/ed.html 'name="social\[telegram\]"')$(has $T/ed.html 'name="photo"')$(has $T/ed.html 'name="photos\[\]"')$(has $T/ed.html 'name="consent"')$(has $T/ed.html 'name="name"')$(has $T/ed.html 'name="summary"')$(hasnt $T/ed.html 'pat@example.com')" = 11111111 ] && echo 1 || echo 0)
 ok "editor page is never cached" $(grep -qi '^cache-control:.*no-cache' $T/ed.h && echo 1 || echo 0)
 edit(){ curl -s -b $T/$1.jar -c $T/$1.jar -o /dev/null -w '%{http_code} %{redirect_url}' "$H/wp-admin/admin-post.php" -F "action=cec_org_edit" -F "term=$TID" -F "name=${NAME-ZZ Rope Collective}" "${@:2}"; }
 r=$(edit orgcy -F "_cec_nonce=$EN2" -F "description=Hijacked")
@@ -237,17 +237,26 @@ ok "someone who can't edit is refused (403), nothing changes" $(echo "$r" | grep
 r=$(edit organn -F "_cec_nonce=bad" -F "description=Bad nonce")
 ok "bad nonce refused" $([ "$(ev "echo get_term($TID)->description;")" != "Bad nonce" ] && echo 1 || echo 0)
 M0=$(mails)
-r=$(edit organn -F "_cec_nonce=$EN2" -F "description=New rope bio." -F "mission=New mission." -F "social[telegram]=https://t.me/c/123/4" -F "new_photo_1=@$T/g1.jpg;type=image/jpeg" -F "new_caption_1=First jam" -F "consent=1")
-ok "a bad link: sent back with the error, nothing saved, no photos stored" $(echo "$r" | grep -q 'cec_org_edit=1' && [ "$(ev "echo get_term($TID)->description;")" != "New rope bio." ] && [ "$(ev "echo count(CEC_Org_Editor::gallery($TID));")" = 0 ] && echo 1 || echo 0)
+r=$(edit organn -F "_cec_nonce=$EN2" -F "description=New rope bio." -F "mission=New mission." -F "social[telegram]=https://t.me/c/123/4" -F "photos[]=@$T/g1.jpg;type=image/jpeg" -F "photos[]=@$T/fake.png;type=image/png" -F "consent=1")
+ok "a bad link and a bad photo don't block the save: everything else is saved" $(echo "$r" | grep -q 'cec_org_edit=1' && [ "$(ev "echo get_term($TID)->description.'|'.get_term_meta($TID,'cec_mission',true);")" = "New rope bio.|New mission." ] && [ "$(ev "echo count(CEC_Org_Editor::gallery($TID));")" = 1 ] && echo 1 || echo 0)
+ok "...the bad link keeps the previous link" $([ "$(ev "echo CEC_Orgs::profile($TID)['socials']['telegram'];")" = "https://t.me/+AbCdEf123" ] && echo 1 || echo 0)
 get organn ed2 "$URL?cec_org_edit=1"
-ok "...the error shows and your text is kept" $([ "$(has $T/ed2.html 'invite link')$(has $T/ed2.html 'New rope bio.')" = 11 ] && echo 1 || echo 0)
-r=$(edit organn -F "_cec_nonce=$EN2" -F "description=New rope bio." -F "mission=New mission." -F "social[telegram]=https://t.me/+NewInvite" -F "new_photo_1=@$T/g1.jpg;type=image/jpeg" -F "new_caption_1=First jam")
-ok "new gallery photos without the consent box: refused" $([ "$(ev "echo count(CEC_Org_Editor::gallery($TID));")" = 0 ] && echo 1 || echo 0)
-r=$(edit organn -F "_cec_nonce=$EN2" -F "description=New rope bio." -F "mission=New mission." -F $'highlights=Rope Education\nSocial Nights\nPeer Support' -F "social[telegram]=https://t.me/+NewInvite" -F "social[website]=https://example.org/rope" -F "new_photo_1=@$T/g1.jpg;type=image/jpeg" -F "new_caption_1=First jam" -F "new_photo_2=@$T/g2.jpg;type=image/jpeg" -F "new_caption_2=Rope 101 night" -F "consent=1")
-ok "saved: back on the page, live right away" $(echo "$r" | grep -q 'cec_org_msg=saved' && [ "$(ev "echo get_term($TID)->description.'|'.get_term_meta($TID,'cec_mission',true);")" = "New rope bio.|New mission." ] && echo 1 || echo 0)
-ok "...gallery has 2 photos with captions, in order" $([ "$(ev "echo implode(',',wp_list_pluck(CEC_Org_Editor::gallery($TID),'caption'));")" = "First jam,Rope 101 night" ] && echo 1 || echo 0)
+ok "...the editor lists what wasn't changed (the link as typed, the bad photo by name)" $([ "$(has $T/ed2.html 'other changes were saved')$(has $T/ed2.html 't.me/c/123/4')$(has $T/ed2.html 'fake.png')" = 111 ] && echo 1 || echo 0)
+ok "...the list shows once" $(get organn ed2b "$URL?cec_org_edit=1"; hasnt $T/ed2b.html 'other changes were saved')
+G1=$(ev "echo CEC_Org_Editor::gallery($TID)[0]['id'];")
+r=$(edit organn -F "_cec_nonce=$EN2" -F "description=New rope bio." -F "mission=New mission." -F "social[telegram]=https://t.me/+AbCdEf123" -F "photos[]=@$T/g2.jpg;type=image/jpeg")
+HID=$(ev "\$h=CEC_Org_Editor::held($TID,$ANN); echo \$h ? \$h[0]['id'] : 0;")
+ok "photos added without the consent box are kept, not shown on the page" $([ "$(ev "echo count(CEC_Org_Editor::gallery($TID));")" = 1 ] && [ "$HID" -gt 0 ] && echo 1 || echo 0)
+get organn ed3h "$URL?cec_org_edit=1"
+ok "...the editor shows them as waiting, with a caption box" $([ "$(has $T/ed3h.html 'not on your page yet')$(has $T/ed3h.html "name=\"held\[$HID\]\[caption\]\"")" = 11 ] && echo 1 || echo 0)
+get anon pubh "$URL"
+ok "...and they aren't on the public page" $(hasnt $T/pubh.html "wp-content/uploads/.*$(ev "echo pathinfo(get_attached_file($HID),PATHINFO_FILENAME);")")
+ok "the editor takes many photos at once" $(has $T/ed3h.html 'name="photos\[\]" multiple')
+r=$(edit organn -F "_cec_nonce=$EN2" -F "description=New rope bio." -F "mission=New mission." -F $'highlights=Rope Education\nSocial Nights\nPeer Support' -F "social[telegram]=https://t.me/+NewInvite" -F "social[website]=https://example.org/rope" -F "gallery[$G1][caption]=First jam" -F "held[$HID][caption]=Rope 101 night" -F "consent=1")
+ok "saved: back on the page, live right away" $(echo "$r" | grep -q 'cec_org_msg=saved' && echo 1 || echo 0)
+ok "...confirming adds the waiting photo with its caption, after the others" $([ "$(ev "echo implode(',',wp_list_pluck(CEC_Org_Editor::gallery($TID),'caption'));")" = "First jam,Rope 101 night" ] && [ "$(ev "echo count(CEC_Org_Editor::held($TID,$ANN));")" = 0 ] && echo 1 || echo 0)
 ok "...the site admin is emailed what changed with an undo link" $(tail -n $(( $(mails) - M0 )) wp-content/mail.log | grep -q 'page was edited' && tail -n 1 wp-content/mail.log | grep -q 'Restore' && echo 1 || echo 0)
-ok "...the previous version is kept" $([ "$(ev "echo count(get_term_meta($TID,'cec_profile_history',true));")" = 1 ] && echo 1 || echo 0)
+ok "...previous versions are kept" $([ "$(ev "echo count(get_term_meta($TID,'cec_profile_history',true));")" -ge 1 ] && echo 1 || echo 0)
 get anon pub "$URL"
 ok "public page shows the gallery with captions, linked to the full image" $([ "$(has $T/pub.html 'cec-org-gallery')$(has $T/pub.html '<figcaption>First jam</figcaption>')$(has $T/pub.html 'alt="Rope 101 night"')$(has $T/pub.html 'New rope bio.')$(has $T/pub.html 't.me/+NewInvite')" = 11111 ] && echo 1 || echo 0)
 GRID_MOD=$(ev "echo get_post_modified_time('U',true,$GRID_ID);")
@@ -258,12 +267,12 @@ ok "card: new name, card text and bullets show on the homepage grid" $([ "$(has 
 ok "...the page address stays the same" $([ "$(ev "echo get_term_link($TID,'cec_partner_org');")" = "$URL" ] && echo 1 || echo 0)
 ok "...pages showing the grid are re-saved so the CDN refreshes" $([ "$(ev "echo get_post_modified_time('U',true,$GRID_ID);")" -gt "$GRID_MOD" ] && echo 1 || echo 0)
 r=$(NAME="ZZ Existing Group" edit organn -F "_cec_nonce=$EN2" -F "description=New rope bio.")
-ok "...a name another group already uses is refused" $([ "$(ev "echo get_term($TID)->name;")" = "ZZ Rope Collective Renamed" ] && echo 1 || echo 0)
+ok "...a name another group already uses isn't used (the rest still saves)" $([ "$(ev "echo get_term($TID)->name;")" = "ZZ Rope Collective Renamed" ] && echo 1 || echo 0)
 r=$(NAME="" edit organn -F "_cec_nonce=$EN2" -F "description=New rope bio.")
-ok "...an empty name is refused" $([ "$(ev "echo get_term($TID)->name;")" = "ZZ Rope Collective Renamed" ] && echo 1 || echo 0)
+ok "...an empty name keeps the current name" $([ "$(ev "echo get_term($TID)->name;")" = "ZZ Rope Collective Renamed" ] && echo 1 || echo 0)
 get organn ed3 "$URL?cec_org_edit=1"
 EN3=$(php -r 'preg_match("~name=\"_cec_nonce\" value=\"([^\"]+)\"~",file_get_contents($argv[1]),$m); echo $m[1]??"";' $T/ed3.html)
-G1=$(ev "echo CEC_Org_Editor::gallery($TID)[0]['id'];"); G2=$(ev "echo CEC_Org_Editor::gallery($TID)[1]['id'];")
+G2=$(ev "echo CEC_Org_Editor::gallery($TID)[1]['id'];")
 r=$(edit organn -F "_cec_nonce=$EN3" -F "description=New rope bio." -F "mission=New mission." -F "social[telegram]=https://t.me/+NewInvite" -F "gallery[$G1][caption]=First jam (2026)" -F "gallery[$G1][order]=2" -F "gallery[$G2][order]=1" -F "gallery[$G2][caption]=Rope 101 night")
 ok "captions and order can be changed" $([ "$(ev "echo implode(',',wp_list_pluck(CEC_Org_Editor::gallery($TID),'caption'));")" = "Rope 101 night,First jam (2026)" ] && echo 1 || echo 0)
 r=$(edit organn -F "_cec_nonce=$EN3" -F "description=New rope bio." -F "gallery[$G1][remove]=1" -F "gallery[$G2][caption]=Rope 101 night" -F "photo=@$T/g2.jpg;type=image/jpeg")
