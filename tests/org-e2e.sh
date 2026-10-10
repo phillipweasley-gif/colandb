@@ -178,6 +178,9 @@ echo "== Member links"
 login organn organn organnpass123
 get organn pga "$URL"
 ok "signed-in member sees linked members with role and profile link" $([ "$(has $T/pga.html 'Members on COL&amp;B')$(has $T/pga.html 'Org Ann')$(has $T/pga.html 'Organizer')$(has $T/pga.html "cmp_member=$ANN")" = 1111 ] && echo 1 || echo 0)
+ok "...your own card first, marked (you), with your role and Manage my groups" $([ "$(grep -o 'cec-org-member-name">[^<]*' $T/pga.html | head -1 | grep -c 'Org Ann (you)')$(has $T/pga.html 'listed here as Organizer')$(has $T/pga.html 'Manage my groups')" = 111 ] && echo 1 || echo 0)
+ok "...and the page is never kept by the browser when signed in" $(grep -qi '^cache-control:.*no-cache' $T/pga.h && echo 1 || echo 0)
+ok "signed out, the page may still be cached" $(grep -qi '^cache-control:.*no-cache' $T/pg.h && echo 0 || echo 1)
 login orgdee orgdee orgdeepass123
 get orgdee pgd "$URL"
 ok "signed in but not a full member: no member list" $(hasnt $T/pgd.html 'Org Ann')
@@ -203,6 +206,7 @@ ok "member profile shows Groups with links" $([ "$(has $T/mp.html 'cmp-pv-groups
 login orgcy orgcy orgcypass1234
 ev "global \$wpdb; \$wpdb->insert(CMP_Install::table('blocks'),array('blocker_id'=>$ANN,'blocked_id'=>$CY,'created_at'=>gmdate('Y-m-d H:i:s')));" >/dev/null
 get orgcy pgc "$URL"
+ok "a member who isn't linked is told so and offered Link my profile" $([ "$(has $T/pgc.html 'linked to this group')$(has $T/pgc.html '>Link my profile<')" = 11 ] && echo 1 || echo 0)
 ok "someone Ann blocked doesn't see her on the group page" $([ "$(has $T/pgc.html 'Members on COL&amp;B')$(hasnt $T/pgc.html 'Org Ann')" = 11 ] && echo 1 || echo 0)
 ev "global \$wpdb; \$wpdb->delete(CMP_Install::table('blocks'),array('blocker_id'=>$ANN,'blocked_id'=>$CY));" >/dev/null
 r=$(gpost organn --data-urlencode "_cmp_nonce=$GN" --data-urlencode "do=remove" --data-urlencode "group=$TID")

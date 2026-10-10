@@ -20,7 +20,7 @@ bash tests/nods-e2e.sh               # nods: 20 checks
 bash tests/retention-e2e.sh          # daily data clean-up: 17 checks
 bash tests/setup-e2e.sh              # profiles v2 + step-by-step setup: 32 checks
 bash tests/dob-e2e.sh                # date of birth at sign-up, one-time step, under-18 lock, Show switches: 33 checks
-bash tests/org-e2e.sh                # organization & titleholder submissions, pages, grid, member links: 60 checks
+bash tests/org-e2e.sh                # organization & titleholder submissions, pages, grid, member links: 64 checks
 ```
 
 | File | What it does |
