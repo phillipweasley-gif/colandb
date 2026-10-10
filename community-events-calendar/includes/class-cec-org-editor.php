@@ -115,22 +115,48 @@ class CEC_Org_Editor {
 		return $out;
 	}
 
+	/** landscape | portrait | square, from the image's own size. */
+	private static function shape_of( $id ) {
+		$m = wp_get_attachment_metadata( $id );
+		$w = (int) ( $m['width'] ?? 0 );
+		$h = (int) ( $m['height'] ?? 0 );
+		if ( ! $w || ! $h ) {
+			return 'square';
+		}
+		$r = $w / $h;
+		return $r > 1.15 ? 'landscape' : ( $r < 0.87 ? 'portrait' : 'square' );
+	}
+
+	/**
+	 * The public gallery (1.40.0): photos grouped by shape (wide, tall,
+	 * square), each group an even grid of matching tiles, in gallery order
+	 * within each group; groups appear in the order their first photo does.
+	 */
 	public static function gallery_html( $p ) {
 		$items = self::gallery( $p['id'] );
 		if ( ! $items ) {
 			return '';
 		}
-		$heading = 'titleholder' === $p['kind'] ? __( 'Events & Appearances', 'cec' ) : __( 'Gallery', 'cec' );
-		$html    = '<section class="cec-org-gallery" aria-labelledby="cec-org-gallery-title"><h2 id="cec-org-gallery-title">' . esc_html( $heading ) . '</h2><ul class="cec-org-gallery-grid">';
+		$groups = array();
 		foreach ( $items as $i => $item ) {
-			/* translators: 1: photo number, 2: group name */
-			$alt   = '' !== $item['caption'] ? $item['caption'] : sprintf( __( 'Photo %1$d from %2$s', 'cec' ), $i + 1, $p['name'] );
-			$full  = wp_get_attachment_image_url( $item['id'], 'full' );
-			$html .= '<li><figure><a href="' . esc_url( $full ) . '" target="_blank" rel="noopener">' . wp_get_attachment_image( $item['id'], 'medium_large', false, array( 'alt' => $alt, 'loading' => 'lazy', 'class' => 'cec-org-gallery-img' ) ) . '</a>';
-			$html .= '' !== $item['caption'] ? '<figcaption>' . esc_html( $item['caption'] ) . '</figcaption>' : '';
-			$html .= '</figure></li>';
+			$groups[ self::shape_of( $item['id'] ) ][] = array( $i, $item );
 		}
-		return $html . '</ul></section>';
+		$heading = 'titleholder' === $p['kind'] ? __( 'Events & Appearances', 'cec' ) : __( 'Gallery', 'cec' );
+		$html    = '<section class="cec-org-gallery" aria-labelledby="cec-org-gallery-title"><h2 id="cec-org-gallery-title">' . esc_html( $heading ) . '</h2>';
+		foreach ( $groups as $shape => $list ) {
+			$html .= '<ul class="cec-org-gallery-grid is-' . esc_attr( $shape ) . '">';
+			foreach ( $list as $row ) {
+				list( $i, $item ) = $row;
+				/* translators: 1: photo number, 2: group name */
+				$alt   = '' !== $item['caption'] ? $item['caption'] : sprintf( __( 'Photo %1$d from %2$s', 'cec' ), $i + 1, $p['name'] );
+				$full  = wp_get_attachment_image_url( $item['id'], 'full' );
+				$html .= '<li><figure><a href="' . esc_url( $full ) . '" target="_blank" rel="noopener">' . wp_get_attachment_image( $item['id'], 'medium_large', false, array( 'alt' => $alt, 'loading' => 'lazy', 'class' => 'cec-org-gallery-img' ) ) . '</a>';
+				$html .= '' !== $item['caption'] ? '<figcaption>' . esc_html( $item['caption'] ) . '</figcaption>' : '';
+				$html .= '</figure></li>';
+			}
+			$html .= '</ul>';
+		}
+		return $html . '</section>';
 	}
 
 	/* ------------------------------------------------------------------

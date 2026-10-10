@@ -135,12 +135,21 @@ button.cec-org-submit:hover, button.cec-org-submit:focus-visible { background: v
 /* ---- Gallery and page editor (1.35.0) ---- */
 .cec-org-gallery { max-width: 75rem; margin: 0 auto 3rem; padding: 0 2rem; box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 .cec-org-gallery h2 { text-align: center; margin: 0 0 1.5rem; font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 900 !important; text-transform: uppercase; letter-spacing: 0.05em; color: #FF50D7 !important; }
-.cec-org-gallery-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1.25rem; align-items: start; }
+.cec-org-gallery-grid { list-style: none; margin: 0 0 1.25rem; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1.25rem; align-items: stretch; }
+.cec-org-gallery-grid.is-portrait { grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); }
+.cec-org-gallery-grid.is-square { grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
 .cec-org-gallery-grid li { margin: 0; }
+.cec-org-gallery-grid figure { height: 100%; }
 .cec-org-gallery-grid figure { margin: 0; background: #1A1A1A; border: 1px solid #FF50D7; display: flex; flex-direction: column; }
 .cec-org-gallery-grid a { display: block; }
 .cec-org-gallery-grid a:focus-visible { outline: 3px solid #E1F577; outline-offset: 2px; }
-.cec-org-gallery-img { display: block; width: 100%; height: auto; }
+.cec-org-gallery-img { display: block; width: 100%; height: auto; object-fit: cover; }
+.cec-org-gallery-grid.is-landscape .cec-org-gallery-img { aspect-ratio: 4 / 3; }
+.cec-org-gallery-grid.is-portrait .cec-org-gallery-img { aspect-ratio: 3 / 4; object-position: 50% 25%; }
+.cec-org-gallery-grid.is-square .cec-org-gallery-img { aspect-ratio: 1 / 1; }
+.cec-org-jump { margin: 0.25rem 0 0; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+#cec-org-events { scroll-margin-top: 6rem; }
 .cec-org-gallery-grid figcaption { padding: 0.75rem 1rem; color: #CCCCCC; font-size: 0.95rem; line-height: 1.5; }
 .cec-org-edit-bar { margin: 0; padding: 1rem 2rem 0; text-align: center; background: #100F0F; }
 .cec-org-saved { max-width: 46rem; margin: 1rem auto 0; color: #FFFFFF; }

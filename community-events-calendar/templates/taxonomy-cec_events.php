@@ -13,7 +13,7 @@ $editing = $is_org && CEC_Org_Editor::is_editing( $term );
 	<?php else : ?>
 		<?php if ( $is_org ) : ?>
 			<?php echo CEC_Orgs::header_html( $term ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
-			<header class="cec-archive-header cec-org-events-head">
+			<header class="cec-archive-header cec-org-events-head" id="cec-org-events">
 				<h2><?php esc_html_e( 'Upcoming Events', 'cec' ); ?></h2>
 				<?php echo CEC_Feeds::subscribe_links_html( $term->term_id ); // phpcs:ignore ?>
 			</header>
