@@ -6,6 +6,23 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.42.0
+
+**Titleholders with more than one title; the city/region filter shows sooner** (owner, 2026-10-11: "You should also be able to filter titleholders by location", "some titleholders have multiple titles").
+
+- **More titles** (`cec_titles_more`: rows of title / year / producer, up to 7 beyond the first). The first title stays in the existing title/year/producer fields, so every listing keeps its current title.
+  - **Edit this page:** a "Titles" section shows the first title plus a row for each extra title, with two empty rows to add more. Clearing a title removes it.
+  - **Submission form:** two optional "more titles" rows. The review screen shows and edits them, and approving saves them.
+  - **Page and cards:** each title line shows ("Great Lakes Handler 2026 · Produced by …", then the next).
+  - A year that isn't four digits is dropped from that title only, with a note.
+- **The city/region filter** (`filter="yes"`) now shows as soon as any listing has an area, plus "Area not listed" for listings without one. Before, it needed two different areas, so the Titleholders page never showed it.
+- The filter dropdown keeps its natural width (the theme stretched selects to 100%).
+- **Verification** (local WordPress 7.1.2):
+  - `tests/org-e2e.sh` 140/140. New checks: one area plus listings without one shows the filter with "Area not listed"; titles 2–3 show on the page and the card, in order; a bad year is dropped from that title only; extra titles from a submission survive review and approval.
+  - `php -l` on every changed file.
+
+---
+
 ## 1.41.1
 
 **Dark text on the calendar's pink elements** (owner, 2026-10-11: "make sure all the text on the website is the correct color").

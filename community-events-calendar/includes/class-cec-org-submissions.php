@@ -154,6 +154,16 @@ class CEC_Org_Submissions {
 					</div>
 					<p class="cec-org-field"><label for="cec_org_producer"><?php esc_html_e( 'Producer', 'cec' ); ?></label><input type="text" id="cec_org_producer" name="producer" maxlength="120" value="<?php echo esc_attr( $v( 'producer' ) ); ?>" />
 						<span class="cec-org-hint"><?php esc_html_e( 'The contest or organization that awards the title.', 'cec' ); ?></span></p>
+					<p class="cec-org-hint"><strong><?php esc_html_e( 'More titles (optional)', 'cec' ); ?></strong> <?php esc_html_e( 'Hold more than one title? Add up to two more here; you can add others later.', 'cec' ); ?></p>
+					<?php $old_more = isset( $old['titles_more'] ) && is_array( $old['titles_more'] ) ? array_values( $old['titles_more'] ) : array(); ?>
+					<?php for ( $i = 0; $i < 2; $i++ ) : ?>
+						<?php $t = $old_more[ $i ] ?? array(); ?>
+						<div class="cec-org-row">
+							<p class="cec-org-field"><label for="cec_org_mt_<?php echo (int) $i; ?>"><?php echo esc_html( sprintf( /* translators: %d: number */ __( 'Title %d', 'cec' ), $i + 2 ) ); ?></label><input type="text" id="cec_org_mt_<?php echo (int) $i; ?>" name="titles_more[<?php echo (int) $i; ?>][title]" maxlength="120" value="<?php echo esc_attr( (string) ( $t['title'] ?? '' ) ); ?>" /></p>
+							<p class="cec-org-field cec-org-year"><label for="cec_org_my_<?php echo (int) $i; ?>"><?php esc_html_e( 'Year', 'cec' ); ?></label><input type="number" id="cec_org_my_<?php echo (int) $i; ?>" name="titles_more[<?php echo (int) $i; ?>][year]" min="1970" max="2100" value="<?php echo esc_attr( (string) ( $t['year'] ?? '' ) ); ?>" /></p>
+							<p class="cec-org-field"><label for="cec_org_mp_<?php echo (int) $i; ?>"><?php esc_html_e( 'Producer', 'cec' ); ?></label><input type="text" id="cec_org_mp_<?php echo (int) $i; ?>" name="titles_more[<?php echo (int) $i; ?>][producer]" maxlength="120" value="<?php echo esc_attr( (string) ( $t['producer'] ?? '' ) ); ?>" /></p>
+						</div>
+					<?php endfor; ?>
 				</div>
 
 				<p class="cec-org-field"><label for="cec_org_logo"><span data-cec-kind="organization"><?php esc_html_e( 'Logo', 'cec' ); ?></span><span data-cec-kind="titleholder"><?php esc_html_e( 'Photo', 'cec' ); ?></span> <?php esc_html_e( '(optional)', 'cec' ); ?></label>
@@ -251,6 +261,7 @@ class CEC_Org_Submissions {
 			'contact_phone' => preg_replace( '/[^0-9+().\- ]/', '', $s( 'contact_phone', 40 ) ),
 			'member'        => $s( 'member', 100 ),
 			'region'        => $s( 'region', 80 ),
+			'titles_more'   => array(),
 			'socials'       => array(),
 		);
 		if ( '' === $c['name'] ) {
@@ -268,8 +279,13 @@ class CEC_Org_Submissions {
 		if ( '' !== $c['year'] && ! preg_match( '/^(19|20|21)\d{2}$/', $c['year'] ) ) {
 			$e[] = __( 'The year should be four digits, e.g. 2026.', 'cec' );
 		}
+		if ( 'titleholder' === $c['kind'] ) {
+			list( $c['titles_more'], $more_notes ) = CEC_Orgs::clean_titles( isset( $post['titles_more'] ) ? $post['titles_more'] : array() );
+			$e = array_merge( $e, $more_notes );
+		}
 		if ( 'organization' === $c['kind'] ) {
 			$c['title'] = $c['year'] = $c['producer'] = '';
+			$c['titles_more'] = array();
 		} else {
 			$c['highlights'] = array();
 		}
@@ -458,7 +474,7 @@ class CEC_Org_Submissions {
 	}
 
 	public static function review_box( $post ) {
-		$c      = wp_parse_args( (array) get_post_meta( $post->ID, '_cec_org', true ), array( 'kind' => 'organization', 'name' => '', 'title' => '', 'year' => '', 'producer' => '', 'description' => '', 'highlights' => array(), 'mission' => '', 'contact_name' => '', 'contact_email' => '', 'contact_phone' => '', 'member' => '', 'region' => '', 'socials' => array() ) );
+		$c      = wp_parse_args( (array) get_post_meta( $post->ID, '_cec_org', true ), array( 'kind' => 'organization', 'name' => '', 'title' => '', 'year' => '', 'producer' => '', 'description' => '', 'highlights' => array(), 'mission' => '', 'contact_name' => '', 'contact_email' => '', 'contact_phone' => '', 'member' => '', 'region' => '', 'titles_more' => array(), 'socials' => array() ) );
 		$review = get_post_meta( $post->ID, '_cec_org_review', true );
 		$logo   = (int) get_post_meta( $post->ID, '_cec_org_logo_id', true );
 		$term   = (int) get_post_meta( $post->ID, '_cec_org_term_id', true );
@@ -482,7 +498,13 @@ class CEC_Org_Submissions {
 				<input form="cec-org-review-form" name="title" value="<?php echo esc_attr( $c['title'] ); ?>" placeholder="<?php esc_attr_e( 'Title', 'cec' ); ?>" />
 				<input form="cec-org-review-form" name="year" value="<?php echo esc_attr( $c['year'] ); ?>" class="small-text" placeholder="<?php esc_attr_e( 'Year', 'cec' ); ?>" />
 				<input form="cec-org-review-form" name="producer" value="<?php echo esc_attr( $c['producer'] ); ?>" placeholder="<?php esc_attr_e( 'Producer', 'cec' ); ?>" />
-				<p class="description"><?php esc_html_e( 'Titleholders only.', 'cec' ); ?></p></td></tr>
+				<?php for ( $i = 0; $i < max( 2, count( (array) $c['titles_more'] ) + 1 ); $i++ ) : ?>
+					<?php $t = ( (array) $c['titles_more'] )[ $i ] ?? array(); ?>
+					<br /><input form="cec-org-review-form" name="titles_more[<?php echo (int) $i; ?>][title]" value="<?php echo esc_attr( (string) ( $t['title'] ?? '' ) ); ?>" placeholder="<?php echo esc_attr( sprintf( /* translators: %d: number */ __( 'Title %d', 'cec' ), $i + 2 ) ); ?>" />
+					<input form="cec-org-review-form" name="titles_more[<?php echo (int) $i; ?>][year]" value="<?php echo esc_attr( (string) ( $t['year'] ?? '' ) ); ?>" class="small-text" placeholder="<?php esc_attr_e( 'Year', 'cec' ); ?>" />
+					<input form="cec-org-review-form" name="titles_more[<?php echo (int) $i; ?>][producer]" value="<?php echo esc_attr( (string) ( $t['producer'] ?? '' ) ); ?>" placeholder="<?php esc_attr_e( 'Producer', 'cec' ); ?>" />
+				<?php endfor; ?>
+				<p class="description"><?php esc_html_e( 'Titleholders only. More titles go in the extra rows.', 'cec' ); ?></p></td></tr>
 			<tr><th><?php esc_html_e( 'Logo / photo', 'cec' ); ?></th><td><?php echo $logo ? wp_get_attachment_image( $logo, 'thumbnail' ) : esc_html__( 'None', 'cec' ); // phpcs:ignore ?></td></tr>
 			<tr><th><label for="r_desc"><?php esc_html_e( 'Description / bio', 'cec' ); ?></label></th><td><textarea form="cec-org-review-form" class="large-text" rows="4" id="r_desc" name="description"><?php echo esc_textarea( $c['description'] ); ?></textarea></td></tr>
 			<tr><th><label for="r_hl"><?php esc_html_e( 'Highlights', 'cec' ); ?></label></th><td><textarea form="cec-org-review-form" class="large-text" rows="3" id="r_hl" name="highlights"><?php echo esc_textarea( implode( "\n", (array) $c['highlights'] ) ); ?></textarea></td></tr>
@@ -594,6 +616,7 @@ class CEC_Org_Submissions {
 			'title'       => $c['title'],
 			'year'        => $c['year'],
 			'producer'    => $c['producer'],
+			'titles_more' => $c['titles_more'] ?? array(),
 			'region'      => $c['region'] ?? '',
 			'socials'     => $c['socials'],
 			'listed'      => '1',

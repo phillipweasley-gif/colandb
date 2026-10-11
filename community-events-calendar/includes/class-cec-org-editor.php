@@ -226,12 +226,26 @@ class CEC_Org_Editor {
 
 				<?php if ( $is_title ) : ?>
 					<fieldset>
-						<legend><?php esc_html_e( 'Title', 'cec' ); ?></legend>
+						<legend><?php esc_html_e( 'Titles', 'cec' ); ?></legend>
 						<div class="cec-org-row">
 							<p class="cec-org-field"><label for="e_title"><?php esc_html_e( 'Title', 'cec' ); ?></label><input type="text" id="e_title" name="title" maxlength="120" value="<?php echo esc_attr( $v( 'title', $p['title'] ) ); ?>" /></p>
 							<p class="cec-org-field cec-org-year"><label for="e_year"><?php esc_html_e( 'Year', 'cec' ); ?></label><input type="number" id="e_year" name="year" min="1970" max="2100" value="<?php echo esc_attr( $v( 'year', $p['year'] ) ); ?>" /></p>
 						</div>
 						<p class="cec-org-field"><label for="e_producer"><?php esc_html_e( 'Producer', 'cec' ); ?></label><input type="text" id="e_producer" name="producer" maxlength="120" value="<?php echo esc_attr( $v( 'producer', $p['producer'] ) ); ?>" /><span class="cec-org-hint"><?php esc_html_e( 'The contest or organization that awards the title.', 'cec' ); ?></span></p>
+						<?php
+						// 1.42.0: more titles. Existing ones plus two empty rows (7 more at most).
+						$more = $p['titles_more'];
+						$rows = min( 7, count( $more ) + 2 );
+						?>
+						<p class="cec-org-hint"><strong><?php esc_html_e( 'More titles', 'cec' ); ?></strong> <?php esc_html_e( 'Hold more than one title? Add each here. Empty rows are ignored; clear a title to remove it.', 'cec' ); ?></p>
+						<?php for ( $i = 0; $i < $rows; $i++ ) : ?>
+							<?php $t = $more[ $i ] ?? array( 'title' => '', 'year' => '', 'producer' => '' ); ?>
+							<div class="cec-org-row cec-org-more-title">
+								<p class="cec-org-field"><label for="e_mt_<?php echo (int) $i; ?>"><?php echo esc_html( sprintf( /* translators: %d: number */ __( 'Title %d', 'cec' ), $i + 2 ) ); ?></label><input type="text" id="e_mt_<?php echo (int) $i; ?>" name="titles_more[<?php echo (int) $i; ?>][title]" maxlength="120" value="<?php echo esc_attr( $t['title'] ); ?>" /></p>
+								<p class="cec-org-field cec-org-year"><label for="e_my_<?php echo (int) $i; ?>"><?php esc_html_e( 'Year', 'cec' ); ?></label><input type="number" id="e_my_<?php echo (int) $i; ?>" name="titles_more[<?php echo (int) $i; ?>][year]" min="1970" max="2100" value="<?php echo esc_attr( $t['year'] ); ?>" /></p>
+								<p class="cec-org-field"><label for="e_mp_<?php echo (int) $i; ?>"><?php esc_html_e( 'Producer', 'cec' ); ?></label><input type="text" id="e_mp_<?php echo (int) $i; ?>" name="titles_more[<?php echo (int) $i; ?>][producer]" maxlength="120" value="<?php echo esc_attr( $t['producer'] ); ?>" /></p>
+							</div>
+						<?php endfor; ?>
 					</fieldset>
 				<?php endif; ?>
 
@@ -567,6 +581,7 @@ class CEC_Org_Editor {
 			'title'       => $p['title'],
 			'year'        => $p['year'],
 			'producer'    => $p['producer'],
+			'titles_more' => $p['titles_more'],
 			'socials'     => $p['socials'],
 			'logo'        => $p['logo'],
 			'logo_id'     => $p['logo_id'],
@@ -730,6 +745,10 @@ class CEC_Org_Editor {
 		if ( '' === $new['description'] ) {
 			$notes[]            = $is_title ? __( 'Bio: it can\'t be empty, so the previous bio was kept.', 'cec' ) : __( 'Description: it can\'t be empty, so the previous description was kept.', 'cec' );
 			$new['description'] = $p['description'];
+		}
+		if ( $is_title ) {
+			list( $new['titles_more'], $more_notes ) = CEC_Orgs::clean_titles( isset( $post['titles_more'] ) ? $post['titles_more'] : array() );
+			$notes = array_merge( $notes, $more_notes );
 		}
 		if ( '' !== $new['year'] && ! preg_match( '/^(19|20|21)\d{2}$/', $new['year'] ) ) {
 			/* translators: %s: what was typed */
@@ -957,6 +976,7 @@ class CEC_Org_Editor {
 			'title'       => __( 'Title', 'cec' ),
 			'year'        => __( 'Year', 'cec' ),
 			'producer'    => __( 'Producer', 'cec' ),
+			'titles_more' => __( 'More titles', 'cec' ),
 			'socials'     => __( 'Links', 'cec' ),
 			'logo_id'     => __( 'Photo / logo', 'cec' ),
 			'shape'       => __( 'Photo shape', 'cec' ),
@@ -1049,7 +1069,7 @@ class CEC_Org_Editor {
 		if ( ! empty( $data['name'] ) && get_term( $term_id )->name !== $data['name'] && ! get_term_by( 'name', $data['name'], 'cec_partner_org' ) ) {
 			wp_update_term( $term_id, 'cec_partner_org', array( 'name' => $data['name'] ) );
 		}
-		$fields = array_intersect_key( $data, array_flip( array( 'summary', 'region', 'description', 'highlights', 'mission', 'title', 'year', 'producer', 'socials', 'logo', 'logo_id', 'shape', 'ask' ) ) );
+		$fields = array_intersect_key( $data, array_flip( array( 'summary', 'region', 'description', 'highlights', 'mission', 'title', 'year', 'producer', 'titles_more', 'socials', 'logo', 'logo_id', 'shape', 'ask' ) ) );
 		CEC_Orgs::save_profile( $term_id, $fields );
 		update_term_meta( $term_id, 'cec_gallery', $gallery );
 		self::prune( $term_id );

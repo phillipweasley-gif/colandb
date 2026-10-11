@@ -184,7 +184,7 @@ button.cec-org-remove:hover, button.cec-org-remove:focus-visible { background: #
 .cec-org-filter { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem 0.75rem; max-width: 75rem; margin: 0 auto 1.5rem; color: var(--org-text); }
 .cec-org-filter[hidden], .cec-org-empty[hidden], .cec-org-tile[hidden] { display: none !important; }
 .cec-org-filter label { font-weight: 700; }
-.cec-org-filter select { min-height: 44px; padding: 0.4rem 0.75rem; background: #0f0d16; color: var(--org-text); border: 1px solid var(--org-pink); border-radius: 0; font: inherit; }
+.cec-org-filter select { width: auto !important; min-width: 14rem; min-height: 44px; padding: 0.4rem 0.75rem; background: #0f0d16; color: var(--org-text); border: 1px solid var(--org-pink); border-radius: 0; font: inherit; }
 .cec-org-filter select:focus-visible { outline: 3px solid var(--org-lime); outline-offset: 2px; }
 .cec-org-filter-count { color: var(--org-muted); font-size: 0.9rem; }
 .cec-org-empty { text-align: center; color: #CCCCCC; }

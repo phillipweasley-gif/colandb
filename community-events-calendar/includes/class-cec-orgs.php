@@ -203,6 +203,7 @@ class CEC_Orgs {
 			'title'      => (string) get_term_meta( $id, 'cec_title', true ),
 			'year'       => (string) get_term_meta( $id, 'cec_title_year', true ),
 			'producer'   => (string) get_term_meta( $id, 'cec_title_producer', true ),
+			'titles_more' => self::clean_titles( get_term_meta( $id, 'cec_titles_more', true ) )[0],
 			'logo'       => (string) get_term_meta( $id, 'cec_logo', true ),
 			'logo_id'    => (int) get_term_meta( $id, 'cec_logo_id', true ),
 			'socials'    => $ordered,
@@ -228,6 +229,7 @@ class CEC_Orgs {
 			'title'      => 'cec_title',
 			'year'       => 'cec_title_year',
 			'producer'   => 'cec_title_producer',
+			'titles_more' => 'cec_titles_more',
 			'logo'       => 'cec_logo',
 			'logo_id'    => 'cec_logo_id',
 			'socials'    => 'cec_socials',
@@ -371,6 +373,48 @@ class CEC_Orgs {
 		return '<img class="' . esc_attr( $class ) . '" src="' . esc_url( $p['logo'] ) . '" alt="' . esc_attr( $alt ) . '" loading="lazy" />';
 	}
 
+	/**
+	 * More titles beyond the first (1.42.0): rows of title / year / producer.
+	 * Returns array( clean rows, notes about years that weren't kept ).
+	 */
+	public static function clean_titles( $rows, $max = 7 ) {
+		$out   = array();
+		$notes = array();
+		foreach ( is_array( $rows ) ? $rows : array() as $r ) {
+			if ( ! is_array( $r ) ) {
+				continue;
+			}
+			$t = mb_substr( trim( sanitize_text_field( (string) ( $r['title'] ?? '' ) ) ), 0, 120 );
+			$y = mb_substr( trim( sanitize_text_field( (string) ( $r['year'] ?? '' ) ) ), 0, 4 );
+			$p = mb_substr( trim( sanitize_text_field( (string) ( $r['producer'] ?? '' ) ) ), 0, 120 );
+			if ( '' === $t ) {
+				continue;
+			}
+			if ( '' !== $y && ! preg_match( '/^(19|20|21)\d{2}$/', $y ) ) {
+				/* translators: 1: year typed, 2: title */
+				$notes[] = sprintf( __( 'The year "%1$s" for %2$s should be four digits, e.g. 2026; that title was saved without a year.', 'cec' ), $y, $t );
+				$y       = '';
+			}
+			$out[] = array( 'title' => $t, 'year' => $y, 'producer' => $p );
+			if ( count( $out ) >= $max ) {
+				break;
+			}
+		}
+		return array( $out, $notes );
+	}
+
+	/** Every title line for a titleholder, first title first. */
+	public static function title_lines( $p ) {
+		$lines = array();
+		foreach ( array_merge( array( array( 'title' => $p['title'], 'year' => $p['year'], 'producer' => $p['producer'] ) ), (array) ( $p['titles_more'] ?? array() ) ) as $t ) {
+			$line = self::title_line( $t );
+			if ( '' !== $line ) {
+				$lines[] = $line;
+			}
+		}
+		return $lines;
+	}
+
 	/** "Great Lakes Handler 2026 · Produced by …" for a titleholder. */
 	public static function title_line( $p ) {
 		$title = trim( $p['title'] . ' ' . $p['year'] );
@@ -405,8 +449,10 @@ class CEC_Orgs {
 		$html  = class_exists( 'CEC_Org_Editor' ) ? CEC_Org_Editor::edit_button_html( $p ) : '';
 		$html .= '<section class="cec-org-hero' . ( $p['logo'] || $p['logo_id'] ? ' has-image' : '' ) . ' is-' . esc_attr( $p['kind'] ) . '">';
 		$html .= '<div class="cec-org-main">';
-		if ( 'titleholder' === $p['kind'] && self::title_line( $p ) ) {
-			$html .= '<p class="cec-org-eyebrow">' . esc_html( self::title_line( $p ) ) . '</p>';
+		if ( 'titleholder' === $p['kind'] ) {
+			foreach ( self::title_lines( $p ) as $line ) {
+				$html .= '<p class="cec-org-eyebrow">' . esc_html( $line ) . '</p>';
+			}
 		}
 		$html .= '<h1 class="cec-org-name">' . esc_html( $p['name'] ) . '</h1><hr class="cec-org-rule" />';
 		if ( $p['description'] ) {
@@ -479,32 +525,41 @@ class CEC_Orgs {
 		if ( ! $list ) {
 			return $atts['empty'] ? '<p class="cec-org-empty">' . esc_html( $atts['empty'] ) . '</p>' : '';
 		}
-		// 1.41.0: filter="yes" adds a city/region filter when listings use 2+ areas.
-		$areas = array();
+		// filter="yes" adds a city/region filter (1.41.0); since 1.41.2 it shows
+		// as soon as any listing has an area, with "Area not listed" for the rest.
+		$areas   = array();
+		$missing = false;
 		foreach ( $list as $p ) {
 			if ( '' !== $p['region'] ) {
 				$areas[ self::region_key( $p['region'] ) ] = $p['region'];
+			} else {
+				$missing = true;
 			}
 		}
 		uasort( $areas, 'strcasecmp' );
 		$html = '';
 		$uid  = 'cec-org-grid-' . wp_unique_id();
-		if ( 'yes' === $atts['filter'] && count( $areas ) >= 2 ) {
+		if ( 'yes' === $atts['filter'] && count( $areas ) + ( $missing ? 1 : 0 ) >= 2 ) {
 			$html .= '<div class="cec-org-filter" hidden data-grid="' . esc_attr( $uid ) . '"><label for="' . esc_attr( $uid ) . '-f">' . esc_html__( 'Filter by city or region', 'cec' ) . '</label> <select id="' . esc_attr( $uid ) . '-f"><option value="">' . esc_html__( 'All areas', 'cec' ) . '</option>';
 			foreach ( $areas as $k => $label ) {
 				$html .= '<option value="' . esc_attr( $k ) . '">' . esc_html( $label ) . '</option>';
 			}
+			if ( $missing ) {
+				$html .= '<option value="-">' . esc_html__( 'Area not listed', 'cec' ) . '</option>';
+			}
 			$html .= '</select> <span class="cec-org-filter-count" aria-live="polite"></span></div>';
 			$html .= '<p class="cec-org-empty" hidden>' . esc_html__( 'Nothing listed in that area yet.', 'cec' ) . '</p>';
-			$html .= "<script>( function () { var f = document.querySelector( '[data-grid=\"" . esc_js( $uid ) . "\"]' ); if ( ! f ) { return; } var s = f.querySelector( 'select' ), g = document.getElementById( '" . esc_js( $uid ) . "' ), c = f.querySelector( '.cec-org-filter-count' ), e = f.nextElementSibling; f.hidden = false; s.addEventListener( 'change', function () { var n = 0; g.querySelectorAll( '.cec-org-tile' ).forEach( function ( t ) { var show = ! s.value || t.dataset.region === s.value; t.hidden = ! show; if ( show ) { n++; } } ); c.textContent = s.value ? n + ' ' + " . wp_json_encode( __( 'shown', 'cec' ) ) . " : ''; e.hidden = n > 0; } ); } )();</script>";
+			$html .= "<script>( function () { var f = document.querySelector( '[data-grid=\"" . esc_js( $uid ) . "\"]' ); if ( ! f ) { return; } var s = f.querySelector( 'select' ), g = document.getElementById( '" . esc_js( $uid ) . "' ), c = f.querySelector( '.cec-org-filter-count' ), e = f.nextElementSibling; f.hidden = false; s.addEventListener( 'change', function () { var n = 0; g.querySelectorAll( '.cec-org-tile' ).forEach( function ( t ) { var show = ! s.value || t.dataset.region === s.value || ( s.value === '-' && ! t.dataset.region ); t.hidden = ! show; if ( show ) { n++; } } ); c.textContent = s.value ? n + ' ' + " . wp_json_encode( __( 'shown', 'cec' ) ) . " : ''; e.hidden = n > 0; } ); } )();</script>";
 		}
 		$html .= '<div class="cec-org-grid" id="' . esc_attr( $uid ) . '">';
 		foreach ( $list as $p ) {
 			$html .= '<article class="cec-org-tile is-' . esc_attr( $p['kind'] ) . '" data-region="' . esc_attr( '' === $p['region'] ? '' : self::region_key( $p['region'] ) ) . '">';
 			$image = self::image_html( $p, 'cec-org-tile-image' );
 			$html .= '<div class="cec-org-tile-head">' . ( $image ? '<span class="cec-org-tile-media">' . $image . '</span>' : '' ) . '<h3>' . esc_html( $p['name'] ) . '</h3></div>';
-			if ( 'titleholder' === $p['kind'] && self::title_line( $p ) ) {
-				$html .= '<p class="cec-org-tile-title">' . esc_html( self::title_line( $p ) ) . '</p>';
+			if ( 'titleholder' === $p['kind'] ) {
+				foreach ( self::title_lines( $p ) as $line ) {
+					$html .= '<p class="cec-org-tile-title">' . esc_html( $line ) . '</p>';
+				}
 			}
 			if ( '' !== $p['region'] ) {
 				$html .= '<p class="cec-org-tile-region">' . esc_html( $p['region'] ) . '</p>';
