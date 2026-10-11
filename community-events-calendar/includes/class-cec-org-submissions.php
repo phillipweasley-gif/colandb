@@ -143,6 +143,9 @@ class CEC_Org_Submissions {
 				<p class="cec-org-field"><label for="cec_org_name"><?php esc_html_e( 'Name (required)', 'cec' ); ?></label>
 					<input type="text" id="cec_org_name" name="name" maxlength="120" required value="<?php echo esc_attr( $v( 'name' ) ); ?>" />
 					<span class="cec-org-hint"><?php esc_html_e( 'The organization\'s name, or the titleholder\'s name as they want it shown.', 'cec' ); ?></span></p>
+				<p class="cec-org-field"><label for="cec_org_region"><?php esc_html_e( 'City or region (optional)', 'cec' ); ?></label>
+					<input type="text" id="cec_org_region" name="region" maxlength="80" list="cec_org_regions" value="<?php echo esc_attr( $v( 'region' ) ); ?>" /><?php echo CEC_Orgs::regions_datalist( 'cec_org_regions' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					<span class="cec-org-hint"><?php esc_html_e( 'Where you\'re based, e.g. Columbus, or Ohio if you cover the whole state.', 'cec' ); ?></span></p>
 
 				<div class="cec-org-only-titleholder" data-cec-kind="titleholder">
 					<div class="cec-org-row">
@@ -247,6 +250,7 @@ class CEC_Org_Submissions {
 			'contact_email' => sanitize_email( $s( 'contact_email', 200 ) ),
 			'contact_phone' => preg_replace( '/[^0-9+().\- ]/', '', $s( 'contact_phone', 40 ) ),
 			'member'        => $s( 'member', 100 ),
+			'region'        => $s( 'region', 80 ),
 			'socials'       => array(),
 		);
 		if ( '' === $c['name'] ) {
@@ -454,7 +458,7 @@ class CEC_Org_Submissions {
 	}
 
 	public static function review_box( $post ) {
-		$c      = wp_parse_args( (array) get_post_meta( $post->ID, '_cec_org', true ), array( 'kind' => 'organization', 'name' => '', 'title' => '', 'year' => '', 'producer' => '', 'description' => '', 'highlights' => array(), 'mission' => '', 'contact_name' => '', 'contact_email' => '', 'contact_phone' => '', 'member' => '', 'socials' => array() ) );
+		$c      = wp_parse_args( (array) get_post_meta( $post->ID, '_cec_org', true ), array( 'kind' => 'organization', 'name' => '', 'title' => '', 'year' => '', 'producer' => '', 'description' => '', 'highlights' => array(), 'mission' => '', 'contact_name' => '', 'contact_email' => '', 'contact_phone' => '', 'member' => '', 'region' => '', 'socials' => array() ) );
 		$review = get_post_meta( $post->ID, '_cec_org_review', true );
 		$logo   = (int) get_post_meta( $post->ID, '_cec_org_logo_id', true );
 		$term   = (int) get_post_meta( $post->ID, '_cec_org_term_id', true );
@@ -473,6 +477,7 @@ class CEC_Org_Submissions {
 				<label><input form="cec-org-review-form" type="radio" name="kind" value="organization" <?php checked( 'organization', $c['kind'] ); ?> /> <?php esc_html_e( 'Organization', 'cec' ); ?></label>&nbsp;
 				<label><input form="cec-org-review-form" type="radio" name="kind" value="titleholder" <?php checked( 'titleholder', $c['kind'] ); ?> /> <?php esc_html_e( 'Titleholder', 'cec' ); ?></label></td></tr>
 			<tr><th><label for="r_name"><?php esc_html_e( 'Name', 'cec' ); ?></label></th><td><input form="cec-org-review-form" class="regular-text" id="r_name" name="name" value="<?php echo esc_attr( $c['name'] ); ?>" /></td></tr>
+			<tr><th><label for="r_region"><?php esc_html_e( 'City or region', 'cec' ); ?></label></th><td><input form="cec-org-review-form" class="regular-text" id="r_region" name="region" list="cec_org_regions" value="<?php echo esc_attr( $c['region'] ); ?>" /><?php echo CEC_Orgs::regions_datalist( 'cec_org_regions' ); // phpcs:ignore ?></td></tr>
 			<tr><th><?php esc_html_e( 'Title / year / producer', 'cec' ); ?></th><td>
 				<input form="cec-org-review-form" name="title" value="<?php echo esc_attr( $c['title'] ); ?>" placeholder="<?php esc_attr_e( 'Title', 'cec' ); ?>" />
 				<input form="cec-org-review-form" name="year" value="<?php echo esc_attr( $c['year'] ); ?>" class="small-text" placeholder="<?php esc_attr_e( 'Year', 'cec' ); ?>" />
@@ -589,6 +594,7 @@ class CEC_Org_Submissions {
 			'title'       => $c['title'],
 			'year'        => $c['year'],
 			'producer'    => $c['producer'],
+			'region'      => $c['region'] ?? '',
 			'socials'     => $c['socials'],
 			'listed'      => '1',
 			'order'       => $current && $current['listed'] ? $current['order'] : CEC_Orgs::next_order(),
