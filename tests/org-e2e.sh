@@ -80,7 +80,7 @@ r=$(submit 10.0.0.1 -F "kind=organization" -F "name=ZZ Rope Collective" -F "desc
 ok "a file that isn't an image is refused" $(echo "$r" | grep -q "cec_org=error" && echo 1 || echo 0)
 
 M0=$(mails)
-r=$(submit 10.0.0.2 -F "kind=organization" -F "name=ZZ Rope Collective" -F "description=Columbus rope education and social nights." -F $'highlights=Rope Education\nSocial Nights' -F "mission=Teach safe rope." -F "contact_name=Pat Doe" -F "contact_email=pat@example.com" -F "contact_phone=614-555-0100" -F "social[telegram]=https://t.me/+AbCdEf123" -F "social[website]=example.org/rope" -F "member=organn" -F "authorized=1" -F "logo=@$T/logo.png;type=image/png")
+r=$(submit 10.0.0.2 -F "kind=organization" -F "name=ZZ Rope Collective" -F "description=Columbus rope education and social nights." -F $'highlights=Rope Education\nSocial Nights' -F "mission=Teach safe rope." -F "contact_name=Pat Doe" -F "contact_email=pat@example.com" -F "contact_phone=614-555-0100" -F "region=Columbus" -F "social[telegram]=https://t.me/+AbCdEf123" -F "social[website]=example.org/rope" -F "member=organn" -F "authorized=1" -F "logo=@$T/logo.png;type=image/png")
 ok "a good organization submission: thanks" $(echo "$r" | grep -q "cec_org=thanks" && echo 1 || echo 0)
 SUB=$(q "SELECT ID FROM wp_posts WHERE post_type='cec_org_submission' AND post_title='ZZ Rope Collective'")
 ok "...stored as pending for review, with its contact kept private" $([ "$(ev "echo get_post_status($SUB).'/'.get_post_meta($SUB,'_cec_org_review',true).'/'.get_post_meta($SUB,'_cec_org_contact_email',true);")" = "pending/pending/pat@example.com" ] && echo 1 || echo 0)
@@ -123,12 +123,13 @@ login orgdee orgdee orgdeepass123
 r=$(curl -s -b $T/orgdee.jar -o /dev/null -w '%{http_code}' "$H/wp-admin/admin-post.php" --data-urlencode "action=cec_org_decide" --data-urlencode "submission=$SUB" --data-urlencode "_wpnonce=$DN" --data-urlencode "decision=approve")
 ok "a non-admin can't approve" $([ "$r" = 403 ] && [ "$(ev "echo get_post_meta($SUB,'_cec_org_review',true);")" = pending ] && echo 1 || echo 0)
 M0=$(mails)
-FIELDS=(--data-urlencode "kind=organization" --data-urlencode "name=ZZ Rope Collective" --data-urlencode "description=Columbus rope education and social nights." --data-urlencode $'highlights=Rope Education\nSocial Nights' --data-urlencode "mission=Teach safe rope." --data-urlencode "contact_name=Pat Doe" --data-urlencode "contact_email=pat@example.com" --data-urlencode "social[telegram]=https://t.me/+AbCdEf123" --data-urlencode "social[website]=https://example.org/rope" --data-urlencode "member=organn")
+FIELDS=(--data-urlencode "kind=organization" --data-urlencode "name=ZZ Rope Collective" --data-urlencode "description=Columbus rope education and social nights." --data-urlencode $'highlights=Rope Education\nSocial Nights' --data-urlencode "mission=Teach safe rope." --data-urlencode "contact_name=Pat Doe" --data-urlencode "contact_email=pat@example.com" --data-urlencode "region=Columbus" --data-urlencode "social[telegram]=https://t.me/+AbCdEf123" --data-urlencode "social[website]=https://example.org/rope" --data-urlencode "member=organn")
 r=$(decide $SUB $DN approve "${FIELDS[@]}")
 ok "approve: back on the review screen" $(echo "$r" | grep -q "cec_org_done=approved" && echo 1 || echo 0)
 TID=$(ev 'echo (int) term_exists("ZZ Rope Collective","cec_partner_org")["term_id"];')
 P=$(ev "\$p=CEC_Orgs::profile($TID); echo \$p['kind'].'|'.\$p['listed'].'|'.implode(',',\$p['highlights']).'|'.\$p['mission'].'|'.\$p['socials']['telegram'].'|'.get_term_meta($TID,'cec_url',true).'|'.(\$p['logo_id']==$LOGO?1:0).'|'.\$p['contact']['email'];")
 ok "...creates the calendar group with its profile, logo, website and private contact" $([ "$P" = "organization|1|Rope Education,Social Nights|Teach safe rope.|https://t.me/+AbCdEf123|https://example.org/rope|1|pat@example.com" ] && echo 1 || echo 0)
+ok "...with its city or region" $([ "$(ev "echo CEC_Orgs::profile($TID)['region'];")" = Columbus ] && echo 1 || echo 0)
 ok "...the submission is marked approved and linked to the group" $([ "$(ev "echo get_post_meta($SUB,'_cec_org_review',true).'/'.get_post_meta($SUB,'_cec_org_term_id',true);")" = "approved/$TID" ] && echo 1 || echo 0)
 ok "...the contact is told it's listed" $(tail -n $(( $(mails) - M0 )) wp-content/mail.log | grep -q 'is now listed' && echo 1 || echo 0)
 ok "...the named member is linked as Organizer and notified" $([ "$(q "SELECT role FROM $GL WHERE user_id=$ANN AND term_id=$TID")" = organizer ] && [ "$(q "SELECT COUNT(*) FROM wp_cmp_notifications WHERE user_id=$ANN AND message LIKE '%ZZ Rope Collective%'")" -ge 1 ] && echo 1 || echo 0)
@@ -350,6 +351,16 @@ ok "...bullet points are laid out as a grid" $(has $T/fxp.html 'class="cec-org-h
 ev "CEC_Orgs::save_profile($ORG2,array('socials'=>array('telegram'=>'https://t.me/+OrgTwo')));" >/dev/null
 get anon tp "$(ev "echo get_term_link($ORG2,'cec_partner_org');")"
 ok "organization page keeps 'Join our Telegram'" $([ "$(has $T/tp.html 'Join our Telegram')$(hasnt $T/tp.html 'Message me on Telegram')" = 11 ] && echo 1 || echo 0)
+
+echo "== City/region filter (CEC 1.41.0)"
+FG=$($W post create --post_type=page --post_status=publish --post_title="ZZ Filter Grid" --post_content='[cec_partner_orgs kind="organization" filter="yes"]' --porcelain)
+ev "update_term_meta($ORG2,'cec_region','Ohio'); update_term_meta($TID,'cec_region','Columbus'); update_term_meta($EXIST,'cec_region','columbus ');" >/dev/null
+get anon fg "$H/?page_id=$FG"
+ok "filter='yes' with 2+ areas shows 'Filter by city or region' with each area once" $([ "$(has $T/fg.html 'Filter by city or region')$(grep -c '<option value="columbus">' $T/fg.html)$(grep -c '<option value="ohio">' $T/fg.html)" = 111 ] && echo 1 || echo 0)
+ok "...tiles carry their area, and show it" $([ "$(has $T/fg.html 'data-region="columbus"')$(has $T/fg.html 'cec-org-tile-region')" = 11 ] && echo 1 || echo 0)
+get anon gr5 "$H/?page_id=$GRID_ID"
+ok "...grids without filter='yes' (the homepage) get no filter" $(hasnt $T/gr5.html 'Filter by city or region')
+$W post delete $FG --force >/dev/null 2>&1
 
 echo "== Titleholder's events (CEC 1.39.0 + CMP 0.23.0)"
 mkev(){ local id; id=$($W post create --post_type=cec_event --post_status=publish --post_title="$1" --porcelain 2>/dev/null); ev "update_post_meta($id,'_cec_start',wp_date('Y-m-d\\T19:00',time()+($2)*DAY_IN_SECONDS)); update_post_meta($id,'_cec_end',wp_date('Y-m-d\\T21:00',time()+($2)*DAY_IN_SECONDS));" >/dev/null; echo $id; }

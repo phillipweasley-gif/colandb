@@ -6,6 +6,24 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.41.0
+
+**City/region filter on the listing pages, space above the footer, buttons that keep their colours anywhere** (owner, 2026-10-11: "can you create a space between the footer and content as well as a filter to filter profiles by city or region?").
+
+- **City or region** (`cec_region`) for every listing. It's set on the submission form, in the review screen, in "Edit this page" and on the group's admin screen. A list suggests areas already in use, so spellings match.
+  - Shown in small capitals on each card.
+- **`[cec_partner_orgs filter="yes"]`** adds "Filter by city or region" above the cards when listings use two or more areas.
+  - "Columbus", "columbus " and "COLUMBUS" count as one area.
+  - The list shows "N shown" and "Nothing listed in that area yet." when empty.
+  - Without JavaScript the filter stays hidden and every card shows. The homepage grids keep no filter.
+- **Space above the footer:** 5rem below the cards and at the end of every `/partner/` page.
+- **`.cec-org-btn` defines its own colours**, so a button placed on an ordinary page (like the Submit buttons) is pink without a wrapper.
+- **Verification** (local WordPress 7.1.2):
+  - `tests/org-e2e.sh` 134/134, with new checks: region saved from a submission; the filter shows each area once; cards carry and show their area; no filter without `filter="yes"`.
+  - `php -l` on every changed file.
+
+---
+
 ## 1.40.0
 
 **A shortcut to the page's events, and the gallery grouped by photo shape** (owner, 2026-10-10: "Add a shortcut at the top to my events of the template and organize the photos by format because it looks messy").

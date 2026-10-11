@@ -197,6 +197,7 @@ class CEC_Orgs {
 			'highlights' => $highlights,
 			'mission'    => (string) get_term_meta( $id, 'cec_mission', true ),
 			'summary'    => (string) get_term_meta( $id, 'cec_summary', true ),
+			'region'     => (string) get_term_meta( $id, 'cec_region', true ),
 			'shape'      => 'rect' === get_term_meta( $id, 'cec_photo_shape', true ) ? 'rect' : 'circle',
 			'ask'        => array_values( array_intersect( array_keys( self::socials() ), (array) get_term_meta( $id, 'cec_social_ask', true ) ) ),
 			'title'      => (string) get_term_meta( $id, 'cec_title', true ),
@@ -221,6 +222,7 @@ class CEC_Orgs {
 			'kind'       => 'cec_kind',
 			'mission'    => 'cec_mission',
 			'summary'    => 'cec_summary',
+			'region'     => 'cec_region',
 			'shape'      => 'cec_photo_shape',
 			'ask'        => 'cec_social_ask',
 			'title'      => 'cec_title',
@@ -269,6 +271,32 @@ class CEC_Orgs {
 		 * A group's public listing changed; purge any other caches here.
 		 */
 		do_action( 'cec_partner_orgs_changed' );
+	}
+
+	/** Groups "Columbus", "columbus " and "COLUMBUS" together. */
+	public static function region_key( $region ) {
+		return sanitize_title( trim( (string) $region ) );
+	}
+
+	/** Every city/region in use, for suggestions. */
+	public static function regions() {
+		global $wpdb;
+		$vals = $wpdb->get_col( "SELECT DISTINCT meta_value FROM {$wpdb->termmeta} WHERE meta_key = 'cec_region' AND meta_value <> ''" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$out  = array();
+		foreach ( $vals as $v ) {
+			$out[ self::region_key( $v ) ] = $v;
+		}
+		uasort( $out, 'strcasecmp' );
+		return array_values( $out );
+	}
+
+	/** <datalist> of regions already in use, so people pick the same spelling. */
+	public static function regions_datalist( $id ) {
+		$html = '<datalist id="' . esc_attr( $id ) . '">';
+		foreach ( self::regions() as $r ) {
+			$html .= '<option value="' . esc_attr( $r ) . '"></option>';
+		}
+		return $html . '</datalist>';
 	}
 
 	public static function next_order() {
@@ -444,20 +472,42 @@ class CEC_Orgs {
 	 * The homepage grid of listed groups.
 	 */
 	public static function shortcode_grid( $atts ) {
-		$atts = shortcode_atts( array( 'kind' => 'all', 'button' => __( 'Learn More', 'cec' ), 'empty' => '' ), $atts, 'cec_partner_orgs' );
+		$atts = shortcode_atts( array( 'kind' => 'all', 'button' => __( 'Learn More', 'cec' ), 'empty' => '', 'filter' => 'no' ), $atts, 'cec_partner_orgs' );
 		$kind = in_array( $atts['kind'], self::KINDS, true ) ? $atts['kind'] : ( 'all' === $atts['kind'] ? '' : 'organization' );
 		$list = self::listed( $kind );
 		wp_enqueue_style( 'cec-orgs' );
 		if ( ! $list ) {
 			return $atts['empty'] ? '<p class="cec-org-empty">' . esc_html( $atts['empty'] ) . '</p>' : '';
 		}
-		$html = '<div class="cec-org-grid">';
+		// 1.41.0: filter="yes" adds a city/region filter when listings use 2+ areas.
+		$areas = array();
 		foreach ( $list as $p ) {
-			$html .= '<article class="cec-org-tile is-' . esc_attr( $p['kind'] ) . '">';
+			if ( '' !== $p['region'] ) {
+				$areas[ self::region_key( $p['region'] ) ] = $p['region'];
+			}
+		}
+		uasort( $areas, 'strcasecmp' );
+		$html = '';
+		$uid  = 'cec-org-grid-' . wp_unique_id();
+		if ( 'yes' === $atts['filter'] && count( $areas ) >= 2 ) {
+			$html .= '<div class="cec-org-filter" hidden data-grid="' . esc_attr( $uid ) . '"><label for="' . esc_attr( $uid ) . '-f">' . esc_html__( 'Filter by city or region', 'cec' ) . '</label> <select id="' . esc_attr( $uid ) . '-f"><option value="">' . esc_html__( 'All areas', 'cec' ) . '</option>';
+			foreach ( $areas as $k => $label ) {
+				$html .= '<option value="' . esc_attr( $k ) . '">' . esc_html( $label ) . '</option>';
+			}
+			$html .= '</select> <span class="cec-org-filter-count" aria-live="polite"></span></div>';
+			$html .= '<p class="cec-org-empty" hidden>' . esc_html__( 'Nothing listed in that area yet.', 'cec' ) . '</p>';
+			$html .= "<script>( function () { var f = document.querySelector( '[data-grid=\"" . esc_js( $uid ) . "\"]' ); if ( ! f ) { return; } var s = f.querySelector( 'select' ), g = document.getElementById( '" . esc_js( $uid ) . "' ), c = f.querySelector( '.cec-org-filter-count' ), e = f.nextElementSibling; f.hidden = false; s.addEventListener( 'change', function () { var n = 0; g.querySelectorAll( '.cec-org-tile' ).forEach( function ( t ) { var show = ! s.value || t.dataset.region === s.value; t.hidden = ! show; if ( show ) { n++; } } ); c.textContent = s.value ? n + ' ' + " . wp_json_encode( __( 'shown', 'cec' ) ) . " : ''; e.hidden = n > 0; } ); } )();</script>";
+		}
+		$html .= '<div class="cec-org-grid" id="' . esc_attr( $uid ) . '">';
+		foreach ( $list as $p ) {
+			$html .= '<article class="cec-org-tile is-' . esc_attr( $p['kind'] ) . '" data-region="' . esc_attr( '' === $p['region'] ? '' : self::region_key( $p['region'] ) ) . '">';
 			$image = self::image_html( $p, 'cec-org-tile-image' );
 			$html .= '<div class="cec-org-tile-head">' . ( $image ? '<span class="cec-org-tile-media">' . $image . '</span>' : '' ) . '<h3>' . esc_html( $p['name'] ) . '</h3></div>';
 			if ( 'titleholder' === $p['kind'] && self::title_line( $p ) ) {
 				$html .= '<p class="cec-org-tile-title">' . esc_html( self::title_line( $p ) ) . '</p>';
+			}
+			if ( '' !== $p['region'] ) {
+				$html .= '<p class="cec-org-tile-region">' . esc_html( $p['region'] ) . '</p>';
 			}
 			// 1.36.0: the card text the group wrote for the card, then its
 			// bullet points; without either, the start of the description.
@@ -494,6 +544,10 @@ class CEC_Orgs {
 				<label><input type="radio" name="cec_org_kind" value="organization" <?php checked( 'organization', $p['kind'] ); ?> /> <?php esc_html_e( 'Organization', 'cec' ); ?></label>&nbsp;&nbsp;
 				<label><input type="radio" name="cec_org_kind" value="titleholder" <?php checked( 'titleholder', $p['kind'] ); ?> /> <?php esc_html_e( 'Titleholder', 'cec' ); ?></label>
 			</td>
+		</tr>
+		<tr class="form-field">
+			<th scope="row"><label for="cec_org_region"><?php esc_html_e( 'City or region', 'cec' ); ?></label></th>
+			<td><input type="text" name="cec_org_region" id="cec_org_region" maxlength="80" list="cec_org_regions" value="<?php echo esc_attr( $p['region'] ); ?>" /><?php echo self::regions_datalist( 'cec_org_regions' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><p class="description"><?php esc_html_e( 'E.g. Columbus, or Ohio for statewide. Used by the city/region filter on the listing pages.', 'cec' ); ?></p></td>
 		</tr>
 		<tr class="form-field">
 			<th scope="row"><?php esc_html_e( 'Show on the site', 'cec' ); ?></th>
@@ -571,6 +625,7 @@ class CEC_Orgs {
 				'title'      => isset( $_POST['cec_org_title'] ) ? sanitize_text_field( wp_unslash( $_POST['cec_org_title'] ) ) : '',
 				'year'       => isset( $_POST['cec_org_year'] ) && preg_match( '/^\d{4}$/', (string) $_POST['cec_org_year'] ) ? (string) $_POST['cec_org_year'] : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 				'producer'   => isset( $_POST['cec_org_producer'] ) ? sanitize_text_field( wp_unslash( $_POST['cec_org_producer'] ) ) : '',
+				'region'     => isset( $_POST['cec_org_region'] ) ? mb_substr( sanitize_text_field( wp_unslash( $_POST['cec_org_region'] ) ), 0, 80 ) : '',
 				'socials'    => array_filter( $socials ),
 			)
 		);

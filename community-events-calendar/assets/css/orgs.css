@@ -7,7 +7,7 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&family=Inter:wght@400;600;700&display=swap');
 
-.cec-org-hero, .cec-org-card, .cec-org-grid, .cec-org-form-wrap, .cec-org-events-head {
+.cec-org-hero, .cec-org-card, .cec-org-grid, .cec-org-form-wrap, .cec-org-events-head, .cec-org-btn, .cec-org-filter {
 	--org-pink: #FF50D7;
 	--org-lime: #E1F577;
 	--org-ink: #100F0F;
@@ -178,6 +178,18 @@ button.cec-org-remove:hover, button.cec-org-remove:focus-visible { background: #
 .cec-org-draft p { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
 .cec-org-upload-pending img { width: 96px; height: 96px; object-fit: cover; flex: 0 0 auto; opacity: 0.6; }
 .cec-org-upload-pending.is-failed .cec-org-hint { color: #ff6b6b; }
+
+/* ---- City/region filter and footer spacing (1.41.0) ---- */
+.cec-org-tile-region { margin: 0; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--org-muted); }
+.cec-org-filter { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem 0.75rem; max-width: 75rem; margin: 0 auto 1.5rem; color: var(--org-text); }
+.cec-org-filter[hidden], .cec-org-empty[hidden], .cec-org-tile[hidden] { display: none !important; }
+.cec-org-filter label { font-weight: 700; }
+.cec-org-filter select { min-height: 44px; padding: 0.4rem 0.75rem; background: #0f0d16; color: var(--org-text); border: 1px solid var(--org-pink); border-radius: 0; font: inherit; }
+.cec-org-filter select:focus-visible { outline: 3px solid var(--org-lime); outline-offset: 2px; }
+.cec-org-filter-count { color: var(--org-muted); font-size: 0.9rem; }
+.cec-org-empty { text-align: center; color: #CCCCCC; }
+.cec-org-grid { margin-bottom: 5rem; }
+.cec-taxonomy-archive.is-partner-org { padding-bottom: 5rem; }
 
 @media (max-width: 1024px) {
 	.cec-org-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
