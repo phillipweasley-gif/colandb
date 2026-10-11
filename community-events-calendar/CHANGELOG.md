@@ -6,6 +6,16 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.41.1
+
+**Dark text on the calendar's pink elements** (owner, 2026-10-11: "make sure all the text on the website is the correct color").
+
+- A contrast check of every public page found white text on the secondary pink (#FF50D7) at 2.85:1, under the 4.5:1 minimum. It affected multi-day event bars, the Today button, the selected day number and the "paid" price badge.
+- Those now use #100F0F (7.4:1), like every other pink button on the site. Only colours change in `assets/css/frontend.css`; no markup changes, so the month view's HTML is unchanged.
+- The same check found theme-level problems (#333 page text and #CC3366 links from the Hello theme, the active Elementor tab). Those were fixed in the site's Additional CSS, not in this plugin.
+
+---
+
 ## 1.41.0
 
 **City/region filter on the listing pages, space above the footer, buttons that keep their colours anywhere** (owner, 2026-10-11: "can you create a space between the footer and content as well as a filter to filter profiles by city or region?").

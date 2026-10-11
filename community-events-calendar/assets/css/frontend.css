@@ -119,7 +119,7 @@ body.cec-plugin-page {
 	margin: 0 4px 4px 0;
 }
 .cec-badge-free { background: var(--cec-free-badge); }
-.cec-badge-paid { background: var(--cec-secondary); color: #fff; }
+.cec-badge-paid { background: var(--cec-secondary); color: #100F0F; }
 .cec-badge-varies { background: var(--cec-accent); color: #0b0a12; }
 .cec-badge-not-posted { background: transparent; color: var(--cec-text); box-shadow: inset 0 0 0 1px var(--cec-border-soft); }
 .cec-badge-postponed { background: #ffb020; color: #0b0a12; }
@@ -190,7 +190,7 @@ body.cec-plugin-page {
 }
 .cec-calendar-wrap .cec-cal-today-btn {
 	background: var(--cec-secondary) !important;
-	color: #fff !important;
+	color: #100F0F !important;
 	border: none !important;
 	border-radius: var(--cec-pill) !important;
 	box-shadow: none !important;
@@ -206,7 +206,7 @@ body.cec-plugin-page {
 .cec-calendar-wrap .cec-cal-today-btn:focus-visible,
 .cec-calendar-wrap .cec-cal-today-btn:active {
 	background: var(--cec-secondary) !important;
-	color: #fff !important;
+	color: #100F0F !important;
 	box-shadow: 0 0 16px var(--cec-secondary) !important;
 }
 
@@ -237,7 +237,7 @@ body.cec-plugin-page {
 	display: flex;
 	align-items: center;
 	background: var(--cec-secondary) !important;
-	color: #fff !important;
+	color: #100F0F !important;
 	border: none !important;
 	box-shadow: none !important;
 	text-shadow: none !important;
@@ -257,7 +257,7 @@ body.cec-plugin-page {
 .cec-calendar-wrap .cec-cal-bar:focus-visible,
 .cec-calendar-wrap .cec-cal-bar:active {
 	background: var(--cec-secondary) !important;
-	color: #fff !important;
+	color: #100F0F !important;
 	filter: brightness(1.1);
 }
 .cec-cal-bar .cec-cal-event-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -338,7 +338,7 @@ body.cec-plugin-page {
 .cec-calendar-wrap .cec-cal-selected-daynum,
 .cec-calendar-wrap .cec-cal-selected-daynum:hover,
 .cec-calendar-wrap .cec-cal-selected-daynum:focus-visible {
-	color: #fff !important;
+	color: #100F0F !important;
 	background: var(--cec-secondary) !important;
 }
 .cec-cal-events { margin-top: 5px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
