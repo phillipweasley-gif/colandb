@@ -94,9 +94,10 @@ for i in 1 2 3 4 5; do submit 10.0.0.3 -F "kind=organization" -F "name=ZZ Flood 
 r=$(submit 10.0.0.3 -F "kind=organization" -F "name=ZZ Flood 6" -F "description=x" -F "contact_name=F" -F "contact_email=f@example.com" -F "authorized=1")
 ok "rate limit: the 6th from one address in a day is refused" $(echo "$r" | grep -q "cec_org=error" && [ "$(q "SELECT COUNT(*) FROM wp_posts WHERE post_type='cec_org_submission' AND post_title LIKE 'ZZ Flood%'")" = 5 ] && echo 1 || echo 0)
 
-r=$(submit 10.0.0.4 -F "kind=titleholder" -F "name=ZZ Foxxy Test" -F "title=Great Lakes Handler" -F "year=2026" -F "producer=Great Lakes Leather" -F "description=Handler and educator." -F "mission=Pup and handler education." -F "contact_name=Fox" -F "contact_email=fox@example.com" -F "social[instagram]=https://www.instagram.com/foxxyforce13" -F "member=orgbo@example.com" -F "authorized=1")
+r=$(submit 10.0.0.4 -F "kind=titleholder" -F "name=ZZ Foxxy Test" -F "title=Great Lakes Handler" -F "year=2026" -F "producer=Great Lakes Leather" -F "titles_more[0][title]=Mr. Test Leather" -F "titles_more[0][year]=2024" -F "description=Handler and educator." -F "mission=Pup and handler education." -F "contact_name=Fox" -F "contact_email=fox@example.com" -F "social[instagram]=https://www.instagram.com/foxxyforce13" -F "member=orgbo@example.com" -F "authorized=1")
 TSUB=$(q "SELECT ID FROM wp_posts WHERE post_type='cec_org_submission' AND post_title='ZZ Foxxy Test'")
 ok "a titleholder submission keeps title, year and producer" $([ "$(ev "\$c=get_post_meta($TSUB,'_cec_org',true); echo \$c['kind'].'|'.\$c['title'].'|'.\$c['year'].'|'.\$c['producer'];")" = "titleholder|Great Lakes Handler|2026|Great Lakes Leather" ] && echo 1 || echo 0)
+ok "...and its extra titles" $([ "$(ev "\$c=get_post_meta($TSUB,'_cec_org',true); echo \$c['titles_more'][0]['title'].' '.\$c['titles_more'][0]['year'];")" = "Mr. Test Leather 2024" ] && echo 1 || echo 0)
 r=$(submit 10.0.0.5 -F "kind=titleholder" -F "name=ZZ Bad Year" -F "year=26" -F "description=x" -F "contact_name=F" -F "contact_email=f@example.com" -F "authorized=1")
 ok "a two-digit year is refused" $(echo "$r" | grep -q "cec_org=error" && echo 1 || echo 0)
 
@@ -139,9 +140,10 @@ ok "saving an approved listing again doesn't email the contact again or duplicat
 
 get admin rv2 "$H/wp-admin/post.php?post=$TSUB&action=edit"
 TN=$(php -r 'preg_match("~name=\"_wpnonce\" value=\"([^\"]+)\" form=\"cec-org-review-form\"~",file_get_contents($argv[1]),$m); echo $m[1]??"";' $T/rv2.html)
-decide $TSUB $TN approve --data-urlencode "kind=titleholder" --data-urlencode "name=ZZ Foxxy Test" --data-urlencode "title=Great Lakes Handler" --data-urlencode "year=2026" --data-urlencode "producer=Great Lakes Leather" --data-urlencode "description=Handler and educator." --data-urlencode "mission=Pup and handler education." --data-urlencode "contact_name=Fox" --data-urlencode "contact_email=fox@example.com" --data-urlencode "social[instagram]=https://www.instagram.com/foxxyforce13" --data-urlencode "member=orgbo@example.com" >/dev/null
+decide $TSUB $TN approve --data-urlencode "kind=titleholder" --data-urlencode "name=ZZ Foxxy Test" --data-urlencode "title=Great Lakes Handler" --data-urlencode "year=2026" --data-urlencode "producer=Great Lakes Leather" --data-urlencode "titles_more[0][title]=Mr. Test Leather" --data-urlencode "titles_more[0][year]=2024" --data-urlencode "description=Handler and educator." --data-urlencode "mission=Pup and handler education." --data-urlencode "contact_name=Fox" --data-urlencode "contact_email=fox@example.com" --data-urlencode "social[instagram]=https://www.instagram.com/foxxyforce13" --data-urlencode "member=orgbo@example.com" >/dev/null
 FID=$(ev 'echo (int) term_exists("ZZ Foxxy Test","cec_partner_org")["term_id"];')
 ok "titleholder approved; member found by email linked as Titleholder" $([ "$FID" -gt 0 ] && [ "$(q "SELECT role FROM $GL WHERE user_id=$BO AND term_id=$FID")" = titleholder ] && echo 1 || echo 0)
+ok "...approval saves the extra titles" $([ "$(ev "echo CEC_Orgs::profile($FID)['titles_more'][0]['title'];")" = "Mr. Test Leather" ] && echo 1 || echo 0)
 
 # A submission for a group that already exists fills it in instead of duplicating it.
 r=$(submit 10.0.0.6 -F "kind=organization" -F "name=ZZ Existing Group" -F "description=Already on the calendar." -F "contact_name=E" -F "contact_email=e@example.com" -F "authorized=1")
@@ -341,11 +343,15 @@ ok "once set back to Member, they can no longer edit" $(echo "$r" | grep -q '^40
 login orgbo orgbo orgbopass1234
 get orgbo tf "$(ev "echo get_term_link($FID,'cec_partner_org');")?cec_org_edit=1"
 TN5=$(php -r 'preg_match("~name=\"_cec_nonce\" value=\"([^\"]+)\"~",file_get_contents($argv[1]),$m); echo $m[1]??"";' $T/tf.html)
-r=$(curl -s -b $T/orgbo.jar -o /dev/null -w '%{redirect_url}' "$H/wp-admin/admin-post.php" -F "action=cec_org_edit" -F "term=$FID" -F "_cec_nonce=$TN5" -F "name=ZZ Foxxy Test" -F "summary=Great Lakes Handler 2026." -F $'highlights=Pup and handler education\nCommunity events' -F "description=Handler and educator." -F "title=Great Lakes Handler" -F "year=2026" -F "social[telegram]=https://t.me/foxxytest" -F "ask[fetlife]=1" -F "social[fetlife]=https://fetlife.com/users/123" -F "shape=rect")
+r=$(curl -s -b $T/orgbo.jar -o /dev/null -w '%{redirect_url}' "$H/wp-admin/admin-post.php" -F "action=cec_org_edit" -F "term=$FID" -F "_cec_nonce=$TN5" -F "name=ZZ Foxxy Test" -F "summary=Great Lakes Handler 2026." -F $'highlights=Pup and handler education\nCommunity events' -F "description=Handler and educator." -F "title=Great Lakes Handler" -F "year=2026" -F "titles_more[0][title]=Mr. Ohio Pup" -F "titles_more[0][year]=2025" -F "titles_more[0][producer]=Ohio Pups" -F "titles_more[1][title]=Bootblack Ohio" -F "titles_more[1][year]=25" -F "social[telegram]=https://t.me/foxxytest" -F "ask[fetlife]=1" -F "social[fetlife]=https://fetlife.com/users/123" -F "shape=rect")
 get anon gr4 "$H/?page_id=$GRID_ID"
 ok "a titleholder manages their own card: card text and bullet points" $([ "$(has $T/gr4.html 'Great Lakes Handler 2026.')$(has $T/gr4.html '<li>Pup and handler education</li>')" = 11 ] && echo 1 || echo 0)
 get anon fxp "$(ev "echo get_term_link($FID,'cec_partner_org');")"
 ok "titleholder page: 'Message me on Telegram', an 'Ask for my FetLife' tag and no FetLife link" $([ "$(has $T/fxp.html 'Message me on Telegram')$(has $T/fxp.html 'Ask for my FetLife')$(hasnt $T/fxp.html 'fetlife.com/users/123')" = 111 ] && [ "$(ev "echo isset(CEC_Orgs::profile($FID)['socials']['fetlife']) ? 1 : 0;")" = 0 ] && echo 1 || echo 0)
+ok "several titles: each shows on the page, in order" $([ "$(has $T/fxp.html 'Great Lakes Handler 2026')$(has $T/fxp.html 'Mr. Ohio Pup 2025 · Produced by Ohio Pups')$(has $T/fxp.html '>Bootblack Ohio<')" = 111 ] && echo 1 || echo 0)
+ok "...a bad year is dropped from that title only" $([ "$(ev "echo wp_json_encode(CEC_Orgs::profile($FID)['titles_more'][1]);")" = '{"title":"Bootblack Ohio","year":"","producer":""}' ] && echo 1 || echo 0)
+get anon grt "$H/?page_id=$GRID_ID"
+ok "...and on the card" $(has $T/grt.html 'cec-org-tile-title">Mr. Ohio Pup 2025')
 ok "...photo shape saved as rectangle" $([ "$(ev "echo CEC_Orgs::profile($FID)['shape'];")" = rect ] && echo 1 || echo 0)
 ok "...bullet points are laid out as a grid" $(has $T/fxp.html 'class="cec-org-highlights"')
 ev "CEC_Orgs::save_profile($ORG2,array('socials'=>array('telegram'=>'https://t.me/+OrgTwo')));" >/dev/null
@@ -360,6 +366,12 @@ ok "filter='yes' with 2+ areas shows 'Filter by city or region' with each area o
 ok "...tiles carry their area, and show it" $([ "$(has $T/fg.html 'data-region="columbus"')$(has $T/fg.html 'cec-org-tile-region')" = 11 ] && echo 1 || echo 0)
 get anon gr5 "$H/?page_id=$GRID_ID"
 ok "...grids without filter='yes' (the homepage) get no filter" $(hasnt $T/gr5.html 'Filter by city or region')
+FT=$($W post create --post_type=page --post_status=publish --post_title="ZZ Filter Titles" --post_content='[cec_partner_orgs kind="titleholder" filter="yes"]' --porcelain)
+ev "update_term_meta($FID,'cec_region','Detroit'); delete_term_meta($ORG2,'cec_region'); update_term_meta($ORG2,'cec_kind','titleholder');" >/dev/null
+get anon ft "$H/?page_id=$FT"
+ok "one area plus listings without one: the filter shows, with 'Area not listed'" $([ "$(has $T/ft.html 'Filter by city or region')$(has $T/ft.html '<option value="detroit">')$(has $T/ft.html 'Area not listed')" = 111 ] && echo 1 || echo 0)
+ev "delete_term_meta($FID,'cec_region'); update_term_meta($ORG2,'cec_kind','organization'); update_term_meta($ORG2,'cec_region','Ohio');" >/dev/null
+$W post delete $FT --force >/dev/null 2>&1
 $W post delete $FG --force >/dev/null 2>&1
 
 echo "== Titleholder's events (CEC 1.39.0 + CMP 0.23.0)"
