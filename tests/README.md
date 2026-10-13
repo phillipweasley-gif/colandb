@@ -11,7 +11,7 @@ bash tests/account-e2e.sh            # member plugin Account tab + dashboard loc
 bash tests/profile-e2e.sh            # member plugin profiles, photos, preferences, menus, account bar: 80 checks
 bash tests/dynamics-e2e.sh           # dynamics between members: 34 checks
 bash tests/homework-e2e.sh           # homework programs: 44 checks
-bash tests/chastity-e2e.sh           # chastity tracking, incl. keyholder-proposed locks and "verified elsewhere": 108 checks
+bash tests/chastity-e2e.sh           # chastity tracking, incl. keyholder-proposed locks, "verified elsewhere" and last verified on badges: 115 checks
 bash tests/feed-e2e.sh               # member feed: 41 checks
 bash tests/messages-e2e.sh           # member messages: 46 checks
 bash tests/follows-e2e.sh            # follow / unfollow: 27 checks
