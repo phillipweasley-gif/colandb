@@ -71,7 +71,7 @@ You choose what to fill in, and each item has its own **Show** switch:
 
 - **Dynamics:** relationships you propose or accept with other members (for example Keyholder / chastity wearer). Either of you can end one at any time.
 - **Homework:** programs a member you're in a dynamic with sets for you, your daily logs and proof (text and photos), their reviews, and the consequence agreements you both see.
-- **Chastity tracking:** locks you start, your keyholder's settings, verification photos and their daily codes, hygiene openings, releases and unlocks.
+- **Chastity tracking:** locks you start or accept from your keyholder, your keyholder's settings, verification photos and their daily codes, hygiene openings, releases and unlocks.
 - **Feed:** your posts and photos, the event you tag, likes, and reports you make.
 - **Messages:** your conversations, message requests, the members you block, and reports you make.
 - **Your calendar:** events you add with "Add to my calendar", whether you're going or interested, and who can see each one. Marking an event Going also RSVPs you if the event takes RSVPs here. If you turn on a private calendar link (to see your calendar in your phone's calendar app), we keep that link's secret key; anyone who has the link can see the events on your calendar, so keep it to yourself. You can make a new link (the old one stops working) or turn it off at any time.
@@ -112,7 +112,7 @@ Much of what members share here is sensitive: sexual orientation, sex life and k
 | Homework and its proof photos | You and the member who set it, while your dynamic is active. When a dynamic ends, they lose access straight away. |
 | Chastity verification photos | You and your keyholder, while your dynamic is active. |
 | Events on your calendar | Who you choose for each event: all members, your dynamic partners (members you're in an active dynamic with), or only you. Followers are told you're going only if they're allowed to see that event. |
-| A "Locked" badge on your profile | Members, only if you turn it on. |
+| A "Locked" badge on your profile | Members, only if you turn it on. If your keyholder allows it, the badge names them ("Locked by …") and their profile shows they hold your key ("Holds the key for …"). Your keyholder can leave the names off. |
 | RSVPs | The event's organizers and site administrators. A public headcount may be shown, but names never are. |
 
 **Blocking.** If you block someone, neither of you can see the other's profile, posts or conversation, follows and nods between you are removed, and any dynamic between you ends. They aren't told.
