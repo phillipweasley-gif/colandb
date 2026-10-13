@@ -11,7 +11,7 @@ bash tests/account-e2e.sh            # member plugin Account tab + dashboard loc
 bash tests/profile-e2e.sh            # member plugin profiles, photos, preferences, menus, account bar: 80 checks
 bash tests/dynamics-e2e.sh           # dynamics between members: 34 checks
 bash tests/homework-e2e.sh           # homework programs: 44 checks
-bash tests/chastity-e2e.sh           # chastity tracking: 55 checks
+bash tests/chastity-e2e.sh           # chastity tracking, incl. keyholder-proposed locks: 91 checks
 bash tests/feed-e2e.sh               # member feed: 41 checks
 bash tests/messages-e2e.sh           # member messages: 46 checks
 bash tests/follows-e2e.sh            # follow / unfollow: 27 checks
@@ -32,7 +32,7 @@ bash tests/org-e2e.sh                # organization & titleholder submissions, p
 | `account-e2e.sh` | Member plugin Account tab and dashboard lockout: details, email change by link, password, devices, privacy requests, exporter/eraser, who is kept out of wp-admin. Copies the plugin from this repo into the test site first. |
 | `dynamics-e2e.sh` | Dynamics (CMP 0.6.0): propose / accept / decline / withdraw / end, who may direct whom, connections, the profile Dynamics card, the 10-pending limit, duplicates, access, export/erase. Empties the dynamics table before and after. |
 | `homework-e2e.sh` | Homework (CMP 0.7.0): programs only from the leading side, tasks, member logging (date window, proof types), proof photos (EXIF stripped, private to the pair), lead review, archive when the dynamic ends, access, export/erase. Needs PHP GD. Empties the dynamics and homework tables before and after. |
-| `chastity-e2e.sh` | Chastity (CMP 0.8.0): starting a lock (self / keyholder only from a dynamic), keyholder time and rules, hidden timer, verification codes and photo privacy, hygiene, releases, ask to unlock, profile badge, dynamic ending (self-lock), emergency unlock, export/erase. Needs PHP GD. Empties the lock and dynamics tables before and after. |
+| `chastity-e2e.sh` | Chastity (CMP 0.8.0): starting a lock (self / keyholder only from a dynamic), keyholder time and rules, hidden timer, verification codes and photo privacy, hygiene, releases, ask to unlock, profile badge, dynamic ending (self-lock), emergency unlock, keyholder-proposed locks (CMP 0.24.0: propose, accept, decline, withdraw, dropped when the dynamic ends), export/erase. Needs PHP GD. Empties the lock and dynamics tables before and after. |
 | `feed-e2e.sh` | Feed (CMP 0.9.0): posting rules (empty, length, audience, photos, event window), who sees what (members / connections / signed out / not yet members), photo privacy and re-encoding, likes, reports (admin email), admin hide, delete, profile posts, dynamic ending, export/erase. Needs PHP GD. Creates and removes two test events and an administrator "mod". |
 | `messages-e2e.sh` | Messages (CMP 0.11.0): requests vs. inbox, the 3-message request limit, accepting, connected members, conversation privacy, requests off, the daily limit, deleting, blocking (messages, profiles, feed, dynamics), reports and the admin screen, export/erase. Creates and removes an administrator "mod". |
 | `org-e2e.sh` | Organization & titleholder listings (CEC 1.34.0) and member ↔ group links (CMP 0.20.0): the public form, review (approve/decline/existing group), `/partner/<slug>/` pages, the grid, old-address redirects, member links, export/erase. Switches the test site to pretty permalinks while it runs and restores them. |

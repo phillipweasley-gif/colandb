@@ -21,6 +21,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   served only to the wearer and their current keyholder.
  * - When the dynamic ends, the keyholder loses access at once and the lock
  *   carries on as a self-lock.
+ * - 0.24.0: the keyholder can set up a lock for the wearer (a row with
+ *   status 'proposed'). Nothing is locked until the wearer accepts; the timer
+ *   starts then. The wearer can decline, the keyholder can withdraw, and a
+ *   proposal disappears when the keyholder can no longer direct the wearer.
  */
 class CMP_Chastity {
 
@@ -87,6 +91,11 @@ class CMP_Chastity {
 			'cl_photo'    => array( 'error', __( 'That photo couldn\'t be used. Use a JPEG, PNG or WebP photo under 5 MB.', 'cmp' ) ),
 			'cl_gone'     => array( 'error', __( 'That lock isn\'t available.', 'cmp' ) ),
 			'cl_kh_name'  => array( 'error', __( 'Type your keyholder\'s name, or choose someone else.', 'cmp' ) ),
+			'cl_proposed' => array( 'success', __( 'Sent. The lock starts when they accept it.', 'cmp' ) ),
+			'cl_accepted' => array( 'success', __( 'Locked. Your timer is running.', 'cmp' ) ),
+			'cl_declined' => array( 'success', __( 'Declined. Your keyholder has been told.', 'cmp' ) ),
+			'cl_withdrawn'=> array( 'success', __( 'Withdrawn.', 'cmp' ) ),
+			'cl_pending'  => array( 'error', __( 'They already have a lock, or a lock from you waiting for an answer.', 'cmp' ) ),
 		);
 	}
 
@@ -111,6 +120,29 @@ class CMP_Chastity {
 	public static function locks_held( $keyholder_id ) {
 		global $wpdb;
 		return $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . self::t( 'locks' ) . " WHERE keyholder_id = %d AND status = 'locked' ORDER BY started_at", $keyholder_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	/** A lock the keyholder set up that's waiting for the wearer (0.24.0). */
+	public static function proposal_for( $wearer_id ) {
+		global $wpdb;
+		return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::t( 'locks' ) . " WHERE wearer_id = %d AND status = 'proposed' ORDER BY id DESC LIMIT 1", $wearer_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	public static function proposals_sent( $keyholder_id ) {
+		global $wpdb;
+		return $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . self::t( 'locks' ) . " WHERE keyholder_id = %d AND status = 'proposed' ORDER BY id", $keyholder_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	/** The planned length (minutes, 0 = open-ended) of a proposal, kept on its 'proposed' event. */
+	public static function proposed_minutes( $lock ) {
+		global $wpdb;
+		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT minutes FROM ' . self::t( 'lock_events' ) . " WHERE lock_id = %d AND type = 'proposed' ORDER BY id DESC LIMIT 1", $lock->id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	private static function delete_lock( $lock_id ) {
+		global $wpdb;
+		$wpdb->delete( self::t( 'lock_events' ), array( 'lock_id' => $lock_id ), array( '%d' ) );
+		$wpdb->delete( self::t( 'locks' ), array( 'id' => $lock_id ), array( '%d' ) );
 	}
 
 	public static function past_locks( $wearer_id ) {
@@ -161,6 +193,21 @@ class CMP_Chastity {
 				$u = get_userdata( $lead );
 				if ( $u ) {
 					$out[ $lead ] = $u->display_name;
+				}
+			}
+		}
+		return $out;
+	}
+
+	/** Members whose key this member holds (chastity add-on, them leading) (0.24.0). */
+	public static function wearer_choices( $keyholder_id ) {
+		$out = array();
+		foreach ( CMP_Dynamics::addons_for_user( $keyholder_id, array( 'active' ) ) as $ad ) {
+			$wearer = CMP_Dynamics::addon_other( $ad, $keyholder_id );
+			if ( 'chastity' === $ad->kind && (int) $ad->lead_id === (int) $keyholder_id && CMP_Dynamics::lead_can_direct( $keyholder_id, $wearer, 'chastity' ) ) {
+				$u = get_userdata( $wearer );
+				if ( $u ) {
+					$out[ $wearer ] = $u->display_name;
 				}
 			}
 		}
@@ -308,7 +355,19 @@ class CMP_Chastity {
 		if ( 'start' === $do ) {
 			self::start( $user_id );
 		}
+		if ( 'propose' === $do ) {
+			self::propose( $user_id );
+		}
 		$lock = self::lock( self::posted_int( 'lock' ) );
+		if ( $lock && 'proposed' === $lock->status ) {
+			if ( in_array( $do, array( 'accept', 'decline' ), true ) && self::is_wearer( $lock, $user_id ) ) {
+				call_user_func( array( __CLASS__, 'do_' . $do ), $lock, $user_id );
+			}
+			if ( 'withdraw' === $do && (int) $lock->keyholder_id === (int) $user_id ) {
+				self::do_withdraw( $lock, $user_id );
+			}
+			self::go( array(), 'cl_gone' );
+		}
 		if ( ! $lock || 'locked' !== $lock->status ) {
 			self::go( array(), 'cl_gone' );
 		}
@@ -386,6 +445,110 @@ class CMP_Chastity {
 			CMP_Notifications::add( $keyholder, 'lock', sprintf( __( '%1$s locked up with you as keyholder: %2$s.', 'cmp' ), self::me(), $name ), self::url( array( 'lock' => $lock_id ) ) );
 		}
 		self::go( array(), 'cl_started' );
+	}
+
+	/**
+	 * The keyholder sets up a lock for a member whose key they hold (0.24.0).
+	 * Nothing is locked yet: the wearer accepts or declines.
+	 */
+	private static function propose( $user_id ) {
+		global $wpdb;
+		$wearer  = self::posted_int( 'wearer' );
+		$option  = self::posted_key( 'option' );
+		$options = self::options();
+		$length  = self::posted_int( 'length' );
+		$hygiene = self::posted_int( 'hygiene_minutes' );
+		if ( ! isset( self::wearer_choices( $user_id )[ $wearer ] ) || ! isset( $options[ $option ] ) || ( $length && ! isset( self::lengths()[ $length ] ) ) || ! isset( self::hygiene_choices()[ $hygiene ] ) ) {
+			self::go( array(), 'cl_invalid' );
+		}
+		if ( self::active_lock( $wearer ) || self::proposal_for( $wearer ) ) {
+			self::go( array(), 'cl_pending' );
+		}
+		list( $name, $rule, $policy ) = $options[ $option ];
+		if ( 'custom' === $option ) {
+			$name   = self::text( 'option_name', 60 );
+			$rule   = self::text( 'rule', 300 );
+			$policy = self::posted_key( 'policy' );
+			if ( '' === $name || ! isset( self::policies()[ $policy ] ) ) {
+				self::go( array(), 'cl_invalid' );
+			}
+		}
+		$now = gmdate( 'Y-m-d H:i:s' );
+		$wpdb->insert(
+			self::t( 'locks' ),
+			array(
+				'wearer_id'       => $wearer,
+				'keyholder_id'    => $user_id,
+				'keyholder_name'  => '',
+				'option_key'      => $option,
+				'option_name'     => $name,
+				'rule'            => $rule,
+				'release_policy'  => $policy,
+				'started_at'      => $now, // Set again when the wearer accepts.
+				'planned_end'     => null,
+				'hide_timer'      => empty( $_POST['hide_timer'] ) ? 0 : 1, // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				'verify_daily'    => empty( $_POST['verify_daily'] ) ? 0 : 1, // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				'hygiene_minutes' => $hygiene,
+				'show_profile'    => 0,
+				'release_allowed' => 0,
+				'status'          => 'proposed',
+				'created_at'      => $now,
+				'updated_at'      => $now,
+			)
+		);
+		$lock_id = (int) $wpdb->insert_id;
+		self::add_event( $lock_id, $user_id, 'proposed', array( 'minutes' => $length, 'note' => self::text( 'note', 300 ) ) );
+		CMP_Audit::log( 'lock_proposed', 'lock', $lock_id, null, array( 'wearer' => $wearer, 'option' => $option, 'minutes' => $length ) );
+		/* translators: 1: keyholder, 2: option */
+		CMP_Notifications::add( $wearer, 'lock', sprintf( __( '%1$s set up a lock for you: %2$s. It starts only if you accept.', 'cmp' ), self::me(), $name ), self::url() );
+		self::go( array(), 'cl_proposed' );
+	}
+
+	/** The wearer accepts: the lock starts now, with the keyholder's settings. */
+	private static function do_accept( $lock, $user_id ) {
+		if ( ! CMP_Dynamics::lead_can_direct( $lock->keyholder_id, $user_id, 'chastity' ) ) {
+			self::delete_lock( $lock->id );
+			self::go( array(), 'cl_gone' );
+		}
+		if ( self::active_lock( $user_id ) ) {
+			self::go( array(), 'cl_busy' );
+		}
+		$minutes = self::proposed_minutes( $lock );
+		$photo   = self::posted_photo( array() );
+		self::update_lock(
+			$lock->id,
+			array(
+				'status'       => 'locked',
+				'started_at'   => gmdate( 'Y-m-d H:i:s' ),
+				'planned_end'  => $minutes ? gmdate( 'Y-m-d H:i:s', time() + $minutes * MINUTE_IN_SECONDS ) : null,
+				'show_profile' => empty( $_POST['show_profile'] ) ? 0 : 1, // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			)
+		);
+		$extra = array( 'minutes' => $minutes, 'note' => $lock->option_name );
+		if ( $photo ) {
+			$extra += array( 'photo' => $photo, 'photo_sha' => hash( 'sha256', $photo ) );
+		}
+		self::add_event( $lock->id, $user_id, 'locked', $extra );
+		CMP_Audit::log( 'lock_started', 'lock', $lock->id, null, array( 'keyholder' => (int) $lock->keyholder_id, 'proposed' => true, 'option' => $lock->option_key, 'minutes' => $minutes ) );
+		/* translators: 1: wearer, 2: option */
+		self::notify_keyholder( $lock, sprintf( __( '%1$s accepted your lock and is now locked: %2$s.', 'cmp' ), self::me(), $lock->option_name ) );
+		self::go( array(), 'cl_accepted' );
+	}
+
+	private static function do_decline( $lock, $user_id ) {
+		self::delete_lock( $lock->id );
+		CMP_Audit::log( 'lock_declined', 'lock', $lock->id, null, array( 'keyholder' => (int) $lock->keyholder_id ) );
+		/* translators: %s: wearer */
+		CMP_Notifications::add( (int) $lock->keyholder_id, 'lock', sprintf( __( '%s declined the lock you set up.', 'cmp' ), self::me() ), self::url() );
+		self::go( array(), 'cl_declined' );
+	}
+
+	private static function do_withdraw( $lock, $user_id ) {
+		self::delete_lock( $lock->id );
+		CMP_Audit::log( 'lock_withdrawn', 'lock', $lock->id, null, array( 'wearer' => (int) $lock->wearer_id ) );
+		/* translators: %s: keyholder */
+		CMP_Notifications::add( (int) $lock->wearer_id, 'lock', sprintf( __( '%s withdrew the lock they set up for you.', 'cmp' ), self::me() ), self::url() );
+		self::go( array(), 'cl_withdrawn' );
 	}
 
 	private static function notify_keyholder( $lock, $message ) {
@@ -581,6 +744,11 @@ class CMP_Chastity {
 				continue;
 			}
 			$ids = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM ' . self::t( 'locks' ) . " WHERE keyholder_id = %d AND wearer_id = %d AND status = 'locked'", $kh, $wearer ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$pending = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM ' . self::t( 'locks' ) . " WHERE keyholder_id = %d AND wearer_id = %d AND status = 'proposed'", $kh, $wearer ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			foreach ( $pending as $pid ) {
+				self::delete_lock( (int) $pid );
+				CMP_Audit::log( 'lock_proposal_dropped', 'lock', (int) $pid, null, null, 'Dynamic ended' );
+			}
 			foreach ( $ids as $id ) {
 				self::update_lock( (int) $id, array( 'keyholder_id' => 0, 'hide_timer' => 0, 'release_allowed' => 0 ) );
 				self::add_event( (int) $id, 0, 'keyholder_left' );
@@ -651,6 +819,10 @@ class CMP_Chastity {
 			<?php endif; ?>
 		</section>
 		<?php
+		$proposal = self::proposal_for( $user_id );
+		if ( $proposal ) {
+			echo self::proposal_html( $proposal, (bool) $lock ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
+		}
 		if ( $lock ) {
 			echo self::wearer_html( $lock ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		} else {
@@ -661,11 +833,12 @@ class CMP_Chastity {
 		<section class="cmp-panel">
 			<h3 class="cmp-panel-title"><?php esc_html_e( 'Locks you hold', 'cmp' ); ?></h3>
 			<?php if ( ! $held ) : ?>
-				<p class="cmp-empty"><?php esc_html_e( 'When a member whose key you hold (chastity in a dynamic) locks up with you as keyholder, their lock appears here.', 'cmp' ); ?></p>
+				<p class="cmp-empty"><?php esc_html_e( 'When a member whose key you hold (chastity in a dynamic) locks up with you as keyholder, or accepts a lock you set up for them, their lock appears here.', 'cmp' ); ?></p>
 			<?php endif; ?>
 			<?php foreach ( $held as $h ) : ?>
 				<p class="cmp-hw-item"><a href="<?php echo esc_url( self::url( array( 'lock' => $h->id ) ) ); ?>"><b><?php echo esc_html( self::name( $h->wearer_id ) ); ?></b></a> · <?php echo esc_html( $h->option_name ); ?> · <?php echo esc_html( sprintf( /* translators: %s: duration */ __( 'locked %s', 'cmp' ), self::duration( self::locked_seconds( $h ) ) ) ); ?></p>
 			<?php endforeach; ?>
+			<?php echo self::sent_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 		</section>
 		<?php
 		$past = self::past_locks( $user_id );
@@ -707,6 +880,79 @@ class CMP_Chastity {
 			$html .= '<p class="cmp-muted">' . esc_html__( 'To have a member as keyholder, agree chastity with them in a dynamic, with them holding the key (any type, or Keyholder / chastity wearer). See the Dynamics tab. If your keyholder doesn\'t have an account yet, choose "Someone without an account" and type their name.', 'cmp' ) . '</p>';
 		}
 		return $html . '</section>';
+	}
+
+	/** What the wearer is asked to agree to (0.24.0). */
+	private static function proposal_html( $lock, $busy ) {
+		$minutes = self::proposed_minutes( $lock );
+		$lengths = self::lengths();
+		$hyg     = self::hygiene_choices();
+		$note    = '';
+		foreach ( self::events( $lock->id, 5 ) as $e ) {
+			if ( 'proposed' === $e->type ) {
+				$note = $e->note;
+				break;
+			}
+		}
+		$length = $lock->hide_timer ? __( 'Hidden by your keyholder', 'cmp' ) : ( $minutes ? ( isset( $lengths[ $minutes ] ) ? $lengths[ $minutes ] : self::duration( $minutes * MINUTE_IN_SECONDS ) ) : __( 'Open-ended', 'cmp' ) );
+		$html   = '<section class="cmp-panel cmp-cl-proposal"><h3 class="cmp-panel-title">' . esc_html( sprintf( /* translators: %s: keyholder */ __( '%s set up a lock for you', 'cmp' ), self::name( $lock->keyholder_id ) ) ) . '</h3>';
+		$html  .= self::rule_html( $lock );
+		$html  .= '<ul class="cmp-cl-terms">';
+		$html  .= '<li>' . esc_html( sprintf( /* translators: %s: length */ __( 'Length: %s', 'cmp' ), $length ) ) . '</li>';
+		$html  .= '<li>' . esc_html( $lock->verify_daily ? __( 'Daily verification photo: yes', 'cmp' ) : __( 'Daily verification photo: no', 'cmp' ) ) . '</li>';
+		$html  .= '<li>' . esc_html( sprintf( /* translators: %s: hygiene allowance */ __( 'Hygiene opening: %s', 'cmp' ), isset( $hyg[ (int) $lock->hygiene_minutes ] ) ? $hyg[ (int) $lock->hygiene_minutes ] : '' ) ) . '</li>';
+		$html  .= '</ul>';
+		if ( '' !== (string) $note ) {
+			$html .= '<p class="cmp-hw-std">“' . esc_html( $note ) . '”</p>';
+		}
+		$html .= '<p class="cmp-muted">' . esc_html__( 'Nothing starts until you accept. Once you do, your timer starts and your keyholder can manage the lock. Emergency unlock is always available to you.', 'cmp' ) . '</p>';
+		if ( $busy ) {
+			$html .= '<p class="cmp-muted">' . esc_html__( 'End your current lock to accept this one.', 'cmp' ) . '</p>';
+		} else {
+			$html .= self::form_open( 'accept', $lock->id, true );
+			$html .= '<p class="cmp-field"><label for="cmp_cl_aphoto">' . esc_html__( 'Photo of the lock (optional)', 'cmp' ) . '</label><input type="file" id="cmp_cl_aphoto" name="photo" accept="image/jpeg,image/png,image/webp" /></p>';
+			$html .= self::check( 'show_profile', 'cmp_cl_ashow', __( 'Show "Locked · N days" on my profile', 'cmp' ), false );
+			$html .= '<button type="submit" class="cmp-btn">' . esc_html__( 'Accept and lock', 'cmp' ) . '</button></form>';
+		}
+		$html .= self::form_open( 'decline', $lock->id, false, 'cmp-inline-form' ) . '<button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Decline', 'cmp' ) . '</button></form>';
+		return $html . '</section>';
+	}
+
+	/** The keyholder's "Set up a lock" form and the locks waiting for an answer (0.24.0). */
+	private static function sent_html( $user_id ) {
+		$html = '';
+		foreach ( self::proposals_sent( $user_id ) as $p ) {
+			$html .= '<p class="cmp-hw-item"><b>' . esc_html( self::name( $p->wearer_id ) ) . '</b> · ' . esc_html( $p->option_name ) . ' · ' . esc_html__( 'waiting for them to accept', 'cmp' ) . ' ' . self::form_open( 'withdraw', $p->id, false, 'cmp-inline-form' ) . '<button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Withdraw', 'cmp' ) . '</button></form></p>';
+		}
+		$wearers = array();
+		foreach ( self::wearer_choices( $user_id ) as $id => $label ) {
+			if ( ! self::active_lock( $id ) && ! self::proposal_for( $id ) ) {
+				$wearers[ $id ] = $label;
+			}
+		}
+		if ( ! $wearers ) {
+			return $html;
+		}
+		$options = array();
+		foreach ( self::options() as $k => $o ) {
+			$options[ $k ] = $o[0];
+		}
+		$html .= '<details class="cmp-hw-taskedit cmp-cl-propose"><summary>' . esc_html__( 'Set up a lock for someone', 'cmp' ) . '</summary>';
+		$html .= '<p class="cmp-muted">' . esc_html__( 'They\'re asked to accept. Their timer starts when they do, with the settings you choose here.', 'cmp' ) . '</p>';
+		$html .= self::form_open( 'propose' );
+		$html .= '<div class="cmp-grid cmp-grid-3"><p class="cmp-field"><label for="cmp_cl_pw">' . esc_html__( 'Wearer', 'cmp' ) . '</label>' . self::select( 'wearer', 'cmp_cl_pw', $wearers, key( $wearers ) ) . '</p>';
+		$html .= '<p class="cmp-field"><label for="cmp_cl_popt">' . esc_html__( 'Option', 'cmp' ) . '</label>' . self::select( 'option', 'cmp_cl_popt', $options, 'a' ) . '</p>';
+		$html .= '<p class="cmp-field"><label for="cmp_cl_plen">' . esc_html__( 'Planned length', 'cmp' ) . '</label>' . self::select( 'length', 'cmp_cl_plen', array( 0 => __( 'Open-ended', 'cmp' ) ) + self::lengths(), 10080 ) . '</p></div>';
+		$html .= '<p class="cmp-field"><label for="cmp_cl_phyg">' . esc_html__( 'Hygiene opening', 'cmp' ) . '</label>' . self::select( 'hygiene_minutes', 'cmp_cl_phyg', self::hygiene_choices(), 15 ) . '</p>';
+		$html .= '<details class="cmp-hw-taskedit"><summary>' . esc_html__( 'Custom option', 'cmp' ) . '</summary><p class="cmp-muted">' . esc_html__( 'Used when Option is "Custom".', 'cmp' ) . '</p>';
+		$html .= '<p class="cmp-field"><label for="cmp_cl_pname">' . esc_html__( 'Name', 'cmp' ) . '</label><input type="text" id="cmp_cl_pname" name="option_name" maxlength="60" /></p>';
+		$html .= '<p class="cmp-field"><label for="cmp_cl_prule">' . esc_html__( 'Rule', 'cmp' ) . '</label><input type="text" id="cmp_cl_prule" name="rule" maxlength="300" /></p>';
+		$html .= '<p class="cmp-field"><label for="cmp_cl_ppol">' . esc_html__( 'Release', 'cmp' ) . '</label>' . self::select( 'policy', 'cmp_cl_ppol', self::policies(), 'none' ) . '</p></details>';
+		$html .= self::check( 'hide_timer', 'cmp_cl_phide', __( 'Hide the time left from them', 'cmp' ), false );
+		$html .= self::check( 'verify_daily', 'cmp_cl_pvd', __( 'Daily verification photo', 'cmp' ), false );
+		$html .= '<p class="cmp-field"><label for="cmp_cl_pnote">' . esc_html__( 'Message (optional)', 'cmp' ) . '</label><input type="text" id="cmp_cl_pnote" name="note" maxlength="300" /></p>';
+		$html .= '<button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Send to them', 'cmp' ) . '</button></form></details>';
+		return $html;
 	}
 
 	private static function timer_html( $lock, $show_left ) {
@@ -847,6 +1093,8 @@ class CMP_Chastity {
 		switch ( $e->type ) {
 			case 'locked':
 				return sprintf( /* translators: %s: option */ __( 'Locked: %s', 'cmp' ), $e->note ) . ( $len && ! $hide_length ? ' · ' . $len : '' );
+			case 'proposed':
+				return __( 'Keyholder set up this lock', 'cmp' ) . ( $len && ! $hide_length ? ' · ' . $len : '' );
 			case 'verification':
 				return sprintf( /* translators: %s: code */ __( 'Verification photo (code %s)', 'cmp' ), $e->code );
 			case 'hygiene_open':
@@ -894,7 +1142,7 @@ class CMP_Chastity {
 		$utc    = new DateTimeZone( 'UTC' );
 		$from   = ( clone $first )->setTimezone( $utc )->format( 'Y-m-d H:i:s' );
 		$to     = ( clone $next )->setTimezone( $utc )->format( 'Y-m-d H:i:s' );
-		$locks  = $wpdb->get_results( $wpdb->prepare( 'SELECT id, started_at, ended_at, status FROM ' . self::t( 'locks' ) . ' WHERE wearer_id = %d AND started_at < %s AND ( ended_at IS NULL OR ended_at >= %s )', $user_id, $to, $from ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$locks  = $wpdb->get_results( $wpdb->prepare( 'SELECT id, started_at, ended_at, status FROM ' . self::t( 'locks' ) . ' WHERE wearer_id = %d AND status IN (\'locked\',\'ended\') AND started_at < %s AND ( ended_at IS NULL OR ended_at >= %s )', $user_id, $to, $from ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( ! $locks ) {
 			return '';
 		}
@@ -965,6 +1213,10 @@ class CMP_Chastity {
 		foreach ( $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM ' . self::t( 'locks' ) . ' WHERE wearer_id = %d', $user_id ) ) as $id ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			$n += (int) $wpdb->delete( self::t( 'lock_events' ), array( 'lock_id' => $id ), array( '%d' ) );
 			$n += (int) $wpdb->delete( self::t( 'locks' ), array( 'id' => $id ), array( '%d' ) );
+		}
+		foreach ( $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM ' . self::t( 'locks' ) . " WHERE keyholder_id = %d AND status = 'proposed'", $user_id ) ) as $id ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			self::delete_lock( (int) $id );
+			$n++;
 		}
 		$n += (int) $wpdb->query( $wpdb->prepare( 'UPDATE ' . self::t( 'locks' ) . ' SET keyholder_id = 0, hide_timer = 0, release_allowed = 0 WHERE keyholder_id = %d', $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$wpdb->update( self::t( 'lock_events' ), array( 'actor_id' => 0 ), array( 'actor_id' => $user_id ), array( '%d' ), array( '%d' ) );

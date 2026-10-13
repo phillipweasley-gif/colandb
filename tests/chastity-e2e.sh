@@ -217,6 +217,64 @@ ok "wearer can end it" $([ "$(lk $NID status)" = "ended" ] && echo 1 || echo 0)
 r=$(act nosy $(hnonce $T/n0.html) wearer_settings -F "lock=$NID" -F "keyholder_name=Hacked")
 ok "another member can't change someone's lock" $([ "$(lk $NID keyholder_name)" = "" ] && echo 1 || echo 0)
 
+echo "== Keyholder sets up a lock (0.24.0)"
+get kh s0 "$PAGE&cmp_tab=chastity"
+ok "no Set up form without a chastity dynamic" $(hasnt $T/s0.html 'Set up a lock for someone')
+SN=$(hnonce $T/s0.html)
+r=$(act kh $SN propose -F "wearer=$SOLO" -F "option=a" -F "length=1440" -F "hygiene_minutes=15")
+ok "can't set up a lock for someone whose key you don't hold" $(echo "$r" | grep -q 'cl_invalid' && [ "$(q "SELECT COUNT(*) FROM $L_T WHERE wearer_id=$SOLO AND status='proposed'")" = 0 ] && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->insert('$D_T',array('type'=>'keyholder','proposer_id'=>$KH,'partner_id'=>$SOLO,'proposer_side'=>'a','status'=>'active','proposer_show'=>1,'partner_show'=>1,'created_at'=>gmdate('Y-m-d H:i:s'))); CMP_Dynamics::grant('chastity',$KH,$SOLO);" >/dev/null
+DYN2=$(q "SELECT MAX(id) FROM $D_T")
+get kh s1 "$PAGE&cmp_tab=chastity"
+ok "keyholder sees Set up a lock with the wearer offered" $([ "$(has $T/s1.html 'Set up a lock for someone')$(grep -o 'id="cmp_cl_pw"[^/]*' $T/s1.html | grep -q "value=\"$SOLO\"" && echo 1 || echo 0)" = 11 ] && echo 1 || echo 0)
+r=$(act kh $SN propose -F "wearer=$SOLO" -F "option=custom" -F "option_name=" -F "length=1440" -F "hygiene_minutes=15")
+ok "custom without a name is refused" $(echo "$r" | grep -q 'cl_invalid' && echo 1 || echo 0)
+r=$(act kh $SN propose -F "wearer=$SOLO" -F "option=b" -F "length=4320" -F "hygiene_minutes=30" -F "hide_timer=1" -F "verify_daily=1" -F "note=Starting tonight")
+PID=$(q "SELECT MAX(id) FROM $L_T WHERE wearer_id=$SOLO AND status='proposed'")
+ok "proposal saved, nothing locked yet" $(echo "$r" | grep -q 'cl_proposed' && [ -n "$PID" ] && [ "$(lk $PID keyholder_id hide_timer verify_daily hygiene_minutes)" = "$KH|1|1|30" ] && [ -z "$(q "SELECT id FROM $L_T WHERE wearer_id=$SOLO AND status='locked'")" ] && echo 1 || echo 0)
+ok "wearer told" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$SOLO AND message LIKE '%set up a lock for you%'")" -ge 1 ] && echo 1 || echo 0)
+r=$(act kh $SN propose -F "wearer=$SOLO" -F "option=a" -F "length=60" -F "hygiene_minutes=15")
+ok "only one waiting proposal per wearer" $(echo "$r" | grep -q 'cl_pending' && [ "$(q "SELECT COUNT(*) FROM $L_T WHERE wearer_id=$SOLO AND status='proposed'")" = 1 ] && echo 1 || echo 0)
+get kh s2 "$PAGE&cmp_tab=chastity"
+ok "keyholder sees it waiting, with Withdraw" $([ "$(has $T/s2.html 'waiting for them to accept')$(has $T/s2.html 'value="withdraw"')" = 11 ] && echo 1 || echo 0)
+ok "keyholder has no controls before acceptance" $(r=$(act kh $SN time -F "lock=$PID" -F "minutes=60" -F "direction=add"); echo "$r" | grep -q 'cl_gone' && [ -z "$(lk $PID planned_end)" ] && echo 1 || echo 0)
+get solo w0 "$PAGE&cmp_tab=chastity"
+ok "wearer sees the proposal with its terms, length hidden" $([ "$(has $T/w0.html 'Sample Keyholder set up a lock for you')$(has $T/w0.html 'One release a week')$(has $T/w0.html 'Hidden by your keyholder')$(has $T/w0.html 'Starting tonight')$(has $T/w0.html 'Accept and lock')$(has $T/w0.html 'Emergency unlock is always available')" = 111111 ] && echo 1 || echo 0)
+ok "wearer doesn't see the length (3 days) in the proposal" $(perl -0ne 'print $1 if /cmp-cl-proposal(.*?)<\/section>/s' $T/w0.html | grep -q '3 days' && echo 0 || echo 1)
+WN=$(hnonce $T/w0.html)
+r=$(act nosy $(hnonce $T/n0.html) accept -F "lock=$PID")
+ok "another member can't accept it" $([ "$(lk $PID status)" = "proposed" ] && echo 1 || echo 0)
+r=$(act solo $WN accept -F "lock=$PID" -F "show_profile=1")
+ok "accepting starts the lock with the keyholder's settings" $(echo "$r" | grep -q 'cl_accepted' && [ "$(lk $PID status keyholder_id option_key hide_timer show_profile)" = "locked|$KH|b|1|1" ] && echo 1 || echo 0)
+ok "planned end is 3 days from acceptance" $(ev "\$l=CMP_Chastity::lock($PID); \$d=strtotime(\$l->planned_end.' UTC')-time(); echo (\$d>4320*60-120 && \$d<=4320*60)?1:0;")
+ok "keyholder told" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$KH AND message LIKE '%accepted your lock%'")" -ge 1 ] && echo 1 || echo 0)
+get kh s3 "$PAGE&cmp_tab=chastity&lock=$PID"
+ok "keyholder now manages it" $([ "$(has $T/s3.html "Solo Wearer&#039;s lock")$(has $T/s3.html 'Add time')" = 11 ] && echo 1 || echo 0)
+get solo w1 "$PAGE&cmp_tab=chastity"
+ok "wearer: My lock, timer hidden, emergency unlock there" $([ "$(has $T/w1.html 'Keyholder: Sample Keyholder')$(has $T/w1.html 'hidden by your keyholder')$(has $T/w1.html 'value="emergency"')" = 111 ] && echo 1 || echo 0)
+r=$(act solo $WN emergency -F "lock=$PID")
+ok "emergency unlock still works" $([ "$(lk $PID status end_reason)" = "ended|emergency" ] && echo 1 || echo 0)
+
+r=$(act kh $SN propose -F "wearer=$SOLO" -F "option=a" -F "length=60" -F "hygiene_minutes=0")
+P2=$(q "SELECT MAX(id) FROM $L_T WHERE wearer_id=$SOLO AND status='proposed'")
+r=$(act solo $WN decline -F "lock=$P2")
+ok "decline removes it and tells the keyholder" $(echo "$r" | grep -q 'cl_declined' && [ "$(q "SELECT COUNT(*) FROM $L_T WHERE id=$P2")" = 0 ] && [ "$(q "SELECT COUNT(*) FROM $E_T WHERE lock_id=$P2")" = 0 ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$KH AND message LIKE '%declined the lock%'")" -ge 1 ] && echo 1 || echo 0)
+r=$(act kh $SN propose -F "wearer=$SOLO" -F "option=a" -F "length=60" -F "hygiene_minutes=0")
+P3=$(q "SELECT MAX(id) FROM $L_T WHERE wearer_id=$SOLO AND status='proposed'")
+r=$(act solo $WN withdraw -F "lock=$P3")
+ok "the wearer can't withdraw" $([ "$(lk $P3 status)" = "proposed" ] && echo 1 || echo 0)
+r=$(act kh $SN withdraw -F "lock=$P3")
+ok "keyholder can withdraw; wearer told" $(echo "$r" | grep -q 'cl_withdrawn' && [ "$(q "SELECT COUNT(*) FROM $L_T WHERE id=$P3")" = 0 ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$SOLO AND message LIKE '%withdrew the lock%'")" -ge 1 ] && echo 1 || echo 0)
+r=$(act solo $WN start -F "keyholder=0" -F "option=a" -F "length=60")
+OWN=$(q "SELECT MAX(id) FROM $L_T WHERE wearer_id=$SOLO AND status='locked'")
+r=$(act kh $SN propose -F "wearer=$SOLO" -F "option=a" -F "length=60" -F "hygiene_minutes=0")
+ok "no proposal while they're already locked" $(echo "$r" | grep -q 'cl_pending' && echo 1 || echo 0)
+r=$(act solo $WN emergency -F "lock=$OWN")
+r=$(act kh $SN propose -F "wearer=$SOLO" -F "option=a" -F "length=60" -F "hygiene_minutes=0")
+P4=$(q "SELECT MAX(id) FROM $L_T WHERE wearer_id=$SOLO AND status='proposed'")
+ev "global \$wpdb; \$d=CMP_Dynamics::get($DYN2); \$wpdb->update('$D_T',array('status'=>'ended'),array('id'=>$DYN2)); do_action('cmp_dynamic_ended',\$d,$SOLO);" >/dev/null
+ok "dynamic ending drops a waiting proposal" $([ "$(q "SELECT COUNT(*) FROM $L_T WHERE id=$P4")" = 0 ] && echo 1 || echo 0)
+
 echo "== Privacy"
 ok "export lists the lock and its history" $(ev "\$j=wp_json_encode(CMP_Account::export('pup@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'One release a week') && false!==strpos(\$j,'Verification photo') && false!==strpos(\$j,'(photo kept)')?1:0;")
 ok "erase removes the wearer's locks and history" $(ev "CMP_Account::erase('pup@example.com'); global \$wpdb; echo 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $L_T WHERE wearer_id=$PUP\") && 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $E_T WHERE lock_id=$LID\")?1:0;")

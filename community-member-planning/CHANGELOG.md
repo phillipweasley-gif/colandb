@@ -4,6 +4,22 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.24.0
+
+**A keyholder can set up a lock for the person whose key they hold** (owner, 2026-10-12: "I need to be able to setup a lock for a submissive … right now it can only be done by the submissive").
+
+- **Chastity tab → Locks you hold → Set up a lock for someone.** Offered to a member who holds someone's key (an active dynamic with the chastity add-on, them leading) when that person has no active lock and no lock waiting. The keyholder picks the wearer, option (or Custom), planned length, hygiene allowance, hidden timer, daily verification and an optional message.
+- **The wearer accepts or declines.** Nothing is locked until they accept. They see the rules, length (or "Hidden by your keyholder"), verification and hygiene terms, and can add a lock photo and the profile badge when accepting. The timer starts at acceptance, with the keyholder's settings; from then on it's an ordinary keyholder lock. Emergency unlock is unchanged.
+- **The keyholder can withdraw** a lock that's still waiting. Both sides are notified of each step (proposed, accepted, declined, withdrawn).
+- **One waiting lock per wearer.** A waiting lock is removed if the dynamic ends or the chastity add-on is turned off, and when the keyholder's data is erased. It has no keyholder controls until it's accepted, and doesn't show on the calendar or profile badge.
+- Stored as a `locks` row with status `proposed` (planned length on its `proposed` event); no schema change, so `CMP_DB_VERSION` is unchanged.
+- **Help & FAQ page** (a WordPress page, not in this repository) still says only the wearer starts a lock; it needs the owner's update.
+- **Verification** (local WordPress from GitHub sources, SQLite, PHP 8.3):
+  - `tests/chastity-e2e.sh` 91/91, with 23 new checks for proposing, accepting, declining, withdrawing, access, and the dynamic ending.
+  - `dynamics-e2e.sh` 56/56, `homework-e2e.sh` 44/44, `account-e2e.sh` 69/69. Erasing a keyholder with a waiting lock checked by hand. `php -l`.
+
+---
+
 ## 0.23.1
 
 - **Profile tab → Groups and titles:** "Run a group or hold a title? **Submit it to be listed**" links to the submission page (the published page with the slug `submit-organization`).
