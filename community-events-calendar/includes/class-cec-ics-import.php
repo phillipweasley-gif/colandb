@@ -37,15 +37,11 @@ class CEC_Ics_Import {
 	 *                                last import. A VEVENT with no UID, or one
 	 *                                that doesn't match anything, is still
 	 *                                created fresh either way.
-	 * @return array{created:int,updated:int,recurrence_skipped:int,errors:string[]}
+	 * @param array  $owner           1.45.0: who the events belong to (see apply_owner()).
+	 * @return array{created:int,updated:int,recurrence_skipped:int,errors:string[],ids:int[]}
 	 */
-	public static function import( $raw, $author_id, $update_existing = false ) {
-		$result = array(
-			'created'            => 0,
-			'updated'            => 0,
-			'recurrence_skipped' => 0,
-			'errors'             => array(),
-		);
+	public static function import( $raw, $author_id, $update_existing = false, $owner = array() ) {
+		$result = self::empty_result();
 
 		$lines = self::unfold( $raw );
 		$events = self::split_vevents( $lines );
@@ -103,135 +99,402 @@ class CEC_Ics_Import {
 				$end_dt   = ( $end_info && ! $end_info['all_day'] ) ? $end_info['datetime'] : clone $start_dt;
 			}
 
-			$description = isset( $props['DESCRIPTION'] ) ? self::unescape_text( $props['DESCRIPTION']['value'] ) : '';
-			$location    = isset( $props['LOCATION'] ) ? self::unescape_text( $props['LOCATION']['value'] ) : '';
-			$uid         = isset( $props['UID'] ) ? trim( $props['UID']['value'] ) : '';
-
 			$organizer_name = '';
 			if ( isset( $props['ORGANIZER']['params']['CN'] ) ) {
 				$organizer_name = trim( $props['ORGANIZER']['params']['CN'], " \t\"" );
 			}
-
 			// Many real calendar exports (Google Calendar, Eventbrite,
 			// etc.) set a URL property pointing at a "more info" page for
 			// the event — this plugin's own .ics export already emits
 			// one (pointing at the event's own permalink), so reading it
 			// back on import is the natural counterpart.
-			$more_info_url = isset( $props['URL']['value'] ) ? esc_url_raw( trim( $props['URL']['value'] ) ) : '';
+			self::save_event(
+				array(
+					'title'       => $title,
+					'description' => isset( $props['DESCRIPTION'] ) ? self::unescape_text( $props['DESCRIPTION']['value'] ) : '',
+					'location'    => isset( $props['LOCATION'] ) ? self::unescape_text( $props['LOCATION']['value'] ) : '',
+					'uid'         => isset( $props['UID'] ) ? trim( $props['UID']['value'] ) : '',
+					'organizer'   => $organizer_name,
+					'url'         => isset( $props['URL']['value'] ) ? esc_url_raw( trim( $props['URL']['value'] ) ) : '',
+					'start'       => $start_dt,
+					'end'         => $end_dt,
+					'all_day'     => $start_info['all_day'],
+					'timezone'    => ! empty( $props['DTSTART']['params']['TZID'] ) ? $props['DTSTART']['params']['TZID'] : '',
+					'repeats'     => ! empty( $props['RRULE'] ),
+					'price'       => null,
+				),
+				$author_id,
+				$update_existing,
+				$owner,
+				$result
+			);
+		}
 
-			$existing_id = 0;
-			if ( $update_existing && $uid ) {
-				$matches = get_posts(
-					array(
-						'post_type'      => 'cec_event',
-						'post_status'    => array( 'publish', 'pending', 'draft', 'future', 'private', 'cec_in_review' ),
-						'posts_per_page' => 1,
-						'fields'         => 'ids',
-						'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery
-							array(
-								'key'   => '_cec_ics_import_uid',
-								'value' => $uid,
-							),
+		return self::finish( $result );
+	}
+
+	/**
+	 * 1.45.0: who imported events belong to. Empty = the uploader, as before.
+	 * - member_id: the member who manages them (post author, so they show
+	 *   under My Events); their email is also kept as the submitter email.
+	 * - email: someone without an account; they manage the events through
+	 *   Manage My Submission (an edit link by email), like a guest submission.
+	 * - org_ids: organization / titleholder terms, so the events show on
+	 *   that group's page and under its name on the calendar.
+	 *
+	 * @param array $owner { member_id?: int, email?: string, org_ids?: int[] }
+	 */
+	private static function apply_owner( $post_id, $owner ) {
+		if ( ! empty( $owner['member_id'] ) ) {
+			wp_update_post( array( 'ID' => $post_id, 'post_author' => (int) $owner['member_id'] ) );
+			$user = get_userdata( (int) $owner['member_id'] );
+			if ( $user ) {
+				update_post_meta( $post_id, '_cec_submitter_email', strtolower( $user->user_email ) );
+			}
+		} elseif ( ! empty( $owner['email'] ) ) {
+			// Like a guest submission: no account owns it; the email does.
+			wp_update_post( array( 'ID' => $post_id, 'post_author' => 0 ) );
+			update_post_meta( $post_id, '_cec_submitter_email', strtolower( $owner['email'] ) );
+		}
+		if ( ! empty( $owner['org_ids'] ) ) {
+			wp_set_object_terms( $post_id, array_map( 'intval', $owner['org_ids'] ), 'cec_partner_org', false );
+		}
+	}
+
+	/**
+	 * Saves one normalized event (from an .ics VEVENT or a CSV row).
+	 *
+	 * @param array $ev  title, description, location, uid, organizer, url,
+	 *                   start/end (DateTime, site time), all_day, timezone,
+	 *                   repeats, price (null = the source has no price).
+	 */
+	private static function save_event( $ev, $author_id, $update_existing, $owner, &$result ) {
+		$title          = $ev['title'];
+		$description    = $ev['description'];
+		$location       = $ev['location'];
+		$uid            = $ev['uid'];
+		$organizer_name = $ev['organizer'];
+		$more_info_url  = $ev['url'];
+		$start_dt       = $ev['start'];
+		$end_dt         = $ev['end'];
+		if ( '' === $organizer_name && ! empty( $owner['org_ids'] ) ) {
+			$term           = get_term( (int) $owner['org_ids'][0], 'cec_partner_org' );
+			$organizer_name = $term && ! is_wp_error( $term ) ? $term->name : '';
+		}
+		$existing_id = 0;
+		if ( $update_existing && $uid ) {
+			$matches = get_posts(
+				array(
+					'post_type'      => 'cec_event',
+					'post_status'    => array( 'publish', 'pending', 'draft', 'future', 'private', 'cec_in_review' ),
+					'posts_per_page' => 1,
+					'fields'         => 'ids',
+					'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+						array(
+							'key'   => '_cec_ics_import_uid',
+							'value' => $uid,
 						),
-					)
-				);
-				$existing_id = $matches ? (int) $matches[0] : 0;
-			}
-
-			if ( $existing_id ) {
-				$post_id = wp_update_post(
-					array(
-						'ID'           => $existing_id,
-						'post_title'   => sanitize_text_field( $title ),
-						'post_content' => wp_kses_post( $description ),
 					),
-					true
-				);
+				)
+			);
+			$existing_id = $matches ? (int) $matches[0] : 0;
+		}
+
+		if ( $existing_id ) {
+			$post_id = wp_update_post(
+				array(
+					'ID'           => $existing_id,
+					'post_title'   => sanitize_text_field( $title ),
+					'post_content' => wp_kses_post( $description ),
+				),
+				true
+			);
+		} else {
+			$post_id = wp_insert_post(
+				array(
+					'post_type'    => 'cec_event',
+					// Imports are restricted to Administrators/Calendar
+					// Managers (the same people who'd otherwise approve a
+					// pending submission), so there's no second person
+					// left to review it against — it's published directly
+					// rather than queued behind its own uploader. 1.45.0:
+					// saved as a draft first and published once its date,
+					// place and group are set (below), so the "New event"
+					// email to subscribers has the details and reaches
+					// the group's followers.
+					'post_status'  => 'draft',
+					'post_title'   => sanitize_text_field( $title ),
+					'post_content' => wp_kses_post( $description ),
+					'post_author'  => $author_id,
+				),
+				true
+			);
+		}
+
+		if ( is_wp_error( $post_id ) ) {
+			/* translators: 1: event title, 2: the underlying WordPress error message */
+			$result['errors'][] = sprintf( __( '"%1$s" could not be saved: %2$s', 'cec' ), $title, $post_id->get_error_message() );
+			return;
+		}
+
+		// These fields are what the source file actually provides,
+		// so a re-sync (matched update) refreshes them just like a
+		// fresh import would — the same way a calendar subscription
+		// is expected to behave when it's re-pulled.
+		update_post_meta( $post_id, '_cec_start', $start_dt->format( 'Y-m-d\TH:i' ) );
+		update_post_meta( $post_id, '_cec_end', $end_dt->format( 'Y-m-d\TH:i' ) );
+		update_post_meta( $post_id, '_cec_venue_custom_address', sanitize_text_field( $location ) );
+		if ( $organizer_name ) {
+			update_post_meta( $post_id, '_cec_host_org_name', sanitize_text_field( $organizer_name ) );
+		}
+		if ( $more_info_url ) {
+			update_post_meta( $post_id, '_cec_more_info_url', $more_info_url );
+		}
+
+		if ( $existing_id ) {
+			// Local enrichments an admin may have already added since
+			// the last import — the real Cost, a linked Venue/Partner
+			// Org term, a manually-set postponed/cancelled status —
+			// are deliberately left untouched on a matched update.
+			// None of these ever came from the source file in the
+			// first place, so re-syncing the file's own fields has no
+			// business overwriting them back to their import default.
+			CEC_Audit_Log::log( $post_id, 'event_ics_resynced' );
+			$result['updated']++;
+		} else {
+			// ICS has no price field at all to read from — "Price not
+			// posted" (the fourth admission state, added precisely for
+			// cases like this) says exactly that, honestly, instead of
+			// guessing Free or inventing a "Paid" claim the source file
+			// never actually made.
+			if ( null === $ev['price'] ) {
+				update_post_meta( $post_id, '_cec_admission_status', 'not_posted' );
+				$result['no_price'] = ( $result['no_price'] ?? 0 ) + 1;
+			} elseif ( 0.0 === (float) $ev['price'] ) {
+				update_post_meta( $post_id, '_cec_admission_status', 'free_confirmed' );
 			} else {
-				$post_id = wp_insert_post(
-					array(
-						'post_type'    => 'cec_event',
-						// Imports are restricted to Administrators/Calendar
-						// Managers (the same people who'd otherwise approve a
-						// pending submission), so there's no second person
-						// left to review it against — publish directly rather
-						// than queuing it behind its own uploader.
-						'post_status'  => 'publish',
-						'post_title'   => sanitize_text_field( $title ),
-						'post_content' => wp_kses_post( $description ),
-						'post_author'  => $author_id,
-					),
-					true
-				);
+				update_post_meta( $post_id, '_cec_admission_status', 'paid' );
+				update_post_meta( $post_id, '_cec_price_amount', (string) $ev['price'] );
+				update_post_meta( $post_id, '_cec_price_currency', 'USD' );
 			}
+			update_post_meta( $post_id, '_cec_location_mode', $location ? 'in_person' : 'not_posted' );
+			update_post_meta( $post_id, '_cec_time_mode', $ev['all_day'] ? 'all_day' : 'exact' );
+			if ( $ev['timezone'] && CEC_Event_Helper::is_valid_timezone( $ev['timezone'] ) ) {
+				update_post_meta( $post_id, '_cec_timezone', $ev['timezone'] );
+			}
+			update_post_meta( $post_id, '_cec_event_status', 'scheduled' );
+			update_post_meta( $post_id, '_cec_recurrence_rule', 'none' );
+			if ( $uid ) {
+				update_post_meta( $post_id, '_cec_ics_import_uid', sanitize_text_field( $uid ) );
+			}
+			CEC_Audit_Log::log( $post_id, 'event_imported_ics' );
+			$result['created']++;
+		}
+		update_post_meta( $post_id, '_cec_ics_imported_at', current_time( 'mysql' ) ); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp
+		if ( $owner ) {
+			self::apply_owner( $post_id, $owner );
+		}
+		if ( ! $existing_id ) {
+			wp_update_post( array( 'ID' => $post_id, 'post_status' => 'publish' ) );
+		}
+		$result['ids'][] = (int) $post_id;
 
-			if ( is_wp_error( $post_id ) ) {
-				/* translators: 1: event title, 2: the underlying WordPress error message */
-				$result['errors'][] = sprintf( __( '"%1$s" could not be saved: %2$s', 'cec' ), $title, $post_id->get_error_message() );
+		if ( $ev['repeats'] ) {
+			$result['recurrence_skipped']++;
+			/* translators: 1: event title */
+			$result['errors'][] = sprintf( __( '"%s" repeats in the source file (a recurrence rule was found) — only its first date was imported. Set recurrence manually on this event if it should repeat here too.', 'cec' ), $title );
+		}
+	}
+
+	/** The import summary's closing note, once per import rather than per event. */
+	private static function finish( $result ) {
+		if ( ! empty( $result['no_price'] ) ) {
+			// .ics has no price field at all, and a CSV may leave the
+			// column empty: "Price not posted" says exactly that instead
+			// of guessing Free or inventing a price.
+			$result['errors'][] = sprintf(
+				/* translators: %d: number of events */
+				_n( '%d imported event had no price in the file, so it was marked Price Not Posted rather than guessing Free or a price — review and set the real cost.', '%d imported events had no price in the file, so each was marked Price Not Posted rather than guessing Free or a price — review and set the real cost on each one.', (int) $result['no_price'], 'cec' ),
+				(int) $result['no_price']
+			);
+		}
+		unset( $result['no_price'] );
+		return $result;
+	}
+
+	/**
+	 * 1.45.0: CSV import, for organizers whose events live in a spreadsheet
+	 * or a tool that exports CSV. One event per row; the first row names the
+	 * columns. Column names are matched loosely (case, spaces and
+	 * punctuation ignored), including Outlook's export names:
+	 *
+	 *   Title (or Subject, Name, Event)             required
+	 *   Start (date and time), or Start Date + Start Time   required
+	 *   End, or End Date + End Time                 optional (defaults to the start)
+	 *   All Day (yes/true/1)                        optional; a start with no time is all-day too
+	 *   Description, Location (or Venue, Address), URL (or Link), Price (or Cost)
+	 *
+	 * Price: empty = Price Not Posted; "Free" or 0 = Free; one amount
+	 * ("$20", "20.00") = that price; anything else is left Not Posted, noted.
+	 * Each row gets a stable ID from its title and start, so re-uploading the
+	 * same sheet with "update previously imported" updates instead of duplicating.
+	 */
+	public static function import_csv( $raw, $author_id, $update_existing = false, $owner = array() ) {
+		$result = self::empty_result();
+		$raw    = preg_replace( '/^\xEF\xBB\xBF/', '', (string) $raw );
+		$fh     = fopen( 'php://temp', 'r+' );
+		fwrite( $fh, $raw );
+		rewind( $fh );
+		$header = fgetcsv( $fh, 0, ',', '"', '\\' );
+		$map    = array();
+		$alias  = array(
+			'title'       => array( 'title', 'subject', 'name', 'event', 'eventname', 'eventtitle', 'summary' ),
+			'start'       => array( 'start', 'starts', 'startdatetime', 'startdate', 'date', 'begin' ),
+			'start_time'  => array( 'starttime', 'time' ),
+			'end'         => array( 'end', 'ends', 'enddatetime', 'enddate', 'finish' ),
+			'end_time'    => array( 'endtime' ),
+			'all_day'     => array( 'allday', 'alldayevent' ),
+			'description' => array( 'description', 'details', 'about', 'notes' ),
+			'location'    => array( 'location', 'venue', 'address', 'where', 'place' ),
+			'url'         => array( 'url', 'link', 'moreinfo', 'eventurl', 'website', 'eventlink' ),
+			'price'       => array( 'price', 'cost', 'admission', 'ticketprice' ),
+		);
+		foreach ( (array) $header as $i => $name ) {
+			$key = preg_replace( '/[^a-z0-9]/', '', strtolower( (string) $name ) );
+			foreach ( $alias as $field => $names ) {
+				if ( ! isset( $map[ $field ] ) && in_array( $key, $names, true ) ) {
+					$map[ $field ] = $i;
+				}
+			}
+		}
+		if ( ! isset( $map['title'], $map['start'] ) ) {
+			fclose( $fh );
+			$result['errors'][] = __( 'The first row of the CSV needs column names, including a Title and a Start (or Start Date) column. Download the template from this page to see the layout.', 'cec' );
+			return $result;
+		}
+		$tz  = wp_timezone();
+		$row = 1;
+		while ( false !== ( $cells = fgetcsv( $fh, 0, ',', '"', '\\' ) ) ) {
+			$row++;
+			if ( array( null ) === $cells || '' === trim( implode( '', $cells ) ) ) {
 				continue;
 			}
-
-			// These fields are what the source file actually provides,
-			// so a re-sync (matched update) refreshes them just like a
-			// fresh import would — the same way a calendar subscription
-			// is expected to behave when it's re-pulled.
-			update_post_meta( $post_id, '_cec_start', $start_dt->format( 'Y-m-d\TH:i' ) );
-			update_post_meta( $post_id, '_cec_end', $end_dt->format( 'Y-m-d\TH:i' ) );
-			update_post_meta( $post_id, '_cec_venue_custom_address', sanitize_text_field( $location ) );
-			if ( $organizer_name ) {
-				update_post_meta( $post_id, '_cec_host_org_name', sanitize_text_field( $organizer_name ) );
+			$get   = function ( $field ) use ( $map, $cells ) {
+				return isset( $map[ $field ], $cells[ $map[ $field ] ] ) ? trim( (string) $cells[ $map[ $field ] ] ) : '';
+			};
+			$title = $get( 'title' );
+			if ( '' === $title ) {
+				/* translators: %d: row number in the spreadsheet */
+				$result['errors'][] = sprintf( __( 'Row %d has no title and was skipped.', 'cec' ), $row );
+				continue;
 			}
-			if ( $more_info_url ) {
-				update_post_meta( $post_id, '_cec_more_info_url', $more_info_url );
+			$start_str = trim( $get( 'start' ) . ' ' . $get( 'start_time' ) );
+			$start     = self::parse_loose_datetime( $start_str, $tz );
+			if ( ! $start ) {
+				/* translators: 1: row number, 2: event title, 3: what was in the start column */
+				$result['errors'][] = sprintf( __( 'Row %1$d ("%2$s"): the start "%3$s" isn\'t a date this importer can read, so it was skipped. Use a format like 2026-10-16 19:00 or 10/16/2026 7:00 PM.', 'cec' ), $row, $title, $start_str );
+				continue;
 			}
-
-			if ( $existing_id ) {
-				// Local enrichments an admin may have already added since
-				// the last import — the real Cost, a linked Venue/Partner
-				// Org term, a manually-set postponed/cancelled status —
-				// are deliberately left untouched on a matched update.
-				// None of these ever came from the source file in the
-				// first place, so re-syncing the file's own fields has no
-				// business overwriting them back to their import default.
-				CEC_Audit_Log::log( $post_id, 'event_ics_resynced' );
-				$result['updated']++;
-			} else {
-				// ICS has no price field at all to read from — "Price not
-				// posted" (the fourth admission state, added precisely for
-				// cases like this) says exactly that, honestly, instead of
-				// guessing Free or inventing a "Paid" claim the source file
-				// never actually made.
-				update_post_meta( $post_id, '_cec_admission_status', 'not_posted' );
-				update_post_meta( $post_id, '_cec_location_mode', $location ? 'in_person' : 'not_posted' );
-				update_post_meta( $post_id, '_cec_time_mode', $start_info['all_day'] ? 'all_day' : 'exact' );
-				if ( ! empty( $props['DTSTART']['params']['TZID'] ) && CEC_Event_Helper::is_valid_timezone( $props['DTSTART']['params']['TZID'] ) ) {
-					update_post_meta( $post_id, '_cec_timezone', $props['DTSTART']['params']['TZID'] );
+			$all_day = in_array( strtolower( $get( 'all_day' ) ), array( 'yes', 'y', 'true', '1', 'x' ), true ) || ! $start['has_time'];
+			$end_str = trim( $get( 'end' ) . ' ' . $get( 'end_time' ) );
+			if ( '' === $get( 'end' ) && '' !== $get( 'end_time' ) ) {
+				$end_str = trim( $get( 'start' ) . ' ' . $get( 'end_time' ) );
+			}
+			$end = '' === $end_str ? null : self::parse_loose_datetime( $end_str, $tz );
+			if ( '' !== $end_str && ! $end ) {
+				/* translators: 1: row number, 2: event title */
+				$result['errors'][] = sprintf( __( 'Row %1$d ("%2$s"): the end couldn\'t be read, so the event was given its start time only.', 'cec' ), $row, $title );
+			}
+			$start_dt = $start['datetime'];
+			$end_dt   = $end ? $end['datetime'] : clone $start_dt;
+			if ( $all_day ) {
+				$start_dt->setTime( 0, 0 );
+				$end_dt->setTime( 23, 59 );
+			}
+			if ( $end_dt < $start_dt ) {
+				$end_dt = clone $start_dt;
+			}
+			$price_raw = strtolower( $get( 'price' ) );
+			$price     = null;
+			if ( '' !== $price_raw ) {
+				if ( in_array( $price_raw, array( 'free', '0', '$0', '0.00', '$0.00', 'no cost' ), true ) ) {
+					$price = 0.0;
+				} elseif ( 1 === preg_match_all( '/\d+(?:\.\d{1,2})?/', $price_raw, $m ) && preg_match( '/^\s*\$?\s*\d+(?:\.\d{1,2})?\s*(usd)?\s*$/', $price_raw ) ) {
+					$price = (float) $m[0][0];
+				} else {
+					/* translators: 1: row number, 2: event title, 3: what was in the price column */
+					$result['errors'][] = sprintf( __( 'Row %1$d ("%2$s"): the price "%3$s" wasn\'t a single amount, so it was left as Price Not Posted. Set it on the event.', 'cec' ), $row, $title, $get( 'price' ) );
 				}
-				update_post_meta( $post_id, '_cec_event_status', 'scheduled' );
-				update_post_meta( $post_id, '_cec_recurrence_rule', 'none' );
-				if ( $uid ) {
-					update_post_meta( $post_id, '_cec_ics_import_uid', sanitize_text_field( $uid ) );
-				}
-				CEC_Audit_Log::log( $post_id, 'event_imported_ics' );
-				$result['created']++;
 			}
-			update_post_meta( $post_id, '_cec_ics_imported_at', current_time( 'mysql' ) ); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp
+			$url = $get( 'url' );
+			self::save_event(
+				array(
+					'title'       => $title,
+					'description' => $get( 'description' ),
+					'location'    => $get( 'location' ),
+					'uid'         => 'csv-' . md5( strtolower( $title ) . '|' . $start_dt->format( 'Y-m-d\TH:i' ) ),
+					'organizer'   => '',
+					'url'         => $url && wp_http_validate_url( $url ) ? esc_url_raw( $url ) : '',
+					'start'       => $start_dt,
+					'end'         => $end_dt,
+					'all_day'     => $all_day,
+					'timezone'    => '',
+					'repeats'     => false,
+					'price'       => $price,
+				),
+				$author_id,
+				$update_existing,
+				$owner,
+				$result
+			);
+		}
+		fclose( $fh );
+		if ( 1 === $row ) {
+			$result['errors'][] = __( 'The CSV has column names but no events below them.', 'cec' );
+		}
+		return self::finish( $result );
+	}
 
-			if ( ! empty( $props['RRULE'] ) ) {
-				$result['recurrence_skipped']++;
-				/* translators: 1: event title */
-				$result['errors'][] = sprintf( __( '"%s" repeats in the source file (a recurrence rule was found) — only its first date was imported. Set recurrence manually on this event if it should repeat here too.', 'cec' ), $title );
+	/**
+	 * A spreadsheet date/time in the site's time zone: ISO ("2026-10-16 19:00",
+	 * "2026-10-16T19:00"), US ("10/16/2026 7:00 PM", "10/16/26 19:00") or
+	 * written out ("Oct 16, 2026 7pm").
+	 *
+	 * @return array{datetime:DateTime,has_time:bool}|null
+	 */
+	private static function parse_loose_datetime( $str, $tz ) {
+		$str = trim( preg_replace( '/\s+/', ' ', (string) $str ) );
+		if ( '' === $str ) {
+			return null;
+		}
+		$has_time = (bool) preg_match( '/\d{1,2}:\d{2}|\d\s*(am|pm)\b/i', $str );
+		$formats  = array( 'Y-m-d H:i', 'Y-m-d\TH:i', 'Y-m-d H:i:s', 'Y-m-d\TH:i:s', 'Y-m-d', 'm/d/Y g:i A', 'm/d/Y g:iA', 'm/d/Y g A', 'm/d/Y H:i', 'm/d/Y', 'm/d/y g:i A', 'm/d/y H:i', 'm/d/y', 'n/j/Y g:i A', 'n/j/Y H:i', 'n/j/Y' );
+		foreach ( $formats as $f ) {
+			$dt = DateTime::createFromFormat( '!' . $f, strtoupper( $str ), $tz );
+			$err = DateTime::getLastErrors();
+			if ( $dt && ( ! $err || ( 0 === $err['warning_count'] && 0 === $err['error_count'] ) ) ) {
+				return array( 'datetime' => $dt, 'has_time' => $has_time );
 			}
 		}
-
-		if ( $result['created'] > 0 ) {
-			// One summary note rather than one per event — .ics has no
-			// price field at all, so this applies to every single import,
-			// not a subset worth calling out individually.
-			$result['errors'][] = __( "None of the imported events had pricing info in the source file, so each was marked Price Not Posted rather than guessing Free or a price — review and set the real cost on each one.", 'cec' );
+		if ( preg_match( '/[a-z]{3}/i', $str ) ) {
+			try {
+				$dt = new DateTime( $str, $tz );
+				return array( 'datetime' => $dt, 'has_time' => $has_time );
+			} catch ( Exception $e ) {
+				return null;
+			}
 		}
+		return null;
+	}
 
-		return $result;
+	private static function empty_result() {
+		return array(
+			'created'            => 0,
+			'updated'            => 0,
+			'recurrence_skipped' => 0,
+			'errors'             => array(),
+			'ids'                => array(),
+		);
 	}
 
 	/**
@@ -348,7 +611,8 @@ class CEC_Ics_Import {
 		if ( ! preg_match( '/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?$/', $value, $m ) ) {
 			return null;
 		}
-		list( , $y, $mo, $d, $h, $mi, $s, $is_utc ) = $m;
+		list( , $y, $mo, $d, $h, $mi, $s ) = $m;
+		$is_utc = $m[7] ?? ''; // 1.45.0: no trailing Z means no 8th match (was an "Undefined array key" warning).
 		$date_str = "$y-$mo-$d $h:$mi:$s";
 
 		try {

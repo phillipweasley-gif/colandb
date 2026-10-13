@@ -109,7 +109,7 @@ The separate member-planning plugin (Phase 2/3) reads events only through these,
 | `[cec_events view="grid\|list"]` | `CEC_Shortcodes::list_grid` | As of 1.24.1, **the default is `view="list"`** (it was `view="grid"` before 1.24.1 — if you see old documentation or an old saved Elementor layout assuming grid is the default, it is not, as of this version). List view is the redesigned "date-range-first" card layout from 1.23.0; Grid view is the older photo-forward card grid and is unchanged. Filterable by event type, venue, and a date-range preset (This Week/This Month/Next 3 Months/All Upcoming); a separate Soonest-First/Latest-First sort toggle. As of 1.24.0, the current filter/sort/view state round-trips through the page URL's own query string (`cec_event_type`, `cec_venue`, `cec_date_range`, `cec_sort`, `cec_view`) — copying the URL reproduces the same filtered view. AJAX-refreshed via `CEC_Ajax::filter_events`. |
 | `[cec_upcoming count="8"]` | `CEC_Shortcodes::upcoming` | Horizontal scroll widget; default count from Settings. Not changed by Phase 1a–1d beyond picking up the new admission-badge labels automatically. |
 | `[cec_submit_event]` | `CEC_Submission_Form` | Main front-end submission form; login/guest gating per Settings. One of the five duplicated forms — see §2. |
-| `[cec_admin_dashboard]` | `CEC_Frontend_Dashboard` | Requires `cec_manage_events` capability. Approve/reject/edit/delete events, manage partner orgs & venues, manage series dates, import `.ics` calendar files. As of 1.25.0, an event's edit screen here also shows the Phase 1d editor preview (see Appendix A, item 10). |
+| `[cec_admin_dashboard]` | `CEC_Frontend_Dashboard` | Requires `cec_manage_events` capability. Approve/reject/edit/delete events, manage partner orgs & venues, manage series dates, import `.ics` or `.csv` (1.45.0: optionally for an organizer: a group, and a member or email who manages them) calendar files. As of 1.25.0, an event's edit screen here also shows the Phase 1d editor preview (see Appendix A, item 10). |
 | `[cec_my_events]` | `CEC_My_Events` | A logged-in submitter's own events: edit (→ back to `pending`), postpone/cancel, withdraw, manage series dates. |
 | `[cec_login]` / `[cec_register]` | `CEC_Auth` | Styled equivalents of wp-login.php; register has an email/password path plus a honeypot field. |
 | `[cec_manage_submission]` | `CEC_Guest_Edit` | Guest (no-account) editing via emailed bearer-token link. See §5. |
@@ -240,7 +240,7 @@ This appendix exists because the main body of this document describes architectu
 
 | Meta key | Type | Allowed values | Notes |
 |---|---|---|---|
-| `_cec_ics_import_uid` / `_cec_ics_imported_at` | string | Pre-existing, unchanged by Phase 1 | Used by the `.ics` calendar-file importer's "update existing instead of duplicate" feature. |
+| `_cec_ics_import_uid` / `_cec_ics_imported_at` | string | Pre-existing, unchanged by Phase 1 | Used by the `.ics` calendar-file importer's "update existing instead of duplicate" feature. 1.45.0: CSV rows get `csv-<md5 of title|start>`. |
 
 ### A2. Post status
 

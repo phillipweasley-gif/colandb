@@ -6,6 +6,29 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.45.0
+
+**Import events for an organizer, and "Copy for Facebook, FetLife or Telegram"** (owner, 2026-10-13, from a member asking: "Is there a way to import events already posted to other socials … As an organizer, it is exhausting having to cross post to so many different formats." Owner: "build both").
+
+- **Import for an organizer** (Calendar Admin → Import):
+  - Takes a **.csv spreadsheet** as well as an .ics calendar file. One event per row; column names in the first row, matched loosely: Title (or Subject / Name / Event), Start (or Start Date + Start Time), End (or End Date + End Time), All Day, Description, Location (or Venue / Address), URL (or Link), Price (or Cost). Outlook's export columns work as-is. Dates like 2026-10-16 19:00, 10/16/2026 7:00 PM or Oct 16, 2026 7pm, in the site's time zone; a date with no time is all-day. Price: empty = Price Not Posted, "Free" or 0 = Free, one amount = Paid at that amount, anything else (a range) = Not Posted with a note. Rows with no title or an unreadable date are skipped and listed. A "Download a template" link gives the layout.
+  - **Organization or titleholder** (optional): the events are linked to that group, so they show on its page and under its name, and its name is the host when the file doesn't give one.
+  - **Managed by** (optional): a member's username or email makes them the events' author (they appear in that member's My Events, with their email as the submitter email); an email address with no account owns them like a guest submission (no author, submitter email set), so that person manages them through Manage My Submission. An unknown username stops the import with a clear message and nothing created.
+  - **Email them** (on by default): the owner gets a list of the events with links and where to manage them.
+  - Re-uploading the same CSV with "update previously imported" updates instead of duplicating (each row's ID comes from its title and start).
+- **Copy for Facebook, FetLife or Telegram** on every event page: the event written up as plain text (title, a CANCELLED/POSTPONED line when it applies, When, Where, Cost, Hosted by, the description with its paragraph breaks, "Details and RSVP: <link>") in a read-only box with a **Copy text** button, so organizers post once on COL&B and paste it everywhere else. No HTML or emoji, so it pastes cleanly on every platform. `CEC_Event_Helper::post_text()`.
+- **Fixes found along the way:**
+  - The import summary ("3 events imported", per-event notes) never showed after an import: its token was mixed case and was read back through `sanitize_key()`, which lowercases. Now lowercase.
+  - Imported events were published before their date, place and group were saved, so the "New event" email to subscribers went out without the date and place, and a group's subscribers weren't matched at all. Events are now saved as drafts, filled in, then published.
+  - An .ics time without a trailing "Z" logged "Undefined array key 7".
+- **Verification** (local WordPress test kit, macOS, PHP 8.4):
+  - New `tests/import-e2e.sh`: 30/30. Covers the form; an .ics imported for a member (author, submitter email, group, host, date/place/link, their email, the group subscriber's "New event" email with date and place, My Events, the group page); a CSV for an email with no account (Outlook columns, prices, all-day, a two-line description, guest ownership, the summary listing skipped rows and price notes, the owner's email, Manage My Submission finding them); re-upload without duplicates; an unknown username, an unknown group, a wrong file type and a CSV without Title/Start are refused; a non-manager can't import; the copy text (fields, link, line breaks, no HTML, host named once, Price Not Posted, CANCELLED).
+  - `tests/org-e2e.sh` 147/147 and `tests/calendar-e2e.sh` 73/73 still pass. No plugin warnings in `debug.log`. `php -l` on every changed PHP file.
+  - Mac setup as before (local router script, port 8898, uncommitted copies of the scripts).
+- **Not possible:** importing straight from Facebook or FetLife. Facebook offers no export of a group's or Page's events without an approved Facebook app, and FetLife has no export or API (and automated collection breaks its rules).
+
+---
+
 ## 1.44.1
 
 **Page-edit emails showed "Array" for extra titles** (owner, 2026-10-13: "fix the Array email bug").

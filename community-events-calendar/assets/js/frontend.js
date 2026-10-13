@@ -39,6 +39,13 @@
 	// Desktop always gets the icon menu instead, which needs no OS handoff.
 	var isTouchDevice = ( 'ontouchstart' in window ) || ( navigator.maxTouchPoints > 0 );
 
+	// 1.45.0: "Copy for Facebook, FetLife or Telegram" on the event page.
+	$( document ).on( 'click', '.cec-post-copy-btn', function () {
+		var $btn = $( this );
+		var $text = $btn.closest( '.cec-post-copy' ).find( '.cec-post-copy-text' );
+		copyLink( $text.val(), $btn );
+	} );
+
 	$( document ).on( 'click', '.cec-share-toggle', function ( e ) {
 		var $share = $( this ).closest( '.cec-share' );
 		if ( navigator.share && isTouchDevice ) {

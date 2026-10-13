@@ -106,6 +106,15 @@ while ( have_posts() ) :
 						</div>
 					</div>
 
+					<?php // 1.45.0: post once here, paste everywhere else. ?>
+					<details class="cec-post-copy">
+						<summary><?php esc_html_e( 'Copy for Facebook, FetLife or Telegram', 'cec' ); ?></summary>
+						<p class="cec-field-hint"><?php esc_html_e( 'The event written up and ready to paste into a post or an event on another site.', 'cec' ); ?></p>
+						<label class="screen-reader-text" for="cec-post-copy-<?php echo (int) $data['id']; ?>"><?php esc_html_e( 'Event text to copy', 'cec' ); ?></label>
+						<textarea id="cec-post-copy-<?php echo (int) $data['id']; ?>" class="cec-post-copy-text" rows="10" readonly><?php echo esc_textarea( CEC_Event_Helper::post_text( $data ) ); ?></textarea>
+						<button type="button" class="cec-btn cec-btn-small cec-post-copy-btn"><?php esc_html_e( 'Copy text', 'cec' ); ?></button>
+					</details>
+
 					<?php $where = CEC_Event_Helper::location_display( $data ); ?>
 					<h3><?php esc_html_e( 'Where', 'cec' ); ?></h3>
 					<p>

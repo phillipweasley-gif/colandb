@@ -1007,6 +1007,64 @@ class CEC_Event_Helper {
 	 * the native OS share sheet (see the .cec-share-btn JS), which lists
 	 * whatever's actually installed on the visitor's own device.
 	 */
+	/**
+	 * 1.45.0: the event written up as plain text, ready to paste into a
+	 * Facebook or FetLife event or post, or a Telegram message, so an
+	 * organizer posts once here and copies it everywhere else. Plain text
+	 * only (no HTML, no emoji) so it pastes cleanly on every platform.
+	 */
+	public static function post_text( $data ) {
+		$lines = array( $data['title_plain'] );
+		if ( 'scheduled' !== $data['event_status'] ) {
+			$lines[] = strtoupper( $data['event_status'] ) . ( $data['event_status_note'] ? ': ' . self::plain_text( $data['event_status_note'] ) : '' );
+		}
+		$lines[] = '';
+		$when = self::when_text( $data );
+		if ( $when ) {
+			/* translators: %s: date and time */
+			$lines[] = sprintf( __( 'When: %s', 'cec' ), self::plain_text( $when ) );
+		}
+		$where = self::location_display( $data );
+		$place = trim( $where['label'] . ( $where['detail'] ? ' — ' . $where['detail'] : '' ) );
+		if ( 'in_person' === $data['location_mode'] && $data['address'] && $data['venue_name'] && false === strpos( $place, $data['address'] ) ) {
+			$place .= ', ' . $data['address'];
+		}
+		/* translators: %s: place */
+		$lines[] = sprintf( __( 'Where: %s', 'cec' ), self::plain_text( $place ) );
+		$cost = self::admission_badge( array_merge( $data, array( 'event_status' => 'scheduled' ) ) );
+		/* translators: %s: price, "Free" or "Price Not Posted" */
+		$lines[] = sprintf( __( 'Cost: %s', 'cec' ), self::plain_text( $cost['label'] ) );
+		$hosts = array();
+		if ( $data['host_org_name'] ) {
+			$hosts[] = self::plain_text( $data['host_org_name'] );
+		}
+		foreach ( (array) $data['partners'] as $partner ) {
+			$name = is_array( $partner ) && isset( $partner['name'] ) ? self::plain_text( $partner['name'] ) : '';
+			if ( $name && ! in_array( $name, $hosts, true ) ) {
+				$hosts[] = $name;
+			}
+		}
+		if ( $hosts ) {
+			/* translators: %s: organizations and titleholders */
+			$lines[] = sprintf( __( 'Hosted by: %s', 'cec' ), implode( ', ', $hosts ) );
+		}
+		$html        = $data['content'] ? $data['content'] : $data['excerpt'];
+		$html        = preg_replace( array( '#</p>\s*#i', '#<br\s*/?>#i', '#</li>\s*#i' ), array( "\n\n", "\n", "\n" ), (string) $html );
+		$description = self::plain_text( $html );
+		$description = trim( preg_replace( "/\n{3,}/", "\n\n", str_replace( array( "\r\n", "\r" ), "\n", $description ) ) );
+		if ( $description ) {
+			if ( mb_strlen( $description ) > 1500 ) {
+				$description = rtrim( mb_substr( $description, 0, 1497 ) ) . '…';
+			}
+			$lines[] = '';
+			$lines[] = $description;
+		}
+		$lines[] = '';
+		/* translators: %s: link to the event on this site */
+		$lines[] = sprintf( __( 'Details and RSVP: %s', 'cec' ), $data['permalink'] );
+		return implode( "\n", $lines );
+	}
+
 	public static function share_links( $data ) {
 		$url   = $data['permalink'];
 		$title = $data['title_plain'];
