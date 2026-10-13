@@ -27,7 +27,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   proposal disappears when the keyholder can no longer direct the wearer.
  * - 0.25.0: profile badges name both sides. The wearer's badge (their
  *   choice, show_profile) reads "Locked by <keyholder> · N days"; the
- *   keyholder's profile shows "Holds the key for <wearer> · N days". The
+ *   keyholder's profile shows "Holds the key for <wearer> · N days" (0.29.0:
+ *   both add "· last verified <day> · photo|elsewhere (<where>)"). The
  *   keyholder can leave their name off (kh_show), and then neither profile
  *   names them. A full POST over post_max_size (PHP drops every field) now
  *   comes back with a "too large" notice instead of a blank page.
@@ -1234,7 +1235,7 @@ class CMP_Chastity {
 		$html .= '<p class="cmp-field"><label for="cmp_cl_rule">' . esc_html__( 'Rule', 'cmp' ) . '</label><input type="text" id="cmp_cl_rule" name="rule" maxlength="300" /></p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_pol">' . esc_html__( 'Release', 'cmp' ) . '</label>' . self::select( 'policy', 'cmp_cl_pol', self::policies(), 'none' ) . '</p></details>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_photo">' . esc_html__( 'Photo of the lock (optional)', 'cmp' ) . '</label><input type="file" id="cmp_cl_photo" name="photo" accept="image/jpeg,image/png,image/webp" /></p>';
-		$html .= self::check( 'show_profile', 'cmp_cl_show', __( 'Show "Locked · N days" on my profile (with your keyholder\'s name, if they allow it)', 'cmp' ), false );
+		$html .= self::check( 'show_profile', 'cmp_cl_show', __( 'Show "Locked · N days · last verified" on my profile (with your keyholder\'s name, if they allow it)', 'cmp' ), false );
 		$html .= '<button type="submit" class="cmp-btn">' . esc_html__( 'Lock', 'cmp' ) . '</button></form>';
 		if ( count( $keyholders ) < 3 ) {
 			$html .= '<p class="cmp-muted">' . esc_html__( 'To have a member as keyholder, agree chastity with them in a dynamic, with them holding the key (any type, or Keyholder / chastity wearer). See the Dynamics tab. If your keyholder doesn\'t have an account yet, choose "Someone without an account" and type their name.', 'cmp' ) . '</p>';
@@ -1569,12 +1570,48 @@ class CMP_Chastity {
 		return '<svg class="cmp-cl-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $paths[ $kind ] . '</svg>';
 	}
 
-	/** The wearer's badge switch, saying what it will show. */
+	/** The wearer's badge switch, saying what it will show (0.29.0: including when it was last verified). */
 	private static function badge_label( $lock ) {
 		return $lock->keyholder_id && (int) $lock->kh_show
 			/* translators: %s: keyholder */
-			? sprintf( __( 'Show "Locked by %s · N days" on my profile (their profile shows they hold your key)', 'cmp' ), self::name( $lock->keyholder_id ) )
-			: __( 'Show "Locked · N days" on my profile', 'cmp' );
+			? sprintf( __( 'Show "Locked by %s · N days · last verified" on my profile (their profile shows they hold your key)', 'cmp' ), self::name( $lock->keyholder_id ) )
+			: __( 'Show "Locked · N days · last verified" on my profile', 'cmp' );
+	}
+
+	/**
+	 * 0.29.0: the latest verification that counts as proof, for the badge.
+	 * With a keyholder on COL&B: a photo they accepted, or a day they marked
+	 * "verified elsewhere". Without one (self-lock, or a keyholder with no
+	 * account): any photo the wearer sent that wasn't sent back.
+	 *
+	 * @return object|null  { created_at, type, note }
+	 */
+	public static function last_verified( $lock ) {
+		global $wpdb;
+		$photo = $lock->keyholder_id ? "( type = 'verification' AND review = 'accepted' )" : "( type = 'verification' AND review <> 'again' )";
+		return $wpdb->get_row( $wpdb->prepare( 'SELECT created_at, type, note FROM ' . self::t( 'lock_events' ) . " WHERE lock_id = %d AND ( type = 'verified_else' OR $photo ) ORDER BY created_at DESC, id DESC LIMIT 1", $lock->id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	}
+
+	/** 0.29.0: "last verified Oct 13 · photo" / "… · elsewhere (Snapchat)", escaped; '' when never verified. */
+	private static function last_verified_text( $lock ) {
+		$v = self::last_verified( $lock );
+		if ( ! $v ) {
+			return '';
+		}
+		$ts  = self::ts( $v->created_at );
+		$day = wp_date( 'Y-m-d', $ts );
+		$when = wp_date( 'Y-m-d' ) === $day ? __( 'today', 'cmp' ) : ( wp_date( 'Y-m-d', time() - DAY_IN_SECONDS ) === $day ? __( 'yesterday', 'cmp' ) : wp_date( 'M j', $ts ) );
+		if ( 'verified_else' === $v->type ) {
+			$where = trim( (string) $v->note );
+			$how   = '' === $where
+				? __( 'elsewhere', 'cmp' )
+				/* translators: %s: where it was sent, as the keyholder typed it */
+				: sprintf( __( 'elsewhere (%s)', 'cmp' ), mb_strlen( $where ) > 40 ? mb_substr( $where, 0, 39 ) . '…' : $where );
+		} else {
+			$how = __( 'photo', 'cmp' );
+		}
+		/* translators: 1: "today", "yesterday" or a date, 2: how ("photo" or "elsewhere (Snapchat)") */
+		return esc_html( sprintf( __( 'last verified %1$s · %2$s', 'cmp' ), $when, $how ) );
 	}
 
 	/** A member named on a badge: linked, unless the viewer and they are in a block. */
@@ -1589,7 +1626,8 @@ class CMP_Chastity {
 	 * Profile badges (0.25.0). Only when the wearer turned their badge on.
 	 * Wearer: "Locked by <keyholder> · N days" (the name only when the
 	 * keyholder allows it). Keyholder: "Holds the key for <wearer> · N days"
-	 * for each such lock, when they allow it.
+	 * for each such lock, when they allow it. 0.29.0: both add "· last
+	 * verified <day> · photo|elsewhere (<where>)" once there's proof.
 	 */
 	public static function profile_badge_html( $owner_id ) {
 		global $wpdb;
@@ -1604,7 +1642,8 @@ class CMP_Chastity {
 				? sprintf( _n( 'Locked by %1$s · %2$d day', 'Locked by %1$s · %2$d days', $days, 'cmp' ), $kh, $days )
 				/* translators: %d: days */
 				: esc_html( sprintf( _n( 'Locked · %d day', 'Locked · %d days', $days, 'cmp' ), $days ) );
-			$out .= '<p class="cmp-cl-badge">' . self::icon( 'lock' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . '</span></p>';
+			$ver  = self::last_verified_text( $lock );
+			$out .= '<p class="cmp-cl-badge">' . self::icon( 'lock' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . ( $ver ? ' · ' . $ver : '' ) . '</span></p>';
 		}
 		$held = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . self::t( 'locks' ) . " WHERE keyholder_id = %d AND status = 'locked' AND show_profile = 1 AND kh_show = 1 ORDER BY started_at", $owner_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		foreach ( $held as $h ) {
@@ -1615,7 +1654,8 @@ class CMP_Chastity {
 			$days = intdiv( self::locked_seconds( $h ), DAY_IN_SECONDS );
 			/* translators: 1: wearer link, 2: days */
 			$text = sprintf( _n( 'Holds the key for %1$s · %2$d day', 'Holds the key for %1$s · %2$d days', $days, 'cmp' ), $who, $days );
-			$out .= '<p class="cmp-cl-badge is-key">' . self::icon( 'key' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . '</span></p>';
+			$ver  = self::last_verified_text( $h );
+			$out .= '<p class="cmp-cl-badge is-key">' . self::icon( 'key' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . ( $ver ? ' · ' . $ver : '' ) . '</span></p>';
 		}
 		return $out ? '<div class="cmp-cl-badges">' . $out . '</div>' : '';
 	}

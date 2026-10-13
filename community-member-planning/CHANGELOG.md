@@ -4,6 +4,22 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.29.0
+
+**Profile badges show when the lock was last verified, and how** (owner, 2026-10-13: "There should be a Lock last verified message with the date and how on the member's profile"; "Being locked and showing it off/proof is very important in chastity"; chose: part of the badge, method + where).
+
+- The wearer's badge ("Locked · N days" / "Locked by … · N days") and the keyholder's ("Holds the key for … · N days") add **"· last verified today · photo"** or **"· last verified Oct 13 · elsewhere (Snapchat)"** once there's proof. Nothing is added until the lock has been verified.
+  - What counts as proof: with a keyholder on COL&B, a photo they **accepted** or a day they marked "verified elsewhere" (0.28.0); an unreviewed photo isn't proof yet. Without one (self-lock, or a keyholder with no account), any photo the wearer sent that wasn't sent back.
+  - "Where" is the keyholder's note on a "verified elsewhere" mark, cut to 40 characters. Photos themselves are never shown.
+  - Part of the badge, as the owner chose: it shows whenever the wearer's badge is on. The badge switches now say so ("Show "Locked · N days · last verified" on my profile"), on the Chastity tab, when accepting a keyholder's lock, and on Users → Member Dynamics & Locks.
+- `docs/privacy-statement.md`: the "Locked" badge row says what the badge now shows.
+- **Tests:** `tests/chastity-e2e.sh` 115/115. New checks: both badges show "last verified today · elsewhere (Telegram)"; an unaccepted photo isn't proof with a keyholder; on a self-lock it is; an accepted photo shows "photo"; the photo is never on the badge; never verified shows nothing.
+  - Also fixes the two badge checks that failed on macOS since 0.25.0 ("badge shown once the wearer turns it on…", "keyholder's profile: Holds the key…"). The site was fine: `IFS='|' read … <<< "$(lk …)"` leaks the `|` into the command inside on macOS's bash 3.2, so the test's rules save was sent blank and refused. The line now reads into a variable first; same result on Linux.
+- `php -l` on the changed files; no plugin warnings in `debug.log`. No database change.
+- **After this is live:** the Help & FAQ answer "Can other members see that I'm locked?" should say the badge now includes when and how the lock was last verified (that page is edited on the site).
+
+---
+
 ## 0.28.0
 
 **Chastity: "Verified elsewhere"** (owner, 2026-10-13: "How does someone mark if their sub sent a photo verification on another platform?" … "yes build it that way").

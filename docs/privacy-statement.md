@@ -112,7 +112,7 @@ Much of what members share here is sensitive: sexual orientation, sex life and k
 | Homework and its proof photos | You and the member who set it, while your dynamic is active. When a dynamic ends, they lose access straight away. |
 | Chastity verification photos | You and your keyholder, while your dynamic is active. |
 | Events on your calendar | Who you choose for each event: all members, your dynamic partners (members you're in an active dynamic with), or only you. Followers are told you're going only if they're allowed to see that event. |
-| A "Locked" badge on your profile | Members, only if you turn it on. If your keyholder allows it, the badge names them ("Locked by …") and their profile shows they hold your key ("Holds the key for …"). Your keyholder can leave the names off. |
+| A "Locked" badge on your profile | Members, only if you turn it on. It shows how many days you've been locked and, once you have one, when you were last verified and how ("photo", or "elsewhere" with where your keyholder noted it was sent, such as "Snapchat"). Verification photos themselves are never shown. If your keyholder allows it, the badge names them ("Locked by …") and their profile shows they hold your key ("Holds the key for …"), with the same details. Your keyholder can leave the names off. |
 | RSVPs | The event's organizers and site administrators. A public headcount may be shown, but names never are. |
 
 **Blocking.** If you block someone, neither of you can see the other's profile, posts or conversation, follows and nods between you are removed, and any dynamic between you ends. They aren't told.
