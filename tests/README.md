@@ -17,7 +17,7 @@ bash tests/messages-e2e.sh           # member messages: 46 checks
 bash tests/follows-e2e.sh            # follow / unfollow: 27 checks
 bash tests/directory-e2e.sh          # Members search and the profile view: 21 checks
 bash tests/nods-e2e.sh               # nods: 20 checks
-bash tests/member-admin-e2e.sh       # Users → Member Dynamics & Locks: 34 checks
+bash tests/member-admin-e2e.sh       # Users → Member Dynamics & Locks: 43 checks
 bash tests/retention-e2e.sh          # daily data clean-up: 17 checks
 bash tests/setup-e2e.sh              # profiles v2 + step-by-step setup: 32 checks
 bash tests/dob-e2e.sh                # date of birth at sign-up, one-time step, under-18 lock, Show switches: 33 checks
@@ -39,7 +39,7 @@ bash tests/org-e2e.sh                # organization & titleholder submissions, p
 | `org-e2e.sh` | Organization & titleholder listings (CEC 1.34.0) and member ↔ group links (CMP 0.20.0): the public form, review (approve/decline/existing group), `/partner/<slug>/` pages, the grid, old-address redirects, member links, export/erase. Switches the test site to pretty permalinks while it runs and restores them. |
 | `follows-e2e.sh` | Follow (CMP 0.12.0 + CEC 1.28.0): following, the opt-in Going to card (upcoming published RSVPs only), the calendar label, RSVP and post notifications, the Following feed filter, blocks, export/erase. Creates and removes three test events. |
 | `directory-e2e.sh` | Members (CMP 0.13.0): who is listed (not self, opted out, blocked, unverified), only shown answers matched, each filter, sort, profile items linking to a filtered list, the cover on profiles, tabs, the opt-out, export/erase. Re-seeds the starter option lists first. |
-| `member-admin-e2e.sh` | Users → Member Dynamics & Locks (CMP 0.26.0): only administrators, reasons required, removing a stuck waiting lock, recording a lock (keyholder must hold the key, no future start, no second running lock), correcting days / start / planned end / end, hidden-timer privacy, ending a lock, turning off an add-on, ending a dynamic, deleting a record, notifications and the audit log. |
+| `member-admin-e2e.sh` | Users → Member Dynamics & Locks (CMP 0.26.0): only administrators, reasons required, removing a stuck waiting lock, recording a lock (keyholder must hold the key, no future start, no second running lock), correcting days / start / planned end / end, hidden-timer privacy, ending a lock, lock settings and keyholder (0.27.0), dynamic profile switches, quiet by default (no notifications unless ticked), turning off an add-on, ending a dynamic, deleting a record, notifications and the audit log. |
 | `nods-e2e.sh` | Nods (CMP 0.14.0): sending, taking back, the notification and Nods list, mutual nods (both told; messages go to the inbox), pronoun-free wording, the daily limit, blocks, export/erase. |
 | `retention-e2e.sh` | Data clean-up (CEC 1.29.0 + CMP 0.15.0): both daily jobs scheduled; old RSVPs/waitlists, submitter emails and edit links, volunteers, event log, audit log, reports and never-verified accounts removed; newer data and protected accounts kept; the overdue-deletion reminder. Runs the jobs directly (no web server needed). |
 | `setup-e2e.sh` | Profiles v2 (CMP 0.5.0): starter lists, new field types (height, weight, month, rated kinks), health starting hidden, the six setup steps (one-step saves, resume, skip / later / finish), the home nudge for existing members, and the new profile display. Resets the profile option lists to the starter lists. |

@@ -4,6 +4,27 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.27.0
+
+**Full control for the site team, and quiet by default** (owner, 2026-10-12: "I need full access in case the member is confused or can't understand how to do it", "I don't need to notify the members when I make the changes I will manually notify them via email").
+
+- **Lock settings on the admin screen.** A lock's page in Users → Dynamics & locks has a Settings form with everything the wearer and keyholder can set:
+  - profile badge, and the keyholder's name on the badges
+  - hidden timer and daily verification photo
+  - hygiene allowance
+  - option (including Custom with a name) and release rule
+  - **keyholder:** move the lock to another member who holds the key, or make it a self-lock
+- **Record a lock** gains "Show the badge", so a recorded lock can show on both profiles straight away.
+- **Dynamics:** each member's "Show on my profile" switch can be turned on or off.
+- **No notifications from admin changes** unless "Notify both members on the site" is ticked. That box is unticked by default and is under every Reason field. While it's unticked, nothing is sent, including knock-on messages such as "now a self-lock" when a dynamic is ended (`CMP_Notifications::$muted`). Lock corrections still add "Corrected by the site team: …" to the lock's history, and every change is still in the audit log with its reason and the old and new values.
+- **Privacy statement** (`docs/privacy-statement.md`) updated to match: settings changes, history lines, and members contacted directly. The live Privacy Policy page needs the same text.
+- **Verification** (local WordPress from GitHub sources, SQLite, PHP 8.3):
+  - `tests/member-admin-e2e.sh` 43/43, with new checks for every setting, refused changes, keyholder moves, dynamic profile switches, and no notifications unless ticked.
+  - `chastity-e2e.sh` 96/96, `dynamics-e2e.sh` 56/56, `homework-e2e.sh` 44/44, `messages-e2e.sh` 51/51, `account-e2e.sh` 69/69. `php -l`.
+  - Screenshot of the lock page with the new Settings form checked at 1280 px.
+
+---
+
 ## 0.26.0
 
 **An admin screen for dynamics and locks, so the site team can fix problems and keep day counts accurate** (owner, 2026-10-12: "I'll need an admin screen in case users have trouble with management and to be able to manually set days for people if something goes wrong. It's very important to these users to have accurate numbers").

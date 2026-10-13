@@ -39,10 +39,19 @@ class CMP_Notifications {
 	 *                                  which would be odd to delay.
 	 * @return int|false Notification ID, or false if not created.
 	 */
+	/**
+	 * While true, add() does nothing. Set by the site team's admin screen
+	 * (CMP_Member_Admin, 0.27.0) unless they choose to notify members, so
+	 * corrections and their knock-on effects send nothing.
+	 *
+	 * @var bool
+	 */
+	public static $muted = false;
+
 	public static function add( $user_id, $category, $message, $url = '', $respect_quiet_hours = true ) {
 		global $wpdb;
 		$user_id = (int) $user_id;
-		if ( ! $user_id || ! in_array( $category, self::CATEGORIES, true ) ) {
+		if ( self::$muted || ! $user_id || ! in_array( $category, self::CATEGORIES, true ) ) {
 			return false;
 		}
 		if ( in_array( $category, (array) get_user_meta( $user_id, self::META_DISABLED, true ), true ) ) {
