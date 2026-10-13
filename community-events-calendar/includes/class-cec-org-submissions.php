@@ -143,9 +143,14 @@ class CEC_Org_Submissions {
 				<p class="cec-org-field"><label for="cec_org_name"><?php esc_html_e( 'Name (required)', 'cec' ); ?></label>
 					<input type="text" id="cec_org_name" name="name" maxlength="120" required value="<?php echo esc_attr( $v( 'name' ) ); ?>" />
 					<span class="cec-org-hint"><?php esc_html_e( 'The organization\'s name, or the titleholder\'s name as they want it shown.', 'cec' ); ?></span></p>
-				<p class="cec-org-field"><label for="cec_org_region"><?php esc_html_e( 'City or region (optional)', 'cec' ); ?></label>
-					<input type="text" id="cec_org_region" name="region" maxlength="80" list="cec_org_regions" value="<?php echo esc_attr( $v( 'region' ) ); ?>" /><?php echo CEC_Orgs::regions_datalist( 'cec_org_regions' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-					<span class="cec-org-hint"><?php esc_html_e( 'Where you\'re based, e.g. Columbus, or Ohio if you cover the whole state.', 'cec' ); ?></span></p>
+				<p class="cec-org-field"><label for="cec_org_city"><?php esc_html_e( 'City (required)', 'cec' ); ?></label>
+					<input type="text" id="cec_org_city" name="city" maxlength="60" required list="cec_org_cities" autocomplete="address-level2" value="<?php echo esc_attr( $v( 'city' ) ); ?>" /><?php echo CEC_Orgs::cities_datalist( 'cec_org_cities' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					<span class="cec-org-hint"><?php esc_html_e( 'Where you\'re based. If you cover a whole state, use the city you\'re based in.', 'cec' ); ?></span></p>
+				<p class="cec-org-field"><label for="cec_org_state"><?php esc_html_e( 'State (required)', 'cec' ); ?></label>
+					<select id="cec_org_state" name="state" required autocomplete="address-level1"><?php echo CEC_Orgs::state_options( $v( 'state' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></select></p>
+				<p class="cec-org-field"><label for="cec_org_zip"><?php esc_html_e( 'ZIP code (optional, private)', 'cec' ); ?></label>
+					<input type="text" id="cec_org_zip" name="zip" maxlength="10" inputmode="numeric" autocomplete="postal-code" value="<?php echo esc_attr( $v( 'zip' ) ); ?>" />
+					<span class="cec-org-hint"><?php esc_html_e( 'Never shown on the site.', 'cec' ); ?></span></p>
 
 				<div class="cec-org-only-titleholder" data-cec-kind="titleholder">
 					<div class="cec-org-row">
@@ -260,12 +265,24 @@ class CEC_Org_Submissions {
 			'contact_email' => sanitize_email( $s( 'contact_email', 200 ) ),
 			'contact_phone' => preg_replace( '/[^0-9+().\- ]/', '', $s( 'contact_phone', 40 ) ),
 			'member'        => $s( 'member', 100 ),
-			'region'        => $s( 'region', 80 ),
+			'city'          => '',
+			'state'         => '',
+			'zip'           => '',
+			'region'        => '',
 			'titles_more'   => array(),
 			'socials'       => array(),
 		);
 		if ( '' === $c['name'] ) {
 			$e[] = __( 'Please enter a name.', 'cec' );
+		}
+		$loc = CEC_Orgs::clean_location( $s( 'city', 60 ), $s( 'state', 2 ), $s( 'zip', 10 ) );
+		if ( is_wp_error( $loc ) ) {
+			$e[]        = $loc->get_error_message();
+			$c['city']  = CEC_Orgs::clean_city( $s( 'city', 60 ) );
+			$c['state'] = strtoupper( $s( 'state', 2 ) );
+			$c['zip']   = $s( 'zip', 10 );
+		} else {
+			$c = array_merge( $c, $loc );
 		}
 		if ( '' === $c['description'] ) {
 			$e[] = 'titleholder' === $c['kind'] ? __( 'Please write a short bio.', 'cec' ) : __( 'Please write a short description.', 'cec' );
@@ -474,7 +491,10 @@ class CEC_Org_Submissions {
 	}
 
 	public static function review_box( $post ) {
-		$c      = wp_parse_args( (array) get_post_meta( $post->ID, '_cec_org', true ), array( 'kind' => 'organization', 'name' => '', 'title' => '', 'year' => '', 'producer' => '', 'description' => '', 'highlights' => array(), 'mission' => '', 'contact_name' => '', 'contact_email' => '', 'contact_phone' => '', 'member' => '', 'region' => '', 'titles_more' => array(), 'socials' => array() ) );
+		$c      = wp_parse_args( (array) get_post_meta( $post->ID, '_cec_org', true ), array( 'kind' => 'organization', 'name' => '', 'title' => '', 'year' => '', 'producer' => '', 'description' => '', 'highlights' => array(), 'mission' => '', 'contact_name' => '', 'contact_email' => '', 'contact_phone' => '', 'member' => '', 'region' => '', 'city' => '', 'state' => '', 'zip' => '', 'titles_more' => array(), 'socials' => array() ) );
+		if ( '' === $c['state'] && '' !== $c['region'] ) { // Sent before 1.43.0.
+			$c = array_merge( $c, CEC_Orgs::parse_location( $c['region'] ) );
+		}
 		$review = get_post_meta( $post->ID, '_cec_org_review', true );
 		$logo   = (int) get_post_meta( $post->ID, '_cec_org_logo_id', true );
 		$term   = (int) get_post_meta( $post->ID, '_cec_org_term_id', true );
@@ -493,7 +513,10 @@ class CEC_Org_Submissions {
 				<label><input form="cec-org-review-form" type="radio" name="kind" value="organization" <?php checked( 'organization', $c['kind'] ); ?> /> <?php esc_html_e( 'Organization', 'cec' ); ?></label>&nbsp;
 				<label><input form="cec-org-review-form" type="radio" name="kind" value="titleholder" <?php checked( 'titleholder', $c['kind'] ); ?> /> <?php esc_html_e( 'Titleholder', 'cec' ); ?></label></td></tr>
 			<tr><th><label for="r_name"><?php esc_html_e( 'Name', 'cec' ); ?></label></th><td><input form="cec-org-review-form" class="regular-text" id="r_name" name="name" value="<?php echo esc_attr( $c['name'] ); ?>" /></td></tr>
-			<tr><th><label for="r_region"><?php esc_html_e( 'City or region', 'cec' ); ?></label></th><td><input form="cec-org-review-form" class="regular-text" id="r_region" name="region" list="cec_org_regions" value="<?php echo esc_attr( $c['region'] ); ?>" /><?php echo CEC_Orgs::regions_datalist( 'cec_org_regions' ); // phpcs:ignore ?></td></tr>
+			<tr><th><label for="r_city"><?php esc_html_e( 'Location', 'cec' ); ?></label></th><td><input form="cec-org-review-form" id="r_city" name="city" placeholder="<?php esc_attr_e( 'City', 'cec' ); ?>" list="cec_org_cities" value="<?php echo esc_attr( $c['city'] ); ?>" /><?php echo CEC_Orgs::cities_datalist( 'cec_org_cities' ); // phpcs:ignore ?>
+				<select form="cec-org-review-form" name="state" aria-label="<?php esc_attr_e( 'State', 'cec' ); ?>"><?php echo CEC_Orgs::state_options( $c['state'] ); // phpcs:ignore ?></select>
+				<input form="cec-org-review-form" name="zip" maxlength="10" placeholder="<?php esc_attr_e( 'ZIP (optional)', 'cec' ); ?>" aria-label="<?php esc_attr_e( 'ZIP code (optional)', 'cec' ); ?>" value="<?php echo esc_attr( $c['zip'] ); ?>" style="width:7em" />
+				<?php if ( '' === $c['city'] && '' !== $c['region'] ) : ?><p class="description"><?php /* translators: %s: area typed on the form */ echo esc_html( sprintf( __( 'Sent as: "%s". City and state are required to approve.', 'cec' ), $c['region'] ) ); ?></p><?php endif; ?></td></tr>
 			<tr><th><?php esc_html_e( 'Title / year / producer', 'cec' ); ?></th><td>
 				<input form="cec-org-review-form" name="title" value="<?php echo esc_attr( $c['title'] ); ?>" placeholder="<?php esc_attr_e( 'Title', 'cec' ); ?>" />
 				<input form="cec-org-review-form" name="year" value="<?php echo esc_attr( $c['year'] ); ?>" class="small-text" placeholder="<?php esc_attr_e( 'Year', 'cec' ); ?>" />
@@ -618,6 +641,9 @@ class CEC_Org_Submissions {
 			'producer'    => $c['producer'],
 			'titles_more' => $c['titles_more'] ?? array(),
 			'region'      => $c['region'] ?? '',
+			'city'        => $c['city'] ?? '',
+			'state'       => $c['state'] ?? '',
+			'zip'         => $c['zip'] ?? '',
 			'socials'     => $c['socials'],
 			'listed'      => '1',
 			'order'       => $current && $current['listed'] ? $current['order'] : CEC_Orgs::next_order(),

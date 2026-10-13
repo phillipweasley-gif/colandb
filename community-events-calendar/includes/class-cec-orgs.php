@@ -198,6 +198,9 @@ class CEC_Orgs {
 			'mission'    => (string) get_term_meta( $id, 'cec_mission', true ),
 			'summary'    => (string) get_term_meta( $id, 'cec_summary', true ),
 			'region'     => (string) get_term_meta( $id, 'cec_region', true ),
+			'city'       => (string) get_term_meta( $id, 'cec_loc_city', true ),
+			'state'      => (string) get_term_meta( $id, 'cec_loc_state', true ),
+			'zip'        => (string) get_term_meta( $id, 'cec_loc_zip', true ), // Private: never shown on the site.
 			'shape'      => 'rect' === get_term_meta( $id, 'cec_photo_shape', true ) ? 'rect' : 'circle',
 			'ask'        => array_values( array_intersect( array_keys( self::socials() ), (array) get_term_meta( $id, 'cec_social_ask', true ) ) ),
 			'title'      => (string) get_term_meta( $id, 'cec_title', true ),
@@ -224,6 +227,9 @@ class CEC_Orgs {
 			'mission'    => 'cec_mission',
 			'summary'    => 'cec_summary',
 			'region'     => 'cec_region',
+			'city'       => 'cec_loc_city',
+			'state'      => 'cec_loc_state',
+			'zip'        => 'cec_loc_zip',
 			'shape'      => 'cec_photo_shape',
 			'ask'        => 'cec_social_ask',
 			'title'      => 'cec_title',
@@ -241,6 +247,19 @@ class CEC_Orgs {
 			if ( array_key_exists( $field, $fields ) ) {
 				update_term_meta( $term_id, $meta, $fields[ $field ] );
 			}
+		}
+		// 1.43.0: city + state are the location; cec_region is kept as the
+		// display text. A bare region (Restore of a version saved before
+		// 1.43.0) is split back into city and state.
+		if ( array_key_exists( 'region', $fields ) && ! array_key_exists( 'city', $fields ) && ! array_key_exists( 'state', $fields ) ) {
+			$loc = self::parse_location( $fields['region'] );
+			if ( '' !== $loc['state'] ) {
+				update_term_meta( $term_id, 'cec_loc_city', $loc['city'] );
+				update_term_meta( $term_id, 'cec_loc_state', $loc['state'] );
+			}
+		}
+		if ( array_key_exists( 'city', $fields ) || array_key_exists( 'state', $fields ) ) {
+			update_term_meta( $term_id, 'cec_region', self::format_location( (string) get_term_meta( $term_id, 'cec_loc_city', true ), (string) get_term_meta( $term_id, 'cec_loc_state', true ) ) );
 		}
 		if ( array_key_exists( 'highlights', $fields ) ) {
 			update_term_meta( $term_id, 'cec_highlights', implode( "\n", (array) $fields['highlights'] ) );
@@ -273,6 +292,121 @@ class CEC_Orgs {
 		 * A group's public listing changed; purge any other caches here.
 		 */
 		do_action( 'cec_partner_orgs_changed' );
+	}
+
+	/* ------------------------------------------------------------------
+	 * 1.43.0: location = city + state (required) + ZIP (optional, private)
+	 * ---------------------------------------------------------------- */
+
+	/** US states, DC and Puerto Rico by postal code, in name order. */
+	public static function states() {
+		return array(
+			'AL' => 'Alabama', 'AK' => 'Alaska', 'AZ' => 'Arizona', 'AR' => 'Arkansas', 'CA' => 'California',
+			'CO' => 'Colorado', 'CT' => 'Connecticut', 'DE' => 'Delaware', 'DC' => 'District of Columbia', 'FL' => 'Florida',
+			'GA' => 'Georgia', 'HI' => 'Hawaii', 'ID' => 'Idaho', 'IL' => 'Illinois', 'IN' => 'Indiana',
+			'IA' => 'Iowa', 'KS' => 'Kansas', 'KY' => 'Kentucky', 'LA' => 'Louisiana', 'ME' => 'Maine',
+			'MD' => 'Maryland', 'MA' => 'Massachusetts', 'MI' => 'Michigan', 'MN' => 'Minnesota', 'MS' => 'Mississippi',
+			'MO' => 'Missouri', 'MT' => 'Montana', 'NE' => 'Nebraska', 'NV' => 'Nevada', 'NH' => 'New Hampshire',
+			'NJ' => 'New Jersey', 'NM' => 'New Mexico', 'NY' => 'New York', 'NC' => 'North Carolina', 'ND' => 'North Dakota',
+			'OH' => 'Ohio', 'OK' => 'Oklahoma', 'OR' => 'Oregon', 'PA' => 'Pennsylvania', 'PR' => 'Puerto Rico',
+			'RI' => 'Rhode Island', 'SC' => 'South Carolina', 'SD' => 'South Dakota', 'TN' => 'Tennessee', 'TX' => 'Texas',
+			'UT' => 'Utah', 'VT' => 'Vermont', 'VA' => 'Virginia', 'WA' => 'Washington', 'WV' => 'West Virginia',
+			'WI' => 'Wisconsin', 'WY' => 'Wyoming',
+		);
+	}
+
+	/** Cities already in use, so the same spelling is reused. */
+	public static function cities() {
+		global $wpdb;
+		$vals = $wpdb->get_col( "SELECT DISTINCT meta_value FROM {$wpdb->termmeta} WHERE meta_key = 'cec_loc_city' AND meta_value <> ''" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		natcasesort( $vals );
+		return array_values( $vals );
+	}
+
+	/** "  columbus " → "Columbus"; mixed case ("McAllen") is kept as typed. */
+	public static function clean_city( $city ) {
+		$city = trim( preg_replace( '/\s+/', ' ', sanitize_text_field( (string) $city ) ) );
+		if ( '' !== $city && ( mb_strtolower( $city ) === $city || mb_strtoupper( $city ) === $city ) ) {
+			$city = mb_convert_case( mb_strtolower( $city ), MB_CASE_TITLE );
+		}
+		foreach ( self::cities() as $known ) {
+			if ( 0 === strcasecmp( $known, $city ) ) {
+				return $known;
+			}
+		}
+		return mb_substr( $city, 0, 60 );
+	}
+
+	/**
+	 * Checks a posted location.
+	 *
+	 * @return array|WP_Error array( city, state, zip, region ).
+	 */
+	public static function clean_location( $city, $state, $zip ) {
+		$city  = self::clean_city( $city );
+		$state = strtoupper( trim( (string) $state ) );
+		$zip   = preg_replace( '/\s+/', '', (string) $zip );
+		if ( '' === $city || ! isset( self::states()[ $state ] ) ) {
+			return new WP_Error( 'cec_location', __( 'Please enter a city and choose a state.', 'cec' ) );
+		}
+		if ( '' !== $zip && ! preg_match( '/^\d{5}(-\d{4})?$/', $zip ) ) {
+			return new WP_Error( 'cec_zip', __( 'The ZIP code should be 5 digits, e.g. 43215.', 'cec' ) );
+		}
+		return array(
+			'city'   => $city,
+			'state'  => $state,
+			'zip'    => substr( $zip, 0, 5 ),
+			'region' => self::format_location( $city, $state ),
+		);
+	}
+
+	/** "Columbus, OH"; the state's name when there is no city. */
+	public static function format_location( $city, $state ) {
+		$states = self::states();
+		if ( '' !== $city && '' !== $state ) {
+			return $city . ', ' . $state;
+		}
+		return '' !== $state ? ( $states[ $state ] ?? $state ) : $city;
+	}
+
+	/** Best guess at city and state from free text ("Indianapolis, Indiana", "Ohio"). */
+	public static function parse_location( $text ) {
+		$text = trim( preg_replace( '/\s+/', ' ', (string) $text ) );
+		$out  = array( 'city' => '', 'state' => '' );
+		if ( '' === $text ) {
+			return $out;
+		}
+		$states = self::states();
+		$names  = array_flip( array_map( 'strtolower', $states ) );
+		$parts  = array_map( 'trim', explode( ',', $text ) );
+		$last   = strtolower( (string) end( $parts ) );
+		$code   = isset( $states[ strtoupper( $last ) ] ) ? strtoupper( $last ) : ( $names[ $last ] ?? '' );
+		if ( '' === $code ) {
+			$out['city'] = self::clean_city( $text );
+			return $out;
+		}
+		array_pop( $parts );
+		$out['state'] = $code;
+		$out['city']  = $parts ? self::clean_city( implode( ', ', $parts ) ) : '';
+		return $out;
+	}
+
+	/** <option>s for the state <select>. */
+	public static function state_options( $selected ) {
+		$html = '<option value="">' . esc_html__( 'Choose a state', 'cec' ) . '</option>';
+		foreach ( self::states() as $code => $name ) {
+			$html .= '<option value="' . esc_attr( $code ) . '"' . selected( $selected, $code, false ) . '>' . esc_html( $name ) . '</option>';
+		}
+		return $html;
+	}
+
+	/** <datalist> of cities already in use. */
+	public static function cities_datalist( $id ) {
+		$html = '<datalist id="' . esc_attr( $id ) . '">';
+		foreach ( self::cities() as $c ) {
+			$html .= '<option value="' . esc_attr( $c ) . '"></option>';
+		}
+		return $html . '</datalist>';
 	}
 
 	/** Groups "Columbus", "columbus " and "COLUMBUS" together. */
@@ -525,35 +659,54 @@ class CEC_Orgs {
 		if ( ! $list ) {
 			return $atts['empty'] ? '<p class="cec-org-empty">' . esc_html( $atts['empty'] ) . '</p>' : '';
 		}
-		// filter="yes" adds a city/region filter (1.41.0); since 1.41.2 it shows
-		// as soon as any listing has an area, with "Area not listed" for the rest.
-		$areas   = array();
-		$missing = false;
+		// 1.43.0: filter="yes" filters by state, then city. Choosing a state
+		// shows every listing in it, including state-wide ones without a city.
+		$by_state = array();
+		$missing  = false;
 		foreach ( $list as $p ) {
-			if ( '' !== $p['region'] ) {
-				$areas[ self::region_key( $p['region'] ) ] = $p['region'];
-			} else {
+			if ( '' === $p['state'] ) {
 				$missing = true;
+				continue;
+			}
+			if ( ! isset( $by_state[ $p['state'] ] ) ) {
+				$by_state[ $p['state'] ] = array();
+			}
+			if ( '' !== $p['city'] ) {
+				$by_state[ $p['state'] ][ self::region_key( $p['city'] ) ] = $p['city'];
 			}
 		}
-		uasort( $areas, 'strcasecmp' );
+		$names = self::states();
+		uksort(
+			$by_state,
+			function ( $a, $b ) use ( $names ) {
+				return strcasecmp( $names[ $a ] ?? $a, $names[ $b ] ?? $b );
+			}
+		);
+		$cities = array();
+		foreach ( $by_state as $code => $in_state ) {
+			asort( $in_state, SORT_NATURAL | SORT_FLAG_CASE );
+			$cities[ $code ] = array();
+			foreach ( $in_state as $k => $label ) {
+				$cities[ $code ][] = array( (string) $k, $label );
+			}
+		}
 		$html = '';
 		$uid  = 'cec-org-grid-' . wp_unique_id();
-		if ( 'yes' === $atts['filter'] && count( $areas ) + ( $missing ? 1 : 0 ) >= 2 ) {
-			$html .= '<div class="cec-org-filter" hidden data-grid="' . esc_attr( $uid ) . '"><label for="' . esc_attr( $uid ) . '-f">' . esc_html__( 'Filter by city or region', 'cec' ) . '</label> <select id="' . esc_attr( $uid ) . '-f"><option value="">' . esc_html__( 'All areas', 'cec' ) . '</option>';
-			foreach ( $areas as $k => $label ) {
-				$html .= '<option value="' . esc_attr( $k ) . '">' . esc_html( $label ) . '</option>';
+		if ( 'yes' === $atts['filter'] && $by_state ) {
+			$html .= '<div class="cec-org-filter" hidden data-grid="' . esc_attr( $uid ) . '" data-cities="' . esc_attr( wp_json_encode( $cities ) ) . '"><label for="' . esc_attr( $uid ) . '-s">' . esc_html__( 'Filter by state', 'cec' ) . '</label> <select id="' . esc_attr( $uid ) . '-s"><option value="">' . esc_html__( 'All states', 'cec' ) . '</option>';
+			foreach ( array_keys( $by_state ) as $code ) {
+				$html .= '<option value="' . esc_attr( $code ) . '">' . esc_html( $names[ $code ] ?? $code ) . '</option>';
 			}
 			if ( $missing ) {
-				$html .= '<option value="-">' . esc_html__( 'Area not listed', 'cec' ) . '</option>';
+				$html .= '<option value="-">' . esc_html__( 'Location not listed', 'cec' ) . '</option>';
 			}
-			$html .= '</select> <span class="cec-org-filter-count" aria-live="polite"></span></div>';
-			$html .= '<p class="cec-org-empty" hidden>' . esc_html__( 'Nothing listed in that area yet.', 'cec' ) . '</p>';
-			$html .= "<script>( function () { var f = document.querySelector( '[data-grid=\"" . esc_js( $uid ) . "\"]' ); if ( ! f ) { return; } var s = f.querySelector( 'select' ), g = document.getElementById( '" . esc_js( $uid ) . "' ), c = f.querySelector( '.cec-org-filter-count' ), e = f.nextElementSibling; f.hidden = false; s.addEventListener( 'change', function () { var n = 0; g.querySelectorAll( '.cec-org-tile' ).forEach( function ( t ) { var show = ! s.value || t.dataset.region === s.value || ( s.value === '-' && ! t.dataset.region ); t.hidden = ! show; if ( show ) { n++; } } ); c.textContent = s.value ? n + ' ' + " . wp_json_encode( __( 'shown', 'cec' ) ) . " : ''; e.hidden = n > 0; } ); } )();</script>";
+			$html .= '</select> <label for="' . esc_attr( $uid ) . '-c" hidden>' . esc_html__( 'City', 'cec' ) . '</label> <select id="' . esc_attr( $uid ) . '-c" hidden><option value="">' . esc_html__( 'All cities', 'cec' ) . '</option></select> <span class="cec-org-filter-count" aria-live="polite"></span></div>';
+			$html .= '<p class="cec-org-empty" hidden>' . esc_html__( 'Nothing listed there yet.', 'cec' ) . '</p>';
+			$html .= "<script>( function () { var f = document.querySelector( '[data-grid=\"" . esc_js( $uid ) . "\"]' ); if ( ! f ) { return; } var sel = f.querySelectorAll( 'select' ), ss = sel[0], cs = sel[1], cl = f.querySelectorAll( 'label' )[1], c = f.querySelector( '.cec-org-filter-count' ), e = f.nextElementSibling, map = JSON.parse( f.getAttribute( 'data-cities' ) || '{}' ), g = null, all = " . wp_json_encode( __( 'All cities', 'cec' ) ) . ", shown = " . wp_json_encode( __( 'shown', 'cec' ) ) . "; f.hidden = false; function apply() { var st = ss.value, ci = cs.value, n = 0; g = g || document.getElementById( f.getAttribute( 'data-grid' ) ); g.querySelectorAll( '.cec-org-tile' ).forEach( function ( t ) { var show = ! st || ( '-' === st ? ! t.dataset.state : t.dataset.state === st && ( ! ci || t.dataset.city === ci ) ); t.hidden = ! show; if ( show ) { n++; } } ); c.textContent = st ? n + ' ' + shown : ''; e.hidden = n > 0; } ss.addEventListener( 'change', function () { var list = map[ ss.value ] || []; cs.innerHTML = ''; [ [ '', all ] ].concat( list ).forEach( function ( x ) { var o = document.createElement( 'option' ); o.value = x[0]; o.textContent = x[1]; cs.appendChild( o ); } ); cs.hidden = cl.hidden = list.length < 2; apply(); } ); cs.addEventListener( 'change', apply ); } )();</script>";
 		}
 		$html .= '<div class="cec-org-grid" id="' . esc_attr( $uid ) . '">';
 		foreach ( $list as $p ) {
-			$html .= '<article class="cec-org-tile is-' . esc_attr( $p['kind'] ) . '" data-region="' . esc_attr( '' === $p['region'] ? '' : self::region_key( $p['region'] ) ) . '">';
+			$html .= '<article class="cec-org-tile is-' . esc_attr( $p['kind'] ) . '" data-region="' . esc_attr( '' === $p['region'] ? '' : self::region_key( $p['region'] ) ) . '" data-state="' . esc_attr( $p['state'] ) . '" data-city="' . esc_attr( '' === $p['city'] ? '' : self::region_key( $p['city'] ) ) . '">';
 			$image = self::image_html( $p, 'cec-org-tile-image' );
 			$html .= '<div class="cec-org-tile-head">' . ( $image ? '<span class="cec-org-tile-media">' . $image . '</span>' : '' ) . '<h3>' . esc_html( $p['name'] ) . '</h3></div>';
 			if ( 'titleholder' === $p['kind'] ) {
@@ -601,8 +754,13 @@ class CEC_Orgs {
 			</td>
 		</tr>
 		<tr class="form-field">
-			<th scope="row"><label for="cec_org_region"><?php esc_html_e( 'City or region', 'cec' ); ?></label></th>
-			<td><input type="text" name="cec_org_region" id="cec_org_region" maxlength="80" list="cec_org_regions" value="<?php echo esc_attr( $p['region'] ); ?>" /><?php echo self::regions_datalist( 'cec_org_regions' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><p class="description"><?php esc_html_e( 'E.g. Columbus, or Ohio for statewide. Used by the city/region filter on the listing pages.', 'cec' ); ?></p></td>
+			<th scope="row"><label for="cec_org_city"><?php esc_html_e( 'Location', 'cec' ); ?></label></th>
+			<td>
+				<input type="text" name="cec_org_city" id="cec_org_city" maxlength="60" list="cec_org_cities" placeholder="<?php esc_attr_e( 'City', 'cec' ); ?>" aria-label="<?php esc_attr_e( 'City', 'cec' ); ?>" value="<?php echo esc_attr( $p['city'] ); ?>" style="width:14em" /><?php echo self::cities_datalist( 'cec_org_cities' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<select name="cec_org_state" aria-label="<?php esc_attr_e( 'State', 'cec' ); ?>"><?php echo self::state_options( $p['state'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></select>
+				<input type="text" name="cec_org_zip" maxlength="10" inputmode="numeric" placeholder="<?php esc_attr_e( 'ZIP (optional)', 'cec' ); ?>" aria-label="<?php esc_attr_e( 'ZIP code (optional)', 'cec' ); ?>" value="<?php echo esc_attr( $p['zip'] ); ?>" style="width:7em" />
+				<p class="description"><?php esc_html_e( 'City and state are required. They show on the card and drive the state and city filter on the listing pages. ZIP is private and never shown on the site.', 'cec' ); ?><?php if ( '' === $p['city'] && '' !== $p['region'] ) : ?> <strong><?php /* translators: %s: area entered before 1.43.0 */ echo esc_html( sprintf( __( 'Previously entered: "%s". Please add a city.', 'cec' ), $p['region'] ) ); ?></strong><?php endif; ?></p>
+			</td>
 		</tr>
 		<tr class="form-field">
 			<th scope="row"><?php esc_html_e( 'Show on the site', 'cec' ); ?></th>
@@ -680,10 +838,18 @@ class CEC_Orgs {
 				'title'      => isset( $_POST['cec_org_title'] ) ? sanitize_text_field( wp_unslash( $_POST['cec_org_title'] ) ) : '',
 				'year'       => isset( $_POST['cec_org_year'] ) && preg_match( '/^\d{4}$/', (string) $_POST['cec_org_year'] ) ? (string) $_POST['cec_org_year'] : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 				'producer'   => isset( $_POST['cec_org_producer'] ) ? sanitize_text_field( wp_unslash( $_POST['cec_org_producer'] ) ) : '',
-				'region'     => isset( $_POST['cec_org_region'] ) ? mb_substr( sanitize_text_field( wp_unslash( $_POST['cec_org_region'] ) ), 0, 80 ) : '',
 				'socials'    => array_filter( $socials ),
 			)
 		);
+		// 1.43.0: city + state (+ private ZIP). Left as it was if incomplete.
+		$loc = self::clean_location(
+			isset( $_POST['cec_org_city'] ) ? sanitize_text_field( wp_unslash( $_POST['cec_org_city'] ) ) : '',
+			isset( $_POST['cec_org_state'] ) ? sanitize_text_field( wp_unslash( $_POST['cec_org_state'] ) ) : '',
+			isset( $_POST['cec_org_zip'] ) ? sanitize_text_field( wp_unslash( $_POST['cec_org_zip'] ) ) : ''
+		);
+		if ( ! is_wp_error( $loc ) ) {
+			self::save_profile( $term_id, $loc );
+		}
 		// A logo picked from the media library by URL: remember its ID too.
 		$logo = (string) get_term_meta( $term_id, 'cec_logo', true );
 		update_term_meta( $term_id, 'cec_logo_id', $logo ? (int) attachment_url_to_postid( $logo ) : 0 );
