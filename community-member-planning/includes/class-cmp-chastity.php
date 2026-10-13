@@ -130,6 +130,7 @@ class CMP_Chastity {
 			'cl_declined' => array( 'success', __( 'Declined. Your keyholder has been told.', 'cmp' ) ),
 			'cl_withdrawn'=> array( 'success', __( 'Withdrawn.', 'cmp' ) ),
 			'cl_pending'  => array( 'error', __( 'They already have a lock, or a lock from you waiting for an answer.', 'cmp' ) ),
+			'cl_verified_day' => array( 'error', __( 'That day already counts as verified, or has a photo waiting for you to review.', 'cmp' ) ),
 			'upload_too_large' => array( 'error', __( 'That was too large to send, so nothing was saved. Try a smaller photo, or send it without one.', 'cmp' ) ),
 		);
 	}
@@ -288,7 +289,36 @@ class CMP_Chastity {
 		global $wpdb;
 		$tz    = wp_timezone();
 		$start = ( new DateTime( 'today', $tz ) )->setTimezone( new DateTimeZone( 'UTC' ) )->format( 'Y-m-d H:i:s' );
-		return $wpdb->get_row( $wpdb->prepare( 'SELECT id, photo_sha, code, review, created_at FROM ' . self::t( 'lock_events' ) . " WHERE lock_id = %d AND type = 'verification' AND created_at >= %s ORDER BY id DESC LIMIT 1", $lock->id, $start ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return $wpdb->get_row( $wpdb->prepare( 'SELECT id, type, photo_sha, code, review, created_at FROM ' . self::t( 'lock_events' ) . " WHERE lock_id = %d AND type IN ('verification','verified_else') AND created_at >= %s ORDER BY id DESC LIMIT 1", $lock->id, $start ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	/**
+	 * 0.28.0: the days a keyholder may mark "verified elsewhere" (the wearer
+	 * sent their verification outside COL&B): today and the 6 days before,
+	 * never before the lock started. Site dates, newest first.
+	 */
+	public static function elsewhere_days( $lock ) {
+		$tz    = wp_timezone();
+		$start = wp_date( 'Y-m-d', self::ts( $lock->started_at ) );
+		$out   = array();
+		for ( $i = 0; $i < 7; $i++ ) {
+			$d   = ( new DateTime( 'today', $tz ) )->modify( '-' . $i . ' day' );
+			$ymd = $d->format( 'Y-m-d' );
+			if ( $ymd < $start ) {
+				break;
+			}
+			$out[ $ymd ] = 0 === $i ? __( 'Today', 'cmp' ) : ( 1 === $i ? __( 'Yesterday', 'cmp' ) : wp_date( 'D M j', $d->getTimestamp() ) );
+		}
+		return $out;
+	}
+
+	/** 0.28.0: whether a site date already counts: a "verified elsewhere" mark, or a photo not sent back for another. */
+	public static function day_verified( $lock, $ymd ) {
+		global $wpdb;
+		$utc  = new DateTimeZone( 'UTC' );
+		$from = new DateTime( $ymd . ' 00:00:00', wp_timezone() );
+		$to   = ( clone $from )->modify( '+1 day' );
+		return (bool) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . self::t( 'lock_events' ) . " WHERE lock_id = %d AND created_at >= %s AND created_at < %s AND ( type = 'verified_else' OR ( type = 'verification' AND review <> 'again' ) )", $lock->id, $from->setTimezone( $utc )->format( 'Y-m-d H:i:s' ), $to->setTimezone( $utc )->format( 'Y-m-d H:i:s' ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
 	/* ------------------------------------------------------------------
@@ -407,7 +437,7 @@ class CMP_Chastity {
 			self::go( array(), 'cl_gone' );
 		}
 		$wearer_actions    = array( 'verify', 'hygiene_open', 'hygiene_close', 'release', 'ask_unlock', 'unlock', 'emergency', 'wearer_settings' );
-		$keyholder_actions = array( 'time', 'rules', 'allow_release', 'review', 'kh_unlock' );
+		$keyholder_actions = array( 'time', 'rules', 'allow_release', 'review', 'verified_else', 'kh_unlock' );
 		if ( in_array( $do, $wearer_actions, true ) && self::is_wearer( $lock, $user_id ) ) {
 			call_user_func( array( __CLASS__, 'do_' . $do ), $lock, $user_id );
 		}
@@ -761,6 +791,38 @@ class CMP_Chastity {
 				? sprintf( __( '%s accepted your verification photo.', 'cmp' ), self::me() )
 				/* translators: %s: keyholder */
 				: sprintf( __( '%s asked for another verification photo.', 'cmp' ), self::me() ),
+			self::url()
+		);
+		self::go( array( 'lock' => $lock->id ), 'cl_saved' );
+	}
+
+	/**
+	 * 0.28.0: the keyholder marks a day verified because the wearer sent
+	 * their verification another way (Telegram, text…). No photo is kept.
+	 * A back-dated day is recorded at midday that day (site time), so it
+	 * lands on the right day of the calendar.
+	 */
+	private static function do_verified_else( $lock, $user_id ) {
+		$day  = isset( $_POST['day'] ) ? sanitize_text_field( wp_unslash( $_POST['day'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$days = self::elsewhere_days( $lock );
+		if ( ! isset( $days[ $day ] ) ) {
+			self::go( array( 'lock' => $lock->id ), 'cl_invalid' );
+		}
+		if ( self::day_verified( $lock, $day ) ) {
+			self::go( array( 'lock' => $lock->id ), 'cl_verified_day' );
+		}
+		$today = wp_date( 'Y-m-d' ) === $day;
+		$at    = gmdate( 'Y-m-d H:i:s' );
+		if ( ! $today ) {
+			$at = ( new DateTime( $day . ' 12:00:00', wp_timezone() ) )->setTimezone( new DateTimeZone( 'UTC' ) )->format( 'Y-m-d H:i:s' );
+			$at = max( $at, $lock->started_at );
+		}
+		self::add_event( $lock->id, $user_id, 'verified_else', array( 'note' => self::text( 'note', 200 ), 'created_at' => $at ) );
+		CMP_Notifications::add(
+			(int) $lock->wearer_id,
+			'lock',
+			/* translators: 1: keyholder, 2: "today" or a date */
+			sprintf( __( '%1$s marked %2$s as verified (sent outside COL&B).', 'cmp' ), self::me(), $today ? __( 'today', 'cmp' ) : wp_date( 'D M j', self::ts( $at ) ) ),
 			self::url()
 		);
 		self::go( array( 'lock' => $lock->id ), 'cl_saved' );
@@ -1294,7 +1356,9 @@ class CMP_Chastity {
 		$html  .= '<section class="cmp-panel"><h3 class="cmp-panel-title">' . esc_html__( 'Verification', 'cmp' ) . '</h3>';
 		$html  .= '<p>' . esc_html( $lock->verify_daily ? __( 'Every day: a photo of the device with today\'s code written on paper.', 'cmp' ) : __( 'Optional: a photo of the device with today\'s code written on paper.', 'cmp' ) ) . '</p>';
 		$html  .= '<p class="cmp-cl-codewrap"><span class="cmp-cl-code" data-cmp-code>' . esc_html( self::code( $lock->id ) ) . '</span></p>';
-		if ( $today ) {
+		if ( $today && 'verified_else' === $today->type ) {
+			$html .= '<p class="cmp-muted">' . esc_html__( 'Your keyholder marked today as verified (sent outside COL&B).', 'cmp' ) . '</p>';
+		} elseif ( $today ) {
 			$state = 'accepted' === $today->review ? __( 'accepted', 'cmp' ) : ( 'again' === $today->review ? __( 'your keyholder asked for another', 'cmp' ) : __( 'sent', 'cmp' ) );
 			$html .= '<p class="cmp-muted">' . esc_html( sprintf( /* translators: 1: time, 2: state */ __( 'Today\'s photo: %1$s, %2$s.', 'cmp' ), wp_date( 'g:i A', self::ts( $today->created_at ) ), $state ) ) . '</p>';
 		}
@@ -1367,6 +1431,14 @@ class CMP_Chastity {
 		if ( ! $shown ) {
 			$html .= '<p class="cmp-empty">' . esc_html__( 'No verification photos yet.', 'cmp' ) . '</p>';
 		}
+		$days = self::elsewhere_days( $lock );
+		if ( $days ) {
+			$html .= '<details class="cmp-hw-taskedit cmp-cl-elsewhere"><summary>' . esc_html__( 'Verified elsewhere', 'cmp' ) . '</summary>' . self::form_open( 'verified_else', $lock->id );
+			$html .= '<p class="cmp-muted">' . esc_html__( 'Did they send you their verification another way, like Telegram or a text? Mark the day here so it counts. No photo is kept.', 'cmp' ) . '</p>';
+			$html .= '<p class="cmp-field"><label for="cmp_cl_vday">' . esc_html__( 'Day', 'cmp' ) . '</label>' . self::select( 'day', 'cmp_cl_vday', $days, (string) key( $days ) ) . '</p>';
+			$html .= '<p class="cmp-field"><label for="cmp_cl_vnote">' . esc_html__( 'Where (optional)', 'cmp' ) . '</label><input type="text" id="cmp_cl_vnote" name="note" maxlength="200" placeholder="' . esc_attr__( 'e.g. Telegram', 'cmp' ) . '" /></p>';
+			$html .= '<button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Mark verified', 'cmp' ) . '</button></form></details>';
+		}
 		$html .= '</section>';
 
 		// Rules.
@@ -1402,6 +1474,8 @@ class CMP_Chastity {
 				return __( 'Keyholder set up this lock', 'cmp' ) . ( $len && ! $hide_length ? ' · ' . $len : '' );
 			case 'verification':
 				return sprintf( /* translators: %s: code */ __( 'Verification photo (code %s)', 'cmp' ), $e->code );
+			case 'verified_else':
+				return __( 'Verified elsewhere (marked by the keyholder; no photo kept)', 'cmp' );
 			case 'hygiene_open':
 				return __( 'Opened for hygiene', 'cmp' );
 			case 'hygiene_close':
@@ -1436,12 +1510,14 @@ class CMP_Chastity {
 			if ( ! $as_keyholder && $lock->hide_timer && ( in_array( $e->type, array( 'time_added', 'time_removed' ), true ) || ( 'admin_fix' === $e->type && 'end' === $e->review ) ) ) {
 				continue;
 			}
-			$html .= '<li><time>' . esc_html( wp_date( 'M j, g:i A', self::ts( $e->created_at ) ) ) . '</time> ' . esc_html( self::event_text( $e, ! $as_keyholder && $lock->hide_timer ) ) . ( $e->note && in_array( $e->type, array( 'release', 'unlock_asked' ), true ) ? ' · “' . esc_html( $e->note ) . '”' : '' ) . '</li>';
+			// 0.28.0: a "verified elsewhere" mark is for a day, not a time.
+			$when  = wp_date( 'verified_else' === $e->type ? 'M j' : 'M j, g:i A', self::ts( $e->created_at ) );
+			$html .= '<li><time>' . esc_html( $when ) . '</time> ' . esc_html( self::event_text( $e, ! $as_keyholder && $lock->hide_timer ) ) . ( $e->note && in_array( $e->type, array( 'release', 'unlock_asked', 'verified_else' ), true ) ? ' · “' . esc_html( $e->note ) . '”' : '' ) . '</li>';
 		}
 		return $html . '</ul></section>';
 	}
 
-	/** This month: days with any time locked, and days with a verification photo. */
+	/** This month: days with any time locked, and verified days (a photo, or 0.28.0 "verified elsewhere"). */
 	private static function calendar_html( $user_id ) {
 		global $wpdb;
 		$tz     = wp_timezone();
@@ -1456,7 +1532,7 @@ class CMP_Chastity {
 		}
 		$ids      = implode( ',', array_map( 'intval', wp_list_pluck( $locks, 'id' ) ) );
 		$verified = array();
-		foreach ( $wpdb->get_col( $wpdb->prepare( 'SELECT created_at FROM ' . self::t( 'lock_events' ) . " WHERE lock_id IN ($ids) AND type = 'verification' AND created_at BETWEEN %s AND %s", $from, $to ) ) as $c ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		foreach ( $wpdb->get_col( $wpdb->prepare( 'SELECT created_at FROM ' . self::t( 'lock_events' ) . " WHERE lock_id IN ($ids) AND type IN ('verification','verified_else') AND created_at BETWEEN %s AND %s", $from, $to ) ) as $c ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$verified[ wp_date( 'Y-m-d', self::ts( $c ) ) ] = true;
 		}
 		$today = wp_date( 'Y-m-d' );
