@@ -24,6 +24,7 @@ community-member-planning/
 │   ├── class-cmp-dynamics.php      dynamics between members: propose/accept/end, lead_can_direct(), connections, Dynamics tab
 │   ├── class-cmp-homework.php      homework programs: tasks, daily entries, proof photos, lead review, Homework tab
 │   ├── class-cmp-chastity.php      chastity locks: keyholder-proposed locks, keyholder controls, verification codes/photos, hygiene, emergency unlock, Chastity tab
+│   ├── class-cmp-member-admin.php  Users → Member Dynamics & Locks: site-team corrections to locks and dynamics (0.26.0)
 │   ├── class-cmp-feed.php          member feed: text/photo posts, event tags, likes, reports, admin hide, Feed tab
 │   ├── class-cmp-messages.php      member messages: requests, blocks, reports (Users → Member reports), Messages tab
 │   ├── class-cmp-follows.php       follow / unfollow, opt-in "Going to", Following feed filter, calendar label (cec_event_social_label)

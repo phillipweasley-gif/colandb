@@ -290,6 +290,48 @@ class CMP_Dynamics {
 		}
 	}
 
+	/**
+	 * Site team (0.26.0): end a dynamic as if a member had, with the same
+	 * knock-on effects (add-ons closed, chastity/homework let go). Both
+	 * members are told. Returns false if it wasn't active.
+	 */
+	public static function admin_end( $dyn_id, $admin_id ) {
+		global $wpdb;
+		$dyn = self::get( $dyn_id );
+		if ( ! $dyn || 'active' !== $dyn->status ) {
+			return false;
+		}
+		$wpdb->update( CMP_Install::table( 'dynamics' ), array( 'status' => 'ended', 'ended_at' => gmdate( 'Y-m-d H:i:s' ), 'ended_by' => $admin_id ), array( 'id' => $dyn->id, 'status' => 'active' ), array( '%s', '%s', '%d' ), array( '%d', '%s' ) );
+		CMP_Audit::log( 'dynamic_ended', 'dynamic', $dyn->id, array( 'status' => 'active' ), array( 'status' => 'ended', 'ended_by' => $admin_id ), 'Site team' );
+		if ( ! self::active_between( $dyn->proposer_id, $dyn->partner_id ) ) {
+			self::close_addons( $dyn->proposer_id, $dyn->partner_id, $admin_id );
+		}
+		do_action( 'cmp_dynamic_ended', $dyn, $admin_id );
+		foreach ( array( $dyn->proposer_id, $dyn->partner_id ) as $uid ) {
+			/* translators: %s: dynamic type */
+			CMP_Notifications::add( (int) $uid, 'access_change', sprintf( __( 'The site team ended your dynamic (%s) at your request or to fix a problem.', 'cmp' ), self::types()[ $dyn->type ]['label'] ), self::url() );
+		}
+		return true;
+	}
+
+	/** Site team (0.26.0): turn off an active add-on, or cancel a request. Both members are told. */
+	public static function admin_addon_off( $addon_id, $admin_id ) {
+		$ad = self::get_addon( $addon_id );
+		if ( ! $ad || ! in_array( $ad->status, array( 'active', 'pending' ), true ) ) {
+			return false;
+		}
+		$was = $ad->status;
+		self::set_addon_status( $ad, 'active' === $was ? 'ended' : 'withdrawn', $admin_id );
+		if ( 'active' === $was ) {
+			do_action( 'cmp_dynamic_ended', self::pair_stub( $ad->user_a, $ad->user_b ), $admin_id );
+		}
+		foreach ( array( $ad->user_a, $ad->user_b ) as $uid ) {
+			/* translators: %s: Chastity or Homework */
+			CMP_Notifications::add( (int) $uid, 'access_change', sprintf( __( 'The site team turned off %s between you and your dynamic partner.', 'cmp' ), mb_strtolower( self::addon_labels()[ $ad->kind ][0] ) ), self::url() );
+		}
+		return true;
+	}
+
 	/** Enough of a dynamic for cmp_dynamic_ended listeners (they check both directions). */
 	private static function pair_stub( $a, $b ) {
 		return (object) array( 'id' => 0, 'type' => '', 'proposer_id' => (int) $a, 'partner_id' => (int) $b, 'proposer_side' => '', 'status' => 'ended' );
