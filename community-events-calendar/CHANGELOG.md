@@ -6,6 +6,19 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.44.1
+
+**Page-edit emails showed "Array" for extra titles** (owner, 2026-10-13: "fix the Array email bug").
+
+- When a titleholder with more than one title saved "Edit this page", the email to the site admin listed each extra title as "Array", and PHP logged "Array to string conversion" (`class-cec-org-editor.php`, the change list). The "More titles" rows (1.42.0) are arrays of title / year / producer; the email now shows each as its title line, e.g. "Mr. Ohio Pup 2025 · Produced by Ohio Pups", the same wording as the page and card.
+- **Verification** (local WordPress test kit, macOS, PHP 8.4):
+  - `tests/org-e2e.sh` 147/147. New check: the change email lists the extra titles by name and never says "Array". The same check fails on 1.44.0 (146/147), so it catches the bug.
+  - No plugin warnings in `debug.log` (1.44.0 logged this one 6 times per run).
+  - `php -l` on the changed file.
+  - Same Mac setup as 1.44.0 (local router script, port 8898, not committed).
+
+---
+
 ## 1.44.0
 
 **Homepage grids: 6 random cards and a "See More" button** (owner, 2026-10-13: "setup the sections on the homepage for Organizations and Titleholders to show 6 and rotate randomly and have a 'see more' option that would go to the regular page for each"). Also brings the 2026-10-12 live-only changes (1.43.0) into the repository.
