@@ -192,12 +192,24 @@ echo "== Profile badge"
 get nosy n1 "$PAGE&cmp_member=$PUP"
 ok "badge off by default" $(hasnt $T/n1.html 'cmp-cl-badge')
 r=$(act pup $PN wearer_settings -F "lock=$LID" -F "show_profile=1")
-IFS='|' read OPT POL HYG <<< "$(lk $LID option_key release_policy hygiene_minutes)"
+LKV=$(lk $LID option_key release_policy hygiene_minutes); IFS='|' read OPT POL HYG <<< "$LKV"
 r=$(act kh $KN rules -F "lock=$LID" -F "option=$OPT" -F "policy=$POL" -F "hygiene_minutes=$HYG" -F "kh_show=1")
 get nosy n2 "$PAGE&cmp_member=$PUP"
 ok "badge shown once the wearer turns it on, naming the keyholder (0.25.0)" $([ "$(has $T/n2.html 'Locked by <a href=')$(has $T/n2.html "cmp_member=$KH")$(has $T/n2.html 'Sample Keyholder</a> · ')" = 111 ] && echo 1 || echo 0)
 get nosy n2k "$PAGE&cmp_member=$KH"
 ok "keyholder's profile: Holds the key for the wearer, linked" $([ "$(has $T/n2k.html 'Holds the key for <a href=')$(has $T/n2k.html "cmp_member=$PUP")$(has $T/n2k.html 'cmp-cl-badge is-key')" = 111 ] && echo 1 || echo 0)
+echo "== Last verified on the badges (CMP 0.29.0)"
+BADGE(){ ev "wp_set_current_user($NOSY); echo CMP_Chastity::profile_badge_html($1);"; }
+ok "wearer's badge: last verified today, elsewhere, with where it was sent" $(BADGE $PUP | grep -q 'last verified today · elsewhere (Telegram)' && echo 1 || echo 0)
+ok "keyholder's badge shows the same" $(BADGE $KH | grep -q 'Holds the key for .*last verified today · elsewhere (Telegram)' && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->insert(CMP_Install::table('lock_events'),array('lock_id'=>$LID,'actor_id'=>$PUP,'type'=>'verification','code'=>'TEST29','review'=>'','created_at'=>gmdate('Y-m-d H:i:s',time()+60)));" >/dev/null
+ok "a photo the keyholder hasn't accepted isn't proof yet" $(BADGE $PUP | grep -q 'elsewhere (Telegram)' && echo 1 || echo 0)
+ok "...but on a self-lock any photo sent counts" $([ "$(ev "\$l=CMP_Chastity::lock($LID); \$l->keyholder_id=0; echo CMP_Chastity::last_verified(\$l)->type;")" = verification ] && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->update(CMP_Install::table('lock_events'),array('review'=>'accepted'),array('code'=>'TEST29'));" >/dev/null
+ok "once accepted, the badge says photo" $(BADGE $PUP | grep -q 'last verified today · photo' && echo 1 || echo 0)
+ok "the photo itself is never on the badge" $(BADGE $PUP | grep -q 'cmp_lockpic' && echo 0 || echo 1)
+ok "never verified: no 'last verified' text" $([ -z "$(ev "\$l=CMP_Chastity::lock($LID); \$l->id=987654; echo CMP_Chastity::last_verified(\$l) ? 'x' : '';")" ] && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->delete(CMP_Install::table('lock_events'),array('code'=>'TEST29'));" >/dev/null
 get kh k2b "$PAGE&cmp_tab=chastity&lock=$LID"
 ok "keyholder has a switch for their name" $(has $T/k2b.html 'name="kh_show"')
 r=$(act kh $KN rules -F "lock=$LID" -F "option=$OPT" -F "policy=$POL" -F "hygiene_minutes=$HYG")
