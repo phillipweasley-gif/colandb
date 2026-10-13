@@ -349,6 +349,7 @@ ok "a titleholder manages their own card: card text and bullet points" $([ "$(ha
 get anon fxp "$(ev "echo get_term_link($FID,'cec_partner_org');")"
 ok "titleholder page: 'Message me on Telegram', an 'Ask for my FetLife' tag and no FetLife link" $([ "$(has $T/fxp.html 'Message me on Telegram')$(has $T/fxp.html 'Ask for my FetLife')$(hasnt $T/fxp.html 'fetlife.com/users/123')" = 111 ] && [ "$(ev "echo isset(CEC_Orgs::profile($FID)['socials']['fetlife']) ? 1 : 0;")" = 0 ] && echo 1 || echo 0)
 ok "several titles: each shows on the page, in order" $([ "$(has $T/fxp.html 'Great Lakes Handler 2026')$(has $T/fxp.html 'Mr. Ohio Pup 2025 · Produced by Ohio Pups')$(has $T/fxp.html '>Bootblack Ohio<')" = 111 ] && echo 1 || echo 0)
+ok "...the change email lists the extra titles by name, not 'Array' (CEC 1.44.1)" $(php -r '$hit=0; foreach(file($argv[1]) as $l){ $m=json_decode($l,true); $b=is_array($m)?(string)$m["message"]:""; if(strpos($b,"More titles")!==false){ $hit = (strpos($b,"Mr. Ohio Pup 2025 · Produced by Ohio Pups")!==false && strpos($b,"Array")===false) ? 1 : 0; } } echo $hit;' wp-content/mail.log)
 ok "...a bad year is dropped from that title only" $([ "$(ev "echo wp_json_encode(CEC_Orgs::profile($FID)['titles_more'][1]);")" = '{"title":"Bootblack Ohio","year":"","producer":""}' ] && echo 1 || echo 0)
 get anon grt "$H/?page_id=$GRID_ID"
 ok "...and on the card" $(has $T/grt.html 'cec-org-tile-title">Mr. Ohio Pup 2025')

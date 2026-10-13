@@ -1010,6 +1010,11 @@ class CEC_Org_Editor {
 				if ( is_array( $x ) ) {
 					$parts = array();
 					foreach ( $x as $kk => $vv ) {
+						// 1.44.1: "More titles" rows are arrays (title / year /
+						// producer); show each as its title line, not "Array".
+						if ( is_array( $vv ) ) {
+							$vv = CEC_Orgs::title_line( wp_parse_args( $vv, array( 'title' => '', 'year' => '', 'producer' => '' ) ) );
+						}
 						$parts[] = is_string( $kk ) ? $kk . ': ' . $vv : $vv;
 					}
 					return implode( '; ', $parts );
