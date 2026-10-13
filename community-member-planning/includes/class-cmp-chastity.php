@@ -31,6 +31,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   keyholder can leave their name off (kh_show), and then neither profile
  *   names them. A full POST over post_max_size (PHP drops every field) now
  *   comes back with a "too large" notice instead of a blank page.
+ * - 0.26.0: the site team can correct a lock's start, planned end and end
+ *   (Users → Member Dynamics & Locks, CMP_Member_Admin), record a lock that
+ *   never got started, end one, or remove a stuck or duplicate one. Each
+ *   correction is an 'admin_fix' history entry both members see (planned-end
+ *   changes stay hidden from a wearer whose timer is hidden), a notification
+ *   to both, and an audit-log row with the old and new values.
  */
 class CMP_Chastity {
 
@@ -787,6 +793,169 @@ class CMP_Chastity {
 	}
 
 	/* ------------------------------------------------------------------
+	 * Site team corrections (0.26.0). Callers check manage_options.
+	 * ---------------------------------------------------------------- */
+
+	/** UTC 'Y-m-d H:i:s' to a site-time label. */
+	public static function site_time( $utc ) {
+		return $utc ? wp_date( 'M j, Y g:i A', self::ts( $utc ) ) : __( 'open-ended', 'cmp' );
+	}
+
+	/** Tell both members, and add the history line they both read. */
+	private static function admin_note( $lock, $admin_id, $text, $about_end = false ) {
+		self::add_event( $lock->id, $admin_id, 'admin_fix', array( 'note' => mb_substr( $text, 0, 500 ), 'review' => $about_end ? 'end' : '' ) );
+		$hidden = $about_end && $lock->keyholder_id && (int) $lock->hide_timer;
+		/* translators: %s: what changed */
+		$msg = sprintf( __( 'The site team corrected your lock: %s', 'cmp' ), $text );
+		CMP_Notifications::add( (int) $lock->wearer_id, 'lock', $hidden ? __( 'The site team made a correction to your lock.', 'cmp' ) : $msg, self::url() );
+		if ( $lock->keyholder_id ) {
+			/* translators: 1: wearer, 2: what changed */
+			CMP_Notifications::add( (int) $lock->keyholder_id, 'lock', sprintf( __( 'The site team corrected %1$s\'s lock: %2$s', 'cmp' ), self::name( $lock->wearer_id ), $text ), self::url( array( 'lock' => $lock->id ) ) );
+		}
+	}
+
+	/**
+	 * Correct a lock's times. $fields may hold started_at, planned_end
+	 * (null = open-ended) and ended_at, all UTC. Returns an error code or ''.
+	 */
+	public static function admin_set_times( $lock_id, $fields, $admin_id, $reason ) {
+		$lock = self::lock( $lock_id );
+		if ( ! $lock || 'proposed' === $lock->status ) {
+			return 'gone';
+		}
+		$start = array_key_exists( 'started_at', $fields ) ? $fields['started_at'] : $lock->started_at;
+		$end   = array_key_exists( 'ended_at', $fields ) ? $fields['ended_at'] : $lock->ended_at;
+		$plan  = array_key_exists( 'planned_end', $fields ) ? $fields['planned_end'] : $lock->planned_end;
+		$now   = time();
+		if ( self::ts( $start ) > $now || ( 'ended' === $lock->status && ( ! $end || self::ts( $end ) > $now || self::ts( $end ) <= self::ts( $start ) ) ) || ( $plan && self::ts( $plan ) <= self::ts( $start ) ) ) {
+			return 'times';
+		}
+		$set   = array();
+		$lines = array();
+		$old   = array();
+		if ( $start !== $lock->started_at ) {
+			$set['started_at'] = $start;
+			$old['started_at'] = $lock->started_at;
+			/* translators: 1: old time, 2: new time */
+			$lines[] = sprintf( __( 'start changed from %1$s to %2$s', 'cmp' ), self::site_time( $lock->started_at ), self::site_time( $start ) );
+		}
+		if ( 'ended' === $lock->status && $end !== $lock->ended_at ) {
+			$set['ended_at'] = $end;
+			$old['ended_at'] = $lock->ended_at;
+			/* translators: 1: old time, 2: new time */
+			$lines[] = sprintf( __( 'end changed from %1$s to %2$s', 'cmp' ), self::site_time( $lock->ended_at ), self::site_time( $end ) );
+		}
+		$end_line = '';
+		if ( 'locked' === $lock->status && $plan !== $lock->planned_end ) {
+			$set['planned_end'] = $plan;
+			$old['planned_end'] = $lock->planned_end;
+			/* translators: 1: old time, 2: new time */
+			$end_line = sprintf( __( 'planned end changed from %1$s to %2$s', 'cmp' ), self::site_time( $lock->planned_end ), self::site_time( $plan ) );
+		}
+		if ( ! $set ) {
+			return 'same';
+		}
+		self::update_lock( $lock->id, $set );
+		CMP_Audit::log( 'lock_admin_fix', 'lock', $lock->id, $old, $set, $reason, $admin_id );
+		if ( $lines ) {
+			$after = self::lock( $lock->id );
+			/* translators: %s: duration */
+			$lines[] = sprintf( __( 'now %s locked', 'cmp' ), self::duration( self::locked_seconds( $after ) ) );
+			self::admin_note( $lock, $admin_id, implode( '; ', $lines ) . '.' );
+		}
+		if ( $end_line ) {
+			self::admin_note( $lock, $admin_id, $end_line . '.', true );
+		}
+		return '';
+	}
+
+	/** End an active lock (reason "site team"). */
+	public static function admin_end( $lock_id, $admin_id, $reason ) {
+		$lock = self::lock( $lock_id );
+		if ( ! $lock || 'locked' !== $lock->status ) {
+			return false;
+		}
+		self::update_lock( $lock->id, array( 'status' => 'ended', 'ended_at' => gmdate( 'Y-m-d H:i:s' ), 'ended_by' => $admin_id, 'end_reason' => 'admin', 'opened_at' => null, 'release_allowed' => 0 ) );
+		self::add_event( $lock->id, $admin_id, 'unlocked', array( 'note' => 'admin' ) );
+		CMP_Audit::log( 'lock_ended', 'lock', $lock->id, null, array( 'reason' => 'admin' ), $reason, $admin_id );
+		self::admin_note( $lock, $admin_id, __( 'the lock was ended.', 'cmp' ) );
+		return true;
+	}
+
+	/** Remove a lock record entirely (a stuck proposal, or a duplicate). Both members are told. */
+	public static function admin_delete( $lock_id, $admin_id, $reason ) {
+		$lock = self::lock( $lock_id );
+		if ( ! $lock ) {
+			return false;
+		}
+		self::delete_lock( $lock->id );
+		CMP_Audit::log( 'lock_admin_removed', 'lock', $lock->id, array( 'wearer' => (int) $lock->wearer_id, 'keyholder' => (int) $lock->keyholder_id, 'status' => $lock->status, 'started_at' => $lock->started_at, 'ended_at' => $lock->ended_at ), null, $reason, $admin_id );
+		$what = 'proposed' === $lock->status ? __( 'The site team removed a lock that was waiting to be accepted.', 'cmp' ) : sprintf( /* translators: %s: date */ __( 'The site team removed a lock record that started %s.', 'cmp' ), self::site_time( $lock->started_at ) );
+		CMP_Notifications::add( (int) $lock->wearer_id, 'lock', $what, self::url() );
+		if ( $lock->keyholder_id ) {
+			CMP_Notifications::add( (int) $lock->keyholder_id, 'lock', $what . ' (' . self::name( $lock->wearer_id ) . ')', self::url() );
+		}
+		return true;
+	}
+
+	/**
+	 * Record a lock that should exist (e.g. an accept that failed): running
+	 * if $ended is null, otherwise a past lock. The keyholder must hold the
+	 * wearer's key now for a running lock. Returns the lock id or an error code.
+	 */
+	public static function admin_record( $wearer, $keyholder, $option, $started, $planned_end, $ended, $admin_id, $reason ) {
+		global $wpdb;
+		$options = self::options();
+		if ( ! get_userdata( $wearer ) || ! isset( $options[ $option ] ) || 'custom' === $option ) {
+			return 'invalid';
+		}
+		if ( $keyholder && ( ! get_userdata( $keyholder ) || ( ! $ended && ! CMP_Dynamics::lead_can_direct( $keyholder, $wearer, 'chastity' ) ) ) ) {
+			return 'keyholder';
+		}
+		if ( ! $started || self::ts( $started ) > time() || ( $ended && ( self::ts( $ended ) > time() || self::ts( $ended ) <= self::ts( $started ) ) ) || ( $planned_end && self::ts( $planned_end ) <= self::ts( $started ) ) ) {
+			return 'times';
+		}
+		if ( ! $ended && self::active_lock( $wearer ) ) {
+			return 'busy';
+		}
+		list( $name, $rule, $policy ) = $options[ $option ];
+		$now = gmdate( 'Y-m-d H:i:s' );
+		$wpdb->insert(
+			self::t( 'locks' ),
+			array(
+				'wearer_id'       => $wearer,
+				'keyholder_id'    => $keyholder,
+				'keyholder_name'  => '',
+				'option_key'      => $option,
+				'option_name'     => $name,
+				'rule'            => $rule,
+				'release_policy'  => $policy,
+				'started_at'      => $started,
+				'planned_end'     => $ended ? null : $planned_end,
+				'hide_timer'      => 0,
+				'verify_daily'    => 0,
+				'hygiene_minutes' => 15,
+				'show_profile'    => 0,
+				'kh_show'         => 1,
+				'release_allowed' => 0,
+				'status'          => $ended ? 'ended' : 'locked',
+				'ended_at'        => $ended ? $ended : null,
+				'ended_by'        => $ended ? $admin_id : null,
+				'end_reason'      => $ended ? 'admin' : '',
+				'created_at'      => $now,
+				'updated_at'      => $now,
+			)
+		);
+		$id = (int) $wpdb->insert_id;
+		self::add_event( $id, $admin_id, 'locked', array( 'note' => $name ) );
+		CMP_Audit::log( 'lock_admin_recorded', 'lock', $id, null, array( 'wearer' => (int) $wearer, 'keyholder' => (int) $keyholder, 'started_at' => $started, 'planned_end' => $planned_end, 'ended_at' => $ended ), $reason, $admin_id );
+		$lock = self::lock( $id );
+		/* translators: 1: start, 2: duration */
+		self::admin_note( $lock, $admin_id, sprintf( __( 'a lock was recorded from %1$s (%2$s locked).', 'cmp' ), self::site_time( $started ), self::duration( self::locked_seconds( $lock ) ) ) );
+		return $id;
+	}
+
+	/* ------------------------------------------------------------------
 	 * Rendering
 	 * ---------------------------------------------------------------- */
 
@@ -871,7 +1040,7 @@ class CMP_Chastity {
 		<?php
 		$past = self::past_locks( $user_id );
 		if ( $past ) :
-			$reasons = array( 'completed' => __( 'completed', 'cmp' ), 'keyholder' => __( 'unlocked by keyholder', 'cmp' ), 'emergency' => __( 'emergency unlock', 'cmp' ) );
+			$reasons = array( 'completed' => __( 'completed', 'cmp' ), 'keyholder' => __( 'unlocked by keyholder', 'cmp' ), 'emergency' => __( 'emergency unlock', 'cmp' ), 'admin' => __( 'ended by the site team', 'cmp' ) );
 			?>
 			<section class="cmp-panel">
 				<h3 class="cmp-panel-title"><?php esc_html_e( 'Past locks', 'cmp' ); ?></h3>
@@ -1151,7 +1320,10 @@ class CMP_Chastity {
 			case 'keyholder_left':
 				return __( 'Dynamic ended; now a self-lock', 'cmp' );
 			case 'unlocked':
-				return __( 'Unlocked', 'cmp' );
+				return 'admin' === $e->note ? __( 'Ended by the site team', 'cmp' ) : __( 'Unlocked', 'cmp' );
+			case 'admin_fix':
+				/* translators: %s: what changed */
+				return sprintf( __( 'Corrected by the site team: %s', 'cmp' ), $e->note );
 		}
 		return $e->type;
 	}
@@ -1160,7 +1332,7 @@ class CMP_Chastity {
 	private static function history_html( $lock, $as_keyholder ) {
 		$html = '<section class="cmp-panel cmp-cl-history"><h3 class="cmp-panel-title">' . esc_html__( 'History', 'cmp' ) . '</h3><ul>';
 		foreach ( self::events( $lock->id, 20 ) as $e ) {
-			if ( ! $as_keyholder && $lock->hide_timer && in_array( $e->type, array( 'time_added', 'time_removed' ), true ) ) {
+			if ( ! $as_keyholder && $lock->hide_timer && ( in_array( $e->type, array( 'time_added', 'time_removed' ), true ) || ( 'admin_fix' === $e->type && 'end' === $e->review ) ) ) {
 				continue;
 			}
 			$html .= '<li><time>' . esc_html( wp_date( 'M j, g:i A', self::ts( $e->created_at ) ) ) . '</time> ' . esc_html( self::event_text( $e, ! $as_keyholder && $lock->hide_timer ) ) . ( $e->note && in_array( $e->type, array( 'release', 'unlock_asked' ), true ) ? ' · “' . esc_html( $e->note ) . '”' : '' ) . '</li>';
@@ -1255,7 +1427,7 @@ class CMP_Chastity {
 				? sprintf( _n( 'Locked by %1$s · %2$d day', 'Locked by %1$s · %2$d days', $days, 'cmp' ), $kh, $days )
 				/* translators: %d: days */
 				: esc_html( sprintf( _n( 'Locked · %d day', 'Locked · %d days', $days, 'cmp' ), $days ) );
-			$out .= '<p class="cmp-cl-badge">' . self::icon( 'lock' ) . ' ' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . '</p>';
+			$out .= '<p class="cmp-cl-badge">' . self::icon( 'lock' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . '</span></p>';
 		}
 		$held = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . self::t( 'locks' ) . " WHERE keyholder_id = %d AND status = 'locked' AND show_profile = 1 AND kh_show = 1 ORDER BY started_at", $owner_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		foreach ( $held as $h ) {
@@ -1266,7 +1438,7 @@ class CMP_Chastity {
 			$days = intdiv( self::locked_seconds( $h ), DAY_IN_SECONDS );
 			/* translators: 1: wearer link, 2: days */
 			$text = sprintf( _n( 'Holds the key for %1$s · %2$d day', 'Holds the key for %1$s · %2$d days', $days, 'cmp' ), $who, $days );
-			$out .= '<p class="cmp-cl-badge is-key">' . self::icon( 'key' ) . ' ' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . '</p>';
+			$out .= '<p class="cmp-cl-badge is-key">' . self::icon( 'key' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . '</span></p>';
 		}
 		return $out ? '<div class="cmp-cl-badges">' . $out . '</div>' : '';
 	}

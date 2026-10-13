@@ -4,6 +4,35 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.26.0
+
+**An admin screen for dynamics and locks, so the site team can fix problems and keep day counts accurate** (owner, 2026-10-12: "I'll need an admin screen in case users have trouble with management and to be able to manually set days for people if something goes wrong. It's very important to these users to have accurate numbers").
+
+- **Users → Dynamics & locks** (administrators only):
+  - Lists locks waiting to be accepted, running locks with days locked, and recently ended locks.
+  - Find any member to see their dynamics, chastity and homework add-ons, and locks.
+- **Fixing a lock:**
+  - **Set days locked:** type days and hours, and the start is set so the lock shows exactly that much time. A running lock counts back from now, an ended one from its end.
+  - **Start, end and planned end:** set by date and time in the site's time zone, or make the lock open-ended.
+  - **End** a running lock, **remove** a stuck waiting lock, or **delete** a duplicate record.
+- **Record a lock** that should exist but doesn't, for example when an Accept failed. It can be running or past, with or without a keyholder. A running lock needs a keyholder who holds the wearer's key now, and the keyholder then manages it as usual.
+- **Dynamics:** end one, turn off an add-on, or cancel an add-on request. These go through the same path members use, so a lock becomes a self-lock and homework is archived, as usual.
+- **Safeguards:**
+  - Every change needs a reason, kept in the audit log with the old and new values.
+  - Both members get a notification saying what changed, with old and new times and the new total. The lock history shows "Corrected by the site team: …".
+  - A planned-end change stays hidden from a wearer whose timer is hidden: they're told only that a correction was made.
+  - Starts and ends can't be in the future, and ends must come after starts.
+  - The screen shows names, status and dates only: no photos, rules, notes or messages. Nothing can be accepted on a member's behalf.
+  - Past locks ended this way show "ended by the site team".
+- **Privacy statement** (`docs/privacy-statement.md`): "Site administrators" now describes what the site team can see and do here. The live Privacy Policy page needs the same update.
+- **Profile badges:** the text now wraps as one line at phone width. Before, it split into three columns ("Locked by" / name / "· N days").
+- **Verification** (local WordPress from GitHub sources, SQLite, PHP 8.3):
+  - New `tests/member-admin-e2e.sh` 34/34.
+  - `chastity-e2e.sh` 96/96, `dynamics-e2e.sh` 56/56, `homework-e2e.sh` 44/44, `account-e2e.sh` 69/69, `messages-e2e.sh` 51/51. `php -l`.
+  - Screenshots checked: the admin member and lock screens at 1280 px; both profile badges at 375 px.
+
+---
+
 ## 0.25.0
 
 **Lock badges name both sides, with a lock and a key icon** (owner, 2026-10-12: "I would like a locked by and the keyholder's name as a badge and the opposite for the caged", "make it a lock icon and a key icon respectively").
