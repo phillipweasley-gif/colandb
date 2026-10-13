@@ -650,11 +650,35 @@ class CEC_Orgs {
 	/**
 	 * [cec_partner_orgs kind="organization|titleholder" button="Learn More"]
 	 * The homepage grid of listed groups.
+	 *
+	 * 1.44.0: limit="6" shuffle="yes" more="/organizations/" shows 6 cards,
+	 * a different random 6 on every visit, then a "See More" button
+	 * (more_label="…") to the full list. The shuffle runs in the browser, so
+	 * it keeps changing even when the page is served from the CDN cache; the
+	 * server-side order is shuffled too for uncached pages. limit is ignored
+	 * with filter="yes", which needs every card.
 	 */
 	public static function shortcode_grid( $atts ) {
-		$atts = shortcode_atts( array( 'kind' => 'all', 'button' => __( 'Learn More', 'cec' ), 'empty' => '', 'filter' => 'no' ), $atts, 'cec_partner_orgs' );
-		$kind = in_array( $atts['kind'], self::KINDS, true ) ? $atts['kind'] : ( 'all' === $atts['kind'] ? '' : 'organization' );
-		$list = self::listed( $kind );
+		$atts  = shortcode_atts(
+			array(
+				'kind'       => 'all',
+				'button'     => __( 'Learn More', 'cec' ),
+				'empty'      => '',
+				'filter'     => 'no',
+				'limit'      => 0,
+				'shuffle'    => 'no',
+				'more'       => '',
+				'more_label' => __( 'See More', 'cec' ),
+			),
+			$atts,
+			'cec_partner_orgs'
+		);
+		$kind  = in_array( $atts['kind'], self::KINDS, true ) ? $atts['kind'] : ( 'all' === $atts['kind'] ? '' : 'organization' );
+		$list  = self::listed( $kind );
+		$limit = 'yes' === $atts['filter'] ? 0 : max( 0, (int) $atts['limit'] );
+		if ( 'yes' === $atts['shuffle'] && $list ) {
+			shuffle( $list );
+		}
 		wp_enqueue_style( 'cec-orgs' );
 		if ( ! $list ) {
 			return $atts['empty'] ? '<p class="cec-org-empty">' . esc_html( $atts['empty'] ) . '</p>' : '';
@@ -704,9 +728,10 @@ class CEC_Orgs {
 			$html .= '<p class="cec-org-empty" hidden>' . esc_html__( 'Nothing listed there yet.', 'cec' ) . '</p>';
 			$html .= "<script>( function () { var f = document.querySelector( '[data-grid=\"" . esc_js( $uid ) . "\"]' ); if ( ! f ) { return; } var sel = f.querySelectorAll( 'select' ), ss = sel[0], cs = sel[1], cl = f.querySelectorAll( 'label' )[1], c = f.querySelector( '.cec-org-filter-count' ), e = f.nextElementSibling, map = JSON.parse( f.getAttribute( 'data-cities' ) || '{}' ), g = null, all = " . wp_json_encode( __( 'All cities', 'cec' ) ) . ", shown = " . wp_json_encode( __( 'shown', 'cec' ) ) . "; f.hidden = false; function apply() { var st = ss.value, ci = cs.value, n = 0; g = g || document.getElementById( f.getAttribute( 'data-grid' ) ); g.querySelectorAll( '.cec-org-tile' ).forEach( function ( t ) { var show = ! st || ( '-' === st ? ! t.dataset.state : t.dataset.state === st && ( ! ci || t.dataset.city === ci ) ); t.hidden = ! show; if ( show ) { n++; } } ); c.textContent = st ? n + ' ' + shown : ''; e.hidden = n > 0; } ss.addEventListener( 'change', function () { var list = map[ ss.value ] || []; cs.innerHTML = ''; [ [ '', all ] ].concat( list ).forEach( function ( x ) { var o = document.createElement( 'option' ); o.value = x[0]; o.textContent = x[1]; cs.appendChild( o ); } ); cs.hidden = cl.hidden = list.length < 2; apply(); } ); cs.addEventListener( 'change', apply ); } )();</script>";
 		}
-		$html .= '<div class="cec-org-grid" id="' . esc_attr( $uid ) . '">';
-		foreach ( $list as $p ) {
-			$html .= '<article class="cec-org-tile is-' . esc_attr( $p['kind'] ) . '" data-region="' . esc_attr( '' === $p['region'] ? '' : self::region_key( $p['region'] ) ) . '" data-state="' . esc_attr( $p['state'] ) . '" data-city="' . esc_attr( '' === $p['city'] ? '' : self::region_key( $p['city'] ) ) . '">';
+		$more  = '' === trim( $atts['more'] ) ? '' : esc_url( $atts['more'] );
+		$html .= '<div class="cec-org-grid' . ( $more ? ' has-more' : '' ) . '" id="' . esc_attr( $uid ) . '">';
+		foreach ( array_values( $list ) as $i => $p ) {
+			$html .= '<article class="cec-org-tile is-' . esc_attr( $p['kind'] ) . '" data-region="' . esc_attr( '' === $p['region'] ? '' : self::region_key( $p['region'] ) ) . '" data-state="' . esc_attr( $p['state'] ) . '" data-city="' . esc_attr( '' === $p['city'] ? '' : self::region_key( $p['city'] ) ) . '"' . ( $limit && $i >= $limit ? ' hidden' : '' ) . '>';
 			$image = self::image_html( $p, 'cec-org-tile-image' );
 			$html .= '<div class="cec-org-tile-head">' . ( $image ? '<span class="cec-org-tile-media">' . $image . '</span>' : '' ) . '<h3>' . esc_html( $p['name'] ) . '</h3></div>';
 			if ( 'titleholder' === $p['kind'] ) {
@@ -734,7 +759,20 @@ class CEC_Orgs {
 			$html .= '<a class="cec-org-tile-btn" href="' . esc_url( $p['url'] ) . '">' . esc_html( $atts['button'] ) . '<span class="screen-reader-text">: ' . esc_html( $p['name'] ) . '</span></a>';
 			$html .= '</article>';
 		}
-		return $html . '</div>';
+		$html .= '</div>';
+		// 1.44.0: reshuffle in the browser so a cached page still rotates,
+		// then show the first `limit` cards.
+		if ( $limit && 'yes' === $atts['shuffle'] && count( $list ) > 1 ) {
+			$html .= "<script>( function () { var g = document.getElementById( '" . esc_js( $uid ) . "' ); if ( ! g ) { return; } var t = Array.prototype.slice.call( g.children ), i, j, x; for ( i = t.length - 1; i > 0; i-- ) { j = Math.floor( Math.random() * ( i + 1 ) ); x = t[ i ]; t[ i ] = t[ j ]; t[ j ] = x; } t.forEach( function ( el, n ) { el.hidden = n >= " . (int) $limit . '; g.appendChild( el ); } ); } )();</script>';
+		}
+		if ( $more ) {
+			$what  = array(
+				'organization' => __( 'organizations', 'cec' ),
+				'titleholder'  => __( 'titleholders', 'cec' ),
+			);
+			$html .= '<p class="cec-org-more"><a class="cec-org-more-btn" href="' . $more . '">' . esc_html( $atts['more_label'] ) . '<span class="screen-reader-text"> ' . esc_html( $what[ $kind ] ?? __( 'listings', 'cec' ) ) . '</span></a></p>';
+		}
+		return $html;
 	}
 
 	/* ------------------------------------------------------------------

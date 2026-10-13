@@ -7,7 +7,7 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&family=Inter:wght@400;600;700&display=swap');
 
-.cec-org-hero, .cec-org-card, .cec-org-grid, .cec-org-form-wrap, .cec-org-events-head, .cec-org-btn, .cec-org-filter {
+.cec-org-hero, .cec-org-card, .cec-org-grid, .cec-org-form-wrap, .cec-org-events-head, .cec-org-btn, .cec-org-filter, .cec-org-more {
 	--org-pink: #FF50D7;
 	--org-lime: #E1F577;
 	--org-ink: #100F0F;
@@ -97,7 +97,7 @@ a.cec-org-tile-btn, .cec-org-tile-btn {
 	letter-spacing: 0.05em; text-transform: uppercase; text-decoration: none !important; border: 0 !important; border-radius: 0 !important;
 }
 a.cec-org-tile-btn:hover, a.cec-org-tile-btn:focus-visible { background: var(--org-lime) !important; }
-.cec-org-grid .screen-reader-text, .cec-org-form-wrap .screen-reader-text {
+.cec-org-grid .screen-reader-text, .cec-org-more .screen-reader-text, .cec-org-form-wrap .screen-reader-text {
 	border: 0; clip: rect(1px, 1px, 1px, 1px); clip-path: inset(50%); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute !important; width: 1px;
 }
 
@@ -190,6 +190,17 @@ button.cec-org-remove:hover, button.cec-org-remove:focus-visible { background: #
 .cec-org-filter-count { color: var(--org-muted); font-size: 0.9rem; }
 .cec-org-empty { text-align: center; color: #CCCCCC; }
 .cec-org-grid { margin-bottom: 5rem; }
+
+/* ---- "See More" under a limited grid (1.44.0) ---- */
+.cec-org-grid.has-more { margin-bottom: 2rem; }
+.cec-org-more { display: flex; justify-content: center; margin: 0 0 5rem; }
+a.cec-org-more-btn, .cec-org-more-btn {
+	display: inline-block !important; padding: 0.9rem 2.25rem !important; background: transparent !important; color: var(--org-pink) !important;
+	font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 900 !important; font-size: 0.95rem !important;
+	letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none !important; border: 3px solid var(--org-pink) !important; border-radius: 0 !important;
+}
+a.cec-org-more-btn:hover, a.cec-org-more-btn:focus-visible { background: var(--org-pink) !important; color: var(--org-ink) !important; }
+a.cec-org-more-btn:focus-visible { outline: 3px solid var(--org-lime); outline-offset: 2px; }
 .cec-taxonomy-archive.is-partner-org { padding-bottom: 5rem; }
 
 @media (max-width: 1024px) {
