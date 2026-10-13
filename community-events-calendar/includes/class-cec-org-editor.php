@@ -216,8 +216,12 @@ class CEC_Org_Editor {
 					<p class="cec-org-hint"><?php esc_html_e( 'Your card on the homepage shows your photo, name, title line (titleholders), the card text and bullet points below. Changes show there as soon as you save.', 'cec' ); ?></p>
 					<p class="cec-org-field"><label for="e_name"><?php esc_html_e( 'Name (required)', 'cec' ); ?></label>
 						<input type="text" id="e_name" name="name" maxlength="120" required value="<?php echo esc_attr( $v( 'name', $p['name'] ) ); ?>" /><span class="cec-org-hint"><?php esc_html_e( 'Your page address stays the same if you change it.', 'cec' ); ?></span></p>
-					<p class="cec-org-field"><label for="e_region"><?php esc_html_e( 'City or region (optional)', 'cec' ); ?></label>
-						<input type="text" id="e_region" name="region" maxlength="80" list="cec_org_regions" value="<?php echo esc_attr( $v( 'region', $p['region'] ) ); ?>" /><?php echo CEC_Orgs::regions_datalist( 'cec_org_regions' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><span class="cec-org-hint"><?php esc_html_e( 'Where you\'re based, e.g. Columbus, or Ohio if you cover the whole state. Shown on your card and used by the city/region filter.', 'cec' ); ?></span></p>
+					<p class="cec-org-field"><label for="e_city"><?php esc_html_e( 'City (required)', 'cec' ); ?></label>
+						<input type="text" id="e_city" name="city" maxlength="60" required list="cec_org_cities" autocomplete="address-level2" value="<?php echo esc_attr( $v( 'city', $p['city'] ) ); ?>" /><?php echo CEC_Orgs::cities_datalist( 'cec_org_cities' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><?php if ( '' === $p['city'] && '' !== $p['region'] ) : ?><span class="cec-org-hint"><?php /* translators: %s: area entered before 1.43.0 */ echo esc_html( sprintf( __( 'You previously entered "%s". Please add the city you\'re based in.', 'cec' ), $p['region'] ) ); ?></span><?php endif; ?></p>
+					<p class="cec-org-field"><label for="e_state"><?php esc_html_e( 'State (required)', 'cec' ); ?></label>
+						<select id="e_state" name="state" required autocomplete="address-level1"><?php echo CEC_Orgs::state_options( $v( 'state', $p['state'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></select></p>
+					<p class="cec-org-field"><label for="e_zip"><?php esc_html_e( 'ZIP code (optional, private)', 'cec' ); ?></label>
+						<input type="text" id="e_zip" name="zip" maxlength="10" inputmode="numeric" autocomplete="postal-code" value="<?php echo esc_attr( $v( 'zip', $p['zip'] ) ); ?>" /><span class="cec-org-hint"><?php esc_html_e( 'Never shown on the site. Your city and state show on your card and are used by the state and city filter.', 'cec' ); ?></span></p>
 					<p class="cec-org-field"><label for="e_summary"><?php esc_html_e( 'Card text (optional)', 'cec' ); ?></label>
 						<textarea id="e_summary" name="summary" rows="2" maxlength="200"><?php echo esc_textarea( $v( 'summary', $p['summary'] ) ); ?></textarea><span class="cec-org-hint"><?php esc_html_e( 'One or two sentences, up to 200 characters. Leave empty to show the start of your bio instead.', 'cec' ); ?></span></p>
 					<p class="cec-org-field"><label for="e_hl"><?php esc_html_e( 'Bullet points (optional)', 'cec' ); ?></label>
@@ -575,6 +579,9 @@ class CEC_Org_Editor {
 			'name'        => $p['name'],
 			'summary'     => $p['summary'],
 			'region'      => $p['region'],
+			'city'        => $p['city'],
+			'state'       => $p['state'],
+			'zip'         => $p['zip'],
 			'description' => $p['description'],
 			'highlights'  => $p['highlights'],
 			'mission'     => $p['mission'],
@@ -720,7 +727,6 @@ class CEC_Org_Editor {
 		$new      = array(
 			'name'        => $s( 'name', 120 ),
 			'summary'     => $s( 'summary', 200 ),
-			'region'      => $s( 'region', 80 ),
 			'description' => $s( 'description', 600, true ),
 			'mission'     => $s( 'mission', 2000, true ),
 			'highlights'  => array_slice( array_values( array_filter( array_map( 'trim', preg_split( '/\r\n|\r|\n/', $s( 'highlights', 600, true ) ) ) ) ), 0, 8 ),
@@ -745,6 +751,13 @@ class CEC_Org_Editor {
 		if ( '' === $new['description'] ) {
 			$notes[]            = $is_title ? __( 'Bio: it can\'t be empty, so the previous bio was kept.', 'cec' ) : __( 'Description: it can\'t be empty, so the previous description was kept.', 'cec' );
 			$new['description'] = $p['description'];
+		}
+		$loc = CEC_Orgs::clean_location( $s( 'city', 60 ), $s( 'state', 2 ), $s( 'zip', 10 ) );
+		if ( is_wp_error( $loc ) ) {
+			/* translators: %s: problem */
+			$notes[] = sprintf( __( 'Location: %s The previous location was kept.', 'cec' ), $loc->get_error_message() );
+		} else {
+			$new = array_merge( $new, $loc );
 		}
 		if ( $is_title ) {
 			list( $new['titles_more'], $more_notes ) = CEC_Orgs::clean_titles( isset( $post['titles_more'] ) ? $post['titles_more'] : array() );
@@ -969,7 +982,7 @@ class CEC_Org_Editor {
 		$labels  = array(
 			'name'        => __( 'Name', 'cec' ),
 			'summary'     => __( 'Card text', 'cec' ),
-			'region'      => __( 'City or region', 'cec' ),
+			'region'      => __( 'Location', 'cec' ),
 			'description' => __( 'Description / bio', 'cec' ),
 			'highlights'  => __( 'Bullet points', 'cec' ),
 			'mission'     => __( 'Mission / areas of focus', 'cec' ),
@@ -1069,7 +1082,7 @@ class CEC_Org_Editor {
 		if ( ! empty( $data['name'] ) && get_term( $term_id )->name !== $data['name'] && ! get_term_by( 'name', $data['name'], 'cec_partner_org' ) ) {
 			wp_update_term( $term_id, 'cec_partner_org', array( 'name' => $data['name'] ) );
 		}
-		$fields = array_intersect_key( $data, array_flip( array( 'summary', 'region', 'description', 'highlights', 'mission', 'title', 'year', 'producer', 'titles_more', 'socials', 'logo', 'logo_id', 'shape', 'ask' ) ) );
+		$fields = array_intersect_key( $data, array_flip( array( 'summary', 'region', 'city', 'state', 'zip', 'description', 'highlights', 'mission', 'title', 'year', 'producer', 'titles_more', 'socials', 'logo', 'logo_id', 'shape', 'ask' ) ) );
 		CEC_Orgs::save_profile( $term_id, $fields );
 		update_term_meta( $term_id, 'cec_gallery', $gallery );
 		self::prune( $term_id );

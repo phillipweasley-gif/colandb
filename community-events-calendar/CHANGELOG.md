@@ -6,6 +6,31 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.44.0
+
+**Homepage grids: 6 random cards and a "See More" button** (owner, 2026-10-13: "setup the sections on the homepage for Organizations and Titleholders to show 6 and rotate randomly and have a 'see more' option that would go to the regular page for each"). Also brings the 2026-10-12 live-only changes (1.43.0) into the repository.
+
+- **`[cec_partner_orgs]` gets four options:** `limit="6"` shows that many cards; `shuffle="yes"` picks a different random set on every visit; `more="/organizations/"` adds a **See More** button under the grid; `more_label="…"` changes its text (default "See More"). Grids without them are unchanged.
+  - The shuffle runs in the visitor's browser. colandb.com's homepage is cached at the CDN for up to a week, so a server-side shuffle alone would show everyone the same cards until the cache is cleared. The server order is shuffled too, for uncached pages.
+  - Every listed card is still in the page; cards past the limit start `hidden`, so without JavaScript the first 6 show.
+  - `limit` is ignored with `filter="yes"`, which needs every card.
+  - The button is an outlined pink button, so it doesn't look like the solid "Submit an Organization or Titleholder" button below it. Screen readers hear "See More organizations" / "See More titleholders".
+- **Homepage:** after updating, change the two homepage shortcode widgets to `[cec_partner_orgs kind="organization" limit="6" shuffle="yes" more="/organizations/"]` and `[cec_partner_orgs kind="titleholder" limit="6" shuffle="yes" more="/titleholders/"]`, and at the same time unpublish the Angie snippet **COL&B Homepage Grid Rotation** (id 942), which did this on live in the meantime. Running both would hide cards twice.
+- **1.43.0, applied on live on 2026-10-12 outside the repository, now imported** (byte-identical to the live files apart from the live-only `-loc1` stylesheet cache buster, which this version bump replaces):
+  - Structured location for organizations and titleholders: City (required) + State (required) + ZIP (optional, private, never shown) in the submission form, review screen, "Edit this page" and wp-admin. New term meta `cec_loc_city`, `cec_loc_state`, `cec_loc_zip`; `cec_region` stays as the display text ("Columbus, OH").
+  - `filter="yes"` filters by state, then city once a state has 2+ cities; "Location not listed" for listings without one.
+  - The grid filter finds its grid again if it wasn't found when the page loaded.
+  - `tests/org-e2e.sh` updated for it: submissions, approvals and page edits send a city and state; the filter checks look for "Filter by state" and state codes.
+- **Verification** (local WordPress test kit, macOS, PHP 8.4):
+  - `tests/org-e2e.sh` 146/146. New checks: `limit` hides all but N cards and keeps them all in the page; `shuffle="yes"` adds the in-browser shuffle; `more` adds the button with its screen-reader text; `more_label`; titleholder wording; `limit` ignored with `filter="yes"`; grids without the new options unchanged.
+  - Headless Chrome on the test site: 11 listed organizations, `limit="6" shuffle="yes"`: 6 visible on each of 5 loads, 5 different sets, See More shown and linking to `/organizations/`.
+  - The same browser-side shuffle has been running on colandb.com since 2026-10-13 (the snippet above); checked there at desktop and phone widths.
+  - `php -l` on every changed PHP file.
+  - Mac notes: PHP 8.4's built-in server needed a small router script for pretty permalinks, and port 8899 was held by an old test server, so the run used a local copy of the script on port 8898. Not committed.
+  - Not covered: an existing "Array to string conversion" warning in the page editor's change email for titleholders with extra titles (`class-cec-org-editor.php`, from 1.42.0) is unrelated and left for a separate fix.
+
+---
+
 ## 1.42.0
 
 **Titleholders with more than one title; the city/region filter shows sooner** (owner, 2026-10-11: "You should also be able to filter titleholders by location", "some titleholders have multiple titles").

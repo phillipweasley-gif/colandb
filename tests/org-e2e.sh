@@ -24,7 +24,7 @@ ev()   { $W eval "$1" 2>&1; }
 member(){ ev "\$i=get_user_by('login','$1')->ID; update_user_meta(\$i,'cmp_verified_email','$1@example.com'); update_user_meta(\$i,'cmp_email_verified_at',gmdate('Y-m-d H:i:s')); update_user_meta(\$i,'cmp_birth_date','1980-01-01'); CMP_Access::record_attestation(\$i); update_user_meta(\$i,'cmp_setup_done','later');" >/dev/null; }
 q()    { ev "global \$wpdb; echo \$wpdb->get_var(\"$1\");"; }
 # submit <ip> <extra curl args...>: posts the public form, prints the redirect.
-submit(){ local ip=$1; shift; curl -s -o /dev/null -w '%{redirect_url}' -H "X-Test-IP: $ip" "$H/wp-admin/admin-post.php" -F "action=cec_submit_org" -F "cec_back=$FORM" "$@"; }
+submit(){ local ip=$1; shift; curl -s -o /dev/null -w '%{redirect_url}' -H "X-Test-IP: $ip" "$H/wp-admin/admin-post.php" -F "action=cec_submit_org" -F "cec_back=$FORM" -F "city=Columbus" -F "state=OH" "$@"; }
 mails(){ if [ -f wp-content/mail.log ]; then wc -l < wp-content/mail.log; else echo 0; fi; }
 
 for p in community-events-calendar community-member-planning; do rm -rf wp-content/plugins/$p && cp -r $REPO/$p wp-content/plugins/; $W plugin activate $p >/dev/null 2>&1; done
@@ -80,7 +80,7 @@ r=$(submit 10.0.0.1 -F "kind=organization" -F "name=ZZ Rope Collective" -F "desc
 ok "a file that isn't an image is refused" $(echo "$r" | grep -q "cec_org=error" && echo 1 || echo 0)
 
 M0=$(mails)
-r=$(submit 10.0.0.2 -F "kind=organization" -F "name=ZZ Rope Collective" -F "description=Columbus rope education and social nights." -F $'highlights=Rope Education\nSocial Nights' -F "mission=Teach safe rope." -F "contact_name=Pat Doe" -F "contact_email=pat@example.com" -F "contact_phone=614-555-0100" -F "region=Columbus" -F "social[telegram]=https://t.me/+AbCdEf123" -F "social[website]=example.org/rope" -F "member=organn" -F "authorized=1" -F "logo=@$T/logo.png;type=image/png")
+r=$(submit 10.0.0.2 -F "kind=organization" -F "name=ZZ Rope Collective" -F "description=Columbus rope education and social nights." -F $'highlights=Rope Education\nSocial Nights' -F "mission=Teach safe rope." -F "contact_name=Pat Doe" -F "contact_email=pat@example.com" -F "contact_phone=614-555-0100" -F "city=Columbus" -F "state=OH" -F "social[telegram]=https://t.me/+AbCdEf123" -F "social[website]=example.org/rope" -F "member=organn" -F "authorized=1" -F "logo=@$T/logo.png;type=image/png")
 ok "a good organization submission: thanks" $(echo "$r" | grep -q "cec_org=thanks" && echo 1 || echo 0)
 SUB=$(q "SELECT ID FROM wp_posts WHERE post_type='cec_org_submission' AND post_title='ZZ Rope Collective'")
 ok "...stored as pending for review, with its contact kept private" $([ "$(ev "echo get_post_status($SUB).'/'.get_post_meta($SUB,'_cec_org_review',true).'/'.get_post_meta($SUB,'_cec_org_contact_email',true);")" = "pending/pending/pat@example.com" ] && echo 1 || echo 0)
@@ -118,19 +118,19 @@ ok "events list says listings are waiting" $(has $T/list.html 'waiting for revie
 DN=$(php -r 'preg_match("~name=\"_wpnonce\" value=\"([^\"]+)\" form=\"cec-org-review-form\"~",file_get_contents($argv[1]),$m); echo $m[1]??"";' $T/rv.html)
 decide(){ # decide <submission> <nonce> <decision> <extra -d args...>
 	local id=$1 n=$2 d=$3; shift 3
-	curl -s -b $T/admin.jar -c $T/admin.jar -o /dev/null -w '%{redirect_url}' -e "$H/wp-admin/post.php?post=$id&action=edit" "$H/wp-admin/admin-post.php" --data-urlencode "action=cec_org_decide" --data-urlencode "submission=$id" --data-urlencode "_wpnonce=$n" --data-urlencode "decision=$d" --data-urlencode "authorized=1" "$@"
+	curl -s -b $T/admin.jar -c $T/admin.jar -o /dev/null -w '%{redirect_url}' -e "$H/wp-admin/post.php?post=$id&action=edit" "$H/wp-admin/admin-post.php" --data-urlencode "action=cec_org_decide" --data-urlencode "submission=$id" --data-urlencode "_wpnonce=$n" --data-urlencode "decision=$d" --data-urlencode "authorized=1" --data-urlencode "city=Columbus" --data-urlencode "state=OH" "$@"
 }
 login orgdee orgdee orgdeepass123
 r=$(curl -s -b $T/orgdee.jar -o /dev/null -w '%{http_code}' "$H/wp-admin/admin-post.php" --data-urlencode "action=cec_org_decide" --data-urlencode "submission=$SUB" --data-urlencode "_wpnonce=$DN" --data-urlencode "decision=approve")
 ok "a non-admin can't approve" $([ "$r" = 403 ] && [ "$(ev "echo get_post_meta($SUB,'_cec_org_review',true);")" = pending ] && echo 1 || echo 0)
 M0=$(mails)
-FIELDS=(--data-urlencode "kind=organization" --data-urlencode "name=ZZ Rope Collective" --data-urlencode "description=Columbus rope education and social nights." --data-urlencode $'highlights=Rope Education\nSocial Nights' --data-urlencode "mission=Teach safe rope." --data-urlencode "contact_name=Pat Doe" --data-urlencode "contact_email=pat@example.com" --data-urlencode "region=Columbus" --data-urlencode "social[telegram]=https://t.me/+AbCdEf123" --data-urlencode "social[website]=https://example.org/rope" --data-urlencode "member=organn")
+FIELDS=(--data-urlencode "kind=organization" --data-urlencode "name=ZZ Rope Collective" --data-urlencode "description=Columbus rope education and social nights." --data-urlencode $'highlights=Rope Education\nSocial Nights' --data-urlencode "mission=Teach safe rope." --data-urlencode "contact_name=Pat Doe" --data-urlencode "contact_email=pat@example.com" --data-urlencode "city=Columbus" --data-urlencode "state=OH" --data-urlencode "social[telegram]=https://t.me/+AbCdEf123" --data-urlencode "social[website]=https://example.org/rope" --data-urlencode "member=organn")
 r=$(decide $SUB $DN approve "${FIELDS[@]}")
 ok "approve: back on the review screen" $(echo "$r" | grep -q "cec_org_done=approved" && echo 1 || echo 0)
 TID=$(ev 'echo (int) term_exists("ZZ Rope Collective","cec_partner_org")["term_id"];')
 P=$(ev "\$p=CEC_Orgs::profile($TID); echo \$p['kind'].'|'.\$p['listed'].'|'.implode(',',\$p['highlights']).'|'.\$p['mission'].'|'.\$p['socials']['telegram'].'|'.get_term_meta($TID,'cec_url',true).'|'.(\$p['logo_id']==$LOGO?1:0).'|'.\$p['contact']['email'];")
 ok "...creates the calendar group with its profile, logo, website and private contact" $([ "$P" = "organization|1|Rope Education,Social Nights|Teach safe rope.|https://t.me/+AbCdEf123|https://example.org/rope|1|pat@example.com" ] && echo 1 || echo 0)
-ok "...with its city or region" $([ "$(ev "echo CEC_Orgs::profile($TID)['region'];")" = Columbus ] && echo 1 || echo 0)
+ok "...with its city and state (CEC 1.43.0)" $([ "$(ev "\$p=CEC_Orgs::profile($TID); echo \$p['city'].'|'.\$p['state'].'|'.\$p['region'];")" = "Columbus|OH|Columbus, OH" ] && echo 1 || echo 0)
 ok "...the submission is marked approved and linked to the group" $([ "$(ev "echo get_post_meta($SUB,'_cec_org_review',true).'/'.get_post_meta($SUB,'_cec_org_term_id',true);")" = "approved/$TID" ] && echo 1 || echo 0)
 ok "...the contact is told it's listed" $(tail -n $(( $(mails) - M0 )) wp-content/mail.log | grep -q 'is now listed' && echo 1 || echo 0)
 ok "...the named member is linked as Organizer and notified" $([ "$(q "SELECT role FROM $GL WHERE user_id=$ANN AND term_id=$TID")" = organizer ] && [ "$(q "SELECT COUNT(*) FROM wp_cmp_notifications WHERE user_id=$ANN AND message LIKE '%ZZ Rope Collective%'")" -ge 1 ] && echo 1 || echo 0)
@@ -256,7 +256,7 @@ get organn ed "$URL?cec_org_edit=1"
 EN2=$(php -r 'preg_match("~name=\"_cec_nonce\" value=\"([^\"]+)\"~",file_get_contents($argv[1]),$m); echo $m[1]??"";' $T/ed.html)
 ok "editor: card (name, card text, bullets), bio, links, photo, gallery slots, consent; no contact fields" $([ "$(has $T/ed.html 'name="description"')$(has $T/ed.html 'name="social\[telegram\]"')$(has $T/ed.html 'name="photo"')$(has $T/ed.html 'name="photos\[\]"')$(has $T/ed.html 'name="consent"')$(has $T/ed.html 'name="name"')$(has $T/ed.html 'name="summary"')$(hasnt $T/ed.html 'pat@example.com')" = 11111111 ] && echo 1 || echo 0)
 ok "editor page is never cached" $(grep -qi '^cache-control:.*no-cache' $T/ed.h && echo 1 || echo 0)
-edit(){ curl -s -b $T/$1.jar -c $T/$1.jar -o /dev/null -w '%{http_code} %{redirect_url}' "$H/wp-admin/admin-post.php" -F "action=cec_org_edit" -F "term=$TID" -F "name=${NAME-ZZ Rope Collective}" "${@:2}"; }
+edit(){ curl -s -b $T/$1.jar -c $T/$1.jar -o /dev/null -w '%{http_code} %{redirect_url}' "$H/wp-admin/admin-post.php" -F "action=cec_org_edit" -F "term=$TID" -F "name=${NAME-ZZ Rope Collective}" -F "city=Columbus" -F "state=OH" "${@:2}"; }
 r=$(edit orgcy -F "_cec_nonce=$EN2" -F "description=Hijacked")
 ok "someone who can't edit is refused (403), nothing changes" $(echo "$r" | grep -q '^403' && [ "$(ev "echo get_term($TID)->description;")" != Hijacked ] && echo 1 || echo 0)
 r=$(edit organn -F "_cec_nonce=bad" -F "description=Bad nonce")
@@ -358,21 +358,38 @@ ev "CEC_Orgs::save_profile($ORG2,array('socials'=>array('telegram'=>'https://t.m
 get anon tp "$(ev "echo get_term_link($ORG2,'cec_partner_org');")"
 ok "organization page keeps 'Join our Telegram'" $([ "$(has $T/tp.html 'Join our Telegram')$(hasnt $T/tp.html 'Message me on Telegram')" = 11 ] && echo 1 || echo 0)
 
-echo "== City/region filter (CEC 1.41.0)"
+echo "== State and city filter (CEC 1.41.0, 1.43.0)"
 FG=$($W post create --post_type=page --post_status=publish --post_title="ZZ Filter Grid" --post_content='[cec_partner_orgs kind="organization" filter="yes"]' --porcelain)
-ev "update_term_meta($ORG2,'cec_region','Ohio'); update_term_meta($TID,'cec_region','Columbus'); update_term_meta($EXIST,'cec_region','columbus ');" >/dev/null
+ev "CEC_Orgs::save_profile($ORG2,array('city'=>'','state'=>'OH')); CEC_Orgs::save_profile($TID,array('city'=>'Columbus','state'=>'OH')); CEC_Orgs::save_profile($EXIST,array('city'=>'Indianapolis','state'=>'IN'));" >/dev/null
 get anon fg "$H/?page_id=$FG"
-ok "filter='yes' with 2+ areas shows 'Filter by city or region' with each area once" $([ "$(has $T/fg.html 'Filter by city or region')$(grep -c '<option value="columbus">' $T/fg.html)$(grep -c '<option value="ohio">' $T/fg.html)" = 111 ] && echo 1 || echo 0)
-ok "...tiles carry their area, and show it" $([ "$(has $T/fg.html 'data-region="columbus"')$(has $T/fg.html 'cec-org-tile-region')" = 11 ] && echo 1 || echo 0)
+ok "filter='yes' shows 'Filter by state' with each state once" $([ "$(has $T/fg.html 'Filter by state')$(grep -c '<option value="OH">' $T/fg.html)$(grep -c '<option value="IN">' $T/fg.html)" = 111 ] && echo 1 || echo 0)
+ok "...tiles carry their state and city, and show the location" $([ "$(has $T/fg.html 'data-state="OH" data-city="columbus"')$(has $T/fg.html 'Columbus, OH')$(has $T/fg.html 'cec-org-tile-region')" = 111 ] && echo 1 || echo 0)
 get anon gr5 "$H/?page_id=$GRID_ID"
-ok "...grids without filter='yes' (the homepage) get no filter" $(hasnt $T/gr5.html 'Filter by city or region')
+ok "...grids without filter='yes' (the homepage) get no filter" $(hasnt $T/gr5.html 'Filter by state')
 FT=$($W post create --post_type=page --post_status=publish --post_title="ZZ Filter Titles" --post_content='[cec_partner_orgs kind="titleholder" filter="yes"]' --porcelain)
-ev "update_term_meta($FID,'cec_region','Detroit'); delete_term_meta($ORG2,'cec_region'); update_term_meta($ORG2,'cec_kind','titleholder');" >/dev/null
+ev "CEC_Orgs::save_profile($FID,array('city'=>'Detroit','state'=>'MI')); update_term_meta($ORG2,'cec_kind','titleholder'); delete_term_meta($ORG2,'cec_loc_state'); delete_term_meta($ORG2,'cec_loc_city'); delete_term_meta($ORG2,'cec_region');" >/dev/null
 get anon ft "$H/?page_id=$FT"
-ok "one area plus listings without one: the filter shows, with 'Area not listed'" $([ "$(has $T/ft.html 'Filter by city or region')$(has $T/ft.html '<option value="detroit">')$(has $T/ft.html 'Area not listed')" = 111 ] && echo 1 || echo 0)
-ev "delete_term_meta($FID,'cec_region'); update_term_meta($ORG2,'cec_kind','organization'); update_term_meta($ORG2,'cec_region','Ohio');" >/dev/null
+ok "one state plus listings without one: the filter shows, with 'Location not listed'" $([ "$(has $T/ft.html 'Filter by state')$(has $T/ft.html '<option value="MI">')$(has $T/ft.html 'Location not listed')" = 111 ] && echo 1 || echo 0)
+ev "foreach(array('cec_loc_city','cec_loc_state','cec_region') as \$k){ delete_term_meta($FID,\$k); } update_term_meta($ORG2,'cec_kind','organization'); CEC_Orgs::save_profile($ORG2,array('city'=>'','state'=>'OH'));" >/dev/null
 $W post delete $FT --force >/dev/null 2>&1
 $W post delete $FG --force >/dev/null 2>&1
+
+echo "== Homepage limit, shuffle and See More (CEC 1.44.0)"
+NORG=$(ev "echo count(CEC_Orgs::listed('organization'));")
+LG=$($W post create --post_type=page --post_status=publish --post_title="ZZ Limit Grid" --post_content='[cec_partner_orgs kind="organization" limit="1" shuffle="yes" more="/organizations/"]' --porcelain)
+get anon lg "$H/?page_id=$LG"
+ok "limit='1': every listed card is in the page, all but 1 start hidden ($NORG listed)" $([ "$NORG" -ge 2 ] && [ "$(grep -o '<article class="cec-org-tile' $T/lg.html | wc -l | tr -d ' ')" = "$NORG" ] && [ "$(grep -o '<article class="cec-org-tile[^>]* hidden>' $T/lg.html | wc -l | tr -d ' ')" = "$((NORG-1))" ] && echo 1 || echo 0)
+ok "...shuffle='yes' adds the in-browser shuffle for cached pages" $(has $T/lg.html 'Math.random()')
+ok "...more= adds a See More link to the full list, named for screen readers" $([ "$(has $T/lg.html 'class="cec-org-more-btn" href="/organizations/">See More<span class="screen-reader-text"> organizations</span>')$(has $T/lg.html 'cec-org-grid has-more')" = 11 ] && echo 1 || echo 0)
+ev "wp_update_post(array('ID'=>$LG,'post_content'=>'[cec_partner_orgs kind=\"titleholder\" limit=\"1\" more=\"/titleholders/\" more_label=\"View all\"]'));" >/dev/null
+get anon lg2 "$H/?page_id=$LG"
+ok "more_label changes the text; titleholders are named; no shuffle script without shuffle='yes'" $([ "$(has $T/lg2.html '>View all<span class="screen-reader-text"> titleholders</span>')$(hasnt $T/lg2.html 'Math.random()')" = 11 ] && echo 1 || echo 0)
+ev "wp_update_post(array('ID'=>$LG,'post_content'=>'[cec_partner_orgs kind=\"organization\" limit=\"1\" filter=\"yes\"]'));" >/dev/null
+get anon lg3 "$H/?page_id=$LG"
+ok "limit is ignored with filter='yes' (the filter needs every card)" $([ "$(grep -o '<article class="cec-org-tile[^>]* hidden>' $T/lg3.html | wc -l | tr -d ' ')" = 0 ] && echo 1 || echo 0)
+get anon gr6 "$H/?page_id=$GRID_ID"
+ok "grids without the new options are unchanged: no hidden cards, no See More" $([ "$(grep -o '<article class="cec-org-tile[^>]* hidden>' $T/gr6.html | wc -l | tr -d ' ')$(hasnt $T/gr6.html 'cec-org-more')" = 01 ] && echo 1 || echo 0)
+$W post delete $LG --force >/dev/null 2>&1
 
 echo "== Titleholder's events (CEC 1.39.0 + CMP 0.23.0)"
 mkev(){ local id; id=$($W post create --post_type=cec_event --post_status=publish --post_title="$1" --porcelain 2>/dev/null); ev "update_post_meta($id,'_cec_start',wp_date('Y-m-d\\T19:00',time()+($2)*DAY_IN_SECONDS)); update_post_meta($id,'_cec_end',wp_date('Y-m-d\\T21:00',time()+($2)*DAY_IN_SECONDS));" >/dev/null; echo $id; }
