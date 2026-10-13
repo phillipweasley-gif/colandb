@@ -71,7 +71,9 @@ class CEC_Frontend_Dashboard {
 			'saved'    => __( 'Event saved.', 'cec' ),
 			'term_added'   => __( 'Added.', 'cec' ),
 			'term_deleted' => __( 'Removed.', 'cec' ),
-			'import_failed' => __( "That file couldn't be read — make sure it's a valid .ics calendar file and try again.", 'cec' ),
+			'import_failed' => __( "That file couldn't be read — make sure it's a valid .ics calendar file or .csv spreadsheet and try again.", 'cec' ),
+			'import_owner_unknown' => __( 'Nothing was imported: no member has that username or email. Check the spelling, or enter an email address for someone without an account.', 'cec' ),
+			'import_org_unknown'   => __( 'Nothing was imported: that organization or titleholder no longer exists. Choose another.', 'cec' ),
 		);
 		if ( ! empty( $_GET['cec_photo_err'] ) ) {
 			$messages['photo_err_shown'] = CEC_Event_Helper::photo_error_message( sanitize_key( wp_unslash( $_GET['cec_photo_err'] ) ) );
@@ -80,7 +82,7 @@ class CEC_Frontend_Dashboard {
 		if ( empty( $messages[ $key ] ) ) {
 			return '';
 		}
-		$class = ( 'import_failed' === $key || 'photo_err_shown' === $key ) ? 'cec-notice-error' : 'cec-notice-success';
+		$class = ( in_array( $key, array( 'import_failed', 'import_owner_unknown', 'import_org_unknown' ), true ) || 'photo_err_shown' === $key ) ? 'cec-notice-error' : 'cec-notice-success';
 		return '<div class="cec-notice ' . esc_attr( $class ) . '">' . esc_html( $messages[ $key ] ) . '</div>';
 	}
 
@@ -702,15 +704,20 @@ class CEC_Frontend_Dashboard {
 	private static function render_import() {
 		ob_start();
 		?>
-		<h2><?php esc_html_e( 'Import Events from a Calendar File', 'cec' ); ?></h2>
-		<p><?php esc_html_e( 'Upload a .ics calendar file (exported from Google Calendar, Outlook, Apple Calendar, Eventbrite, or similar) to create events here automatically. Every imported event is published immediately and fully editable afterward, exactly like one entered by hand.', 'cec' ); ?></p>
+		<h2><?php esc_html_e( 'Import Events from a Calendar File or Spreadsheet', 'cec' ); ?></h2>
+		<p><?php esc_html_e( 'Upload a .ics calendar file (exported from Google Calendar, Outlook, Apple Calendar, Eventbrite, or similar) or a .csv spreadsheet to create events here automatically. Every imported event is published immediately and fully editable afterward, exactly like one entered by hand.', 'cec' ); ?></p>
+		<p><?php esc_html_e( 'Importing for an organizer? Choose their group and who manages the events below. The events then belong to them: they show on the group\'s page, and that person can edit, postpone or cancel them from My Events (members) or Manage My Submission (an email address without an account).', 'cec' ); ?></p>
 		<p>
 			<?php esc_html_e( "A couple of things to know before uploading:", 'cec' ); ?>
 		</p>
 		<ul class="cec-import-notes">
 			<li><?php esc_html_e( "The event's location is copied in as plain text, not matched to one of your existing Venues — open the event afterward if you'd like to link it to a real Venue.", 'cec' ); ?></li>
 			<li><?php esc_html_e( "If the source file includes a website link for the event, it's picked up automatically as the event's More Info link.", 'cec' ); ?></li>
-			<li><?php esc_html_e( "Calendar files don't carry pricing — every imported event is marked Price Not Posted rather than guessed as Free or Paid. Update the Cost field on each one afterward.", 'cec' ); ?></li>
+			<li><?php esc_html_e( "Calendar files don't carry pricing — every imported event is marked Price Not Posted rather than guessed as Free or Paid. Update the Cost field on each one afterward. A spreadsheet can include a Price column.", 'cec' ); ?></li>
+			<li>
+				<?php esc_html_e( 'Spreadsheets: one event per row, with column names in the first row: Title, Start, End, Description, Location, URL, Price (only Title and Start are required; Outlook\'s Subject / Start Date / Start Time columns work too).', 'cec' ); ?>
+				<a href="<?php echo esc_attr( 'data:text/csv;charset=utf-8,' . rawurlencode( "Title,Start,End,Description,Location,URL,Price\r\nKinks & Drinks,2026-11-20 19:00,2026-11-20 21:00,Casual social night.,\"AWOL, 49 Parsons Ave, Columbus, OH\",https://example.org/event,Free\r\n" ) ); ?>" download="colb-events-template.csv"><?php esc_html_e( 'Download a template', 'cec' ); ?></a>
+			</li>
 			<li><?php esc_html_e( "If the source file marks an event as repeating, only its first date is imported — set recurrence here manually if it should repeat.", 'cec' ); ?></li>
 		</ul>
 		<form method="post" enctype="multipart/form-data" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="cec-submit-form">
@@ -718,8 +725,30 @@ class CEC_Frontend_Dashboard {
 			<?php wp_nonce_field( self::IMPORT_NONCE, 'cec_dash_nonce' ); ?>
 			<input type="hidden" name="cec_redirect" value="<?php echo esc_url( get_permalink() ); ?>">
 			<div class="cec-field">
-				<label for="cec_ics_file"><?php esc_html_e( '.ics file', 'cec' ); ?></label>
-				<input type="file" id="cec_ics_file" name="cec_ics_file" accept=".ics,text/calendar" required>
+				<label for="cec_ics_file"><?php esc_html_e( '.ics or .csv file', 'cec' ); ?></label>
+				<input type="file" id="cec_ics_file" name="cec_ics_file" accept=".ics,text/calendar,.csv,text/csv" required>
+			</div>
+			<?php
+			$orgs = get_terms( array( 'taxonomy' => 'cec_partner_org', 'hide_empty' => false, 'orderby' => 'name' ) );
+			?>
+			<div class="cec-field">
+				<label for="cec_import_org"><?php esc_html_e( 'Organization or titleholder (optional)', 'cec' ); ?></label>
+				<select id="cec_import_org" name="cec_import_org">
+					<option value=""><?php esc_html_e( '— None —', 'cec' ); ?></option>
+					<?php foreach ( is_array( $orgs ) ? $orgs : array() as $org ) : ?>
+						<option value="<?php echo (int) $org->term_id; ?>"><?php echo esc_html( $org->name ); ?></option>
+					<?php endforeach; ?>
+				</select>
+				<p class="cec-field-hint"><?php esc_html_e( 'The events show on this group\'s page and under its name on the calendar.', 'cec' ); ?></p>
+			</div>
+			<div class="cec-field">
+				<label for="cec_import_owner"><?php esc_html_e( 'Managed by (optional)', 'cec' ); ?></label>
+				<input type="text" id="cec_import_owner" name="cec_import_owner" autocomplete="off" placeholder="<?php esc_attr_e( 'Member username or email', 'cec' ); ?>">
+				<p class="cec-field-hint"><?php esc_html_e( 'A member\'s username or email: the events appear in their My Events. An email address without an account: they manage them through Manage My Submission. Leave empty to keep them under your own account.', 'cec' ); ?></p>
+				<label class="cec-checkbox">
+					<input type="checkbox" name="cec_import_notify" value="1" checked>
+					<?php esc_html_e( 'Email them a list of the imported events and how to manage them', 'cec' ); ?>
+				</label>
 			</div>
 			<div class="cec-field">
 				<label class="cec-checkbox">
@@ -732,6 +761,37 @@ class CEC_Frontend_Dashboard {
 		</form>
 		<?php
 		return ob_get_clean();
+	}
+
+	/**
+	 * 1.45.0: tells the person an import was assigned to which events are
+	 * now theirs and where to manage them.
+	 */
+	private static function email_import_owner( $owner, $ids ) {
+		$member = ! empty( $owner['member_id'] ) ? get_userdata( (int) $owner['member_id'] ) : null;
+		$to     = $member ? $member->user_email : ( $owner['email'] ?? '' );
+		if ( ! $to ) {
+			return false;
+		}
+		$lines = array();
+		foreach ( array_unique( array_map( 'intval', $ids ) ) as $id ) {
+			$lines[] = '- ' . CEC_Event_Helper::plain_text( get_the_title( $id ) ) . ': ' . get_permalink( $id );
+		}
+		if ( $member ) {
+			$pages  = get_posts( array( 'post_type' => 'page', 'post_status' => 'publish', 's' => '[cec_my_events', 'posts_per_page' => 1, 'fields' => 'ids' ) );
+			$manage = $pages ? get_permalink( $pages[0] ) : home_url( '/' );
+			/* translators: %s: link to My Events */
+			$how = sprintf( __( 'Sign in and open My Events to edit, postpone or cancel them: %s', 'cec' ), $manage );
+		} else {
+			$manage = CEC_Admin_Settings::get( 'manage_submission_page_url' );
+			/* translators: %s: link to Manage My Submission */
+			$how = $manage ? sprintf( __( 'To edit, postpone or cancel them, enter this email address on Manage My Submission and we\'ll send you a link: %s', 'cec' ), $manage ) : __( 'Reply to this email if anything needs changing.', 'cec' );
+		}
+		$site = CEC_Event_Helper::site_name();
+		/* translators: %s: site name */
+		$body = sprintf( __( "These events were added to the %s community calendar for you:\n\n", 'cec' ), $site ) . implode( "\n", $lines ) . "\n\n" . $how . "\n";
+		/* translators: %s: site name */
+		return (bool) wp_mail( $to, sprintf( __( '[%s] Your events were added to the calendar', 'cec' ), $site ), $body );
 	}
 
 	public static function handle_import_ics() {
@@ -754,7 +814,7 @@ class CEC_Frontend_Dashboard {
 		// library asset anyone should be able to browse to later.
 		$original_name = isset( $_FILES['cec_ics_file']['name'] ) ? wp_unslash( $_FILES['cec_ics_file']['name'] ) : '';
 		$ext           = strtolower( pathinfo( $original_name, PATHINFO_EXTENSION ) );
-		if ( 'ics' !== $ext ) {
+		if ( ! in_array( $ext, array( 'ics', 'csv' ), true ) ) {
 			wp_safe_redirect( add_query_arg( 'cec_msg', 'import_failed', $redirect ) );
 			exit;
 		}
@@ -765,10 +825,44 @@ class CEC_Frontend_Dashboard {
 			exit;
 		}
 
-		$update_existing = ! empty( $_POST['cec_ics_update_existing'] );
-		$result          = CEC_Ics_Import::import( $raw, get_current_user_id(), $update_existing );
+		// 1.45.0: who the imported events belong to.
+		$owner     = array();
+		$owner_raw = isset( $_POST['cec_import_owner'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['cec_import_owner'] ) ) ) : '';
+		if ( '' !== $owner_raw ) {
+			$user = is_email( $owner_raw ) ? get_user_by( 'email', $owner_raw ) : get_user_by( 'login', $owner_raw );
+			if ( $user ) {
+				$owner['member_id'] = (int) $user->ID;
+			} elseif ( is_email( $owner_raw ) ) {
+				$owner['email'] = strtolower( $owner_raw );
+			} else {
+				wp_safe_redirect( add_query_arg( 'cec_msg', 'import_owner_unknown', $redirect ) );
+				exit;
+			}
+		}
+		$org_id = isset( $_POST['cec_import_org'] ) ? absint( $_POST['cec_import_org'] ) : 0;
+		if ( $org_id ) {
+			$term = get_term( $org_id, 'cec_partner_org' );
+			if ( ! $term || is_wp_error( $term ) ) {
+				wp_safe_redirect( add_query_arg( 'cec_msg', 'import_org_unknown', $redirect ) );
+				exit;
+			}
+			$owner['org_ids'] = array( $org_id );
+		}
 
-		$token = wp_generate_password( 12, false, false );
+		$update_existing = ! empty( $_POST['cec_ics_update_existing'] );
+		$result          = 'csv' === $ext
+			? CEC_Ics_Import::import_csv( $raw, get_current_user_id(), $update_existing, $owner )
+			: CEC_Ics_Import::import( $raw, get_current_user_id(), $update_existing, $owner );
+		if ( ! empty( $_POST['cec_import_notify'] ) && ( ! empty( $owner['member_id'] ) || ! empty( $owner['email'] ) ) && ! empty( $result['ids'] ) ) {
+			if ( self::email_import_owner( $owner, $result['ids'] ) ) {
+				$result['errors'][] = __( 'The person who manages these events was emailed a list of them and how to manage them.', 'cec' );
+			}
+		}
+
+		// 1.45.0: lowercase, because the notice reads it back through
+		// sanitize_key(), which lowercases — a mixed-case token never
+		// matched, so the import summary never showed.
+		$token = strtolower( wp_generate_password( 12, false, false ) );
 		set_transient( 'cec_ics_import_' . $token, $result, 5 * MINUTE_IN_SECONDS );
 
 		wp_safe_redirect(

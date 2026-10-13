@@ -754,6 +754,12 @@ a.cec-cal-day-detail-title:hover, a.cec-cal-day-detail-title:focus-visible { col
 .cec-add-to-calendar { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .cec-share { position: relative; display: inline-block; margin-top: 4px; }
+
+/* 1.45.0: "Copy for Facebook, FetLife or Telegram" */
+.cec-post-copy { margin: 12px 0 4px; }
+.cec-post-copy > summary { cursor: pointer; font-weight: 700; color: var(--cec-primary); min-height: 32px; }
+.cec-post-copy-text { display: block; width: 100% !important; box-sizing: border-box; margin: 8px 0 !important; padding: 10px 12px !important; background: #0f0d17 !important; color: var(--cec-text) !important; border: 1px solid var(--cec-border-soft) !important; border-radius: 8px !important; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important; resize: vertical; white-space: pre-wrap; }
+.cec-post-copy .screen-reader-text { border: 0; clip: rect(1px, 1px, 1px, 1px); clip-path: inset(50%); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute !important; width: 1px; }
 .cec-share-btn-icon { width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px; }
 .cec-share-menu {
 	position: absolute;
