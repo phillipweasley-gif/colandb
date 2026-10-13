@@ -137,6 +137,38 @@ ok "ask for another -> wearer told" $([ "$(q "SELECT review FROM $E_T WHERE id=$
 get pup p4 "$PAGE&cmp_tab=chastity"
 ok "wearer sees the request" $(has $T/p4.html 'asked for another')
 
+echo "== Verified elsewhere (CMP 0.28.0)"
+ok "keyholder sees 'Verified elsewhere' with Today (the lock started today)" $([ "$(has $T/k2.html 'name="do" value="verified_else"')$(has $T/k2.html '>Today</option>')$(hasnt $T/k2.html '>Yesterday</option>')" = 111 ] && echo 1 || echo 0)
+r=$(act pup $PN verified_else -F "lock=$LID" -F "day=$(ev "echo wp_date('Y-m-d');")")
+ok "the wearer can't mark their own day verified" $([ "$(q "SELECT COUNT(*) FROM $E_T WHERE lock_id=$LID AND type='verified_else'")" = 0 ] && echo 1 || echo 0)
+TODAY=$(ev "echo wp_date('Y-m-d');")
+N0=$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$PUP")
+r=$(act kh $KN verified_else -F "lock=$LID" -F "day=$TODAY" -F "note=Telegram")
+ok "keyholder marks today verified elsewhere: recorded with the note, no photo" $(echo "$r" | grep -q 'cl_saved' && [ "$(q "SELECT CONCAT(note,'|',photo_sha,'|',actor_id) FROM $E_T WHERE lock_id=$LID AND type='verified_else' ORDER BY id DESC LIMIT 1")" = "Telegram||$KH" ] && echo 1 || echo 0)
+ok "...the wearer is told" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$PUP AND message LIKE '%today as verified (sent outside%'")" = 1 ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$PUP")" -gt "$N0" ] && echo 1 || echo 0)
+r=$(act kh $KN verified_else -F "lock=$LID" -F "day=$TODAY")
+ok "...the same day can't be marked twice" $(echo "$r" | grep -q 'cl_verified_day' && [ "$(q "SELECT COUNT(*) FROM $E_T WHERE lock_id=$LID AND type='verified_else'")" = 1 ] && echo 1 || echo 0)
+get pup p5 "$PAGE&cmp_tab=chastity"
+ok "wearer sees today marked, and it in the history with the note" $([ "$(has $T/p5.html 'Your keyholder marked today as verified')$(has $T/p5.html 'Verified elsewhere (marked by the keyholder; no photo kept)')$(has $T/p5.html 'Telegram')" = 111 ] && echo 1 || echo 0)
+OLDSTART=$(q "SELECT started_at FROM $L_T WHERE id=$LID")
+ev "global \$wpdb; \$wpdb->update(CMP_Install::table('locks'),array('started_at'=>gmdate('Y-m-d H:i:s',time()-3*DAY_IN_SECONDS)),array('id'=>$LID));" >/dev/null
+ok "a lock started 3 days ago offers today and the 3 days before, no earlier" $([ "$(ev "echo count(CMP_Chastity::elsewhere_days(CMP_Chastity::lock($LID)));")" = 4 ] && echo 1 || echo 0)
+YDAY=$(ev "echo (new DateTime('yesterday', wp_timezone()))->format('Y-m-d');")
+r=$(act kh $KN verified_else -F "lock=$LID" -F "day=$YDAY")
+ok "back-dated: yesterday is recorded on yesterday (site time)" $(echo "$r" | grep -q 'cl_saved' && [ "$(ev "global \$wpdb; echo wp_date('Y-m-d', strtotime(\$wpdb->get_var(\"SELECT created_at FROM $E_T WHERE lock_id=$LID AND type='verified_else' ORDER BY id DESC LIMIT 1\").' UTC'));")" = "$YDAY" ] && echo 1 || echo 0)
+get pup p6 "$PAGE&cmp_tab=chastity"
+ok "...and shows as verified on the wearer's month calendar" $([ "${YDAY:0:7}" != "${TODAY:0:7}" ] || grep -q "class=\"is-locked is-verified\" title=\"$YDAY\"" $T/p6.html && echo 1 || echo 0)
+D2=$(ev "echo (new DateTime('-2 days', wp_timezone()))->format('Y-m-d');")
+ev "global \$wpdb; \$wpdb->insert(CMP_Install::table('lock_events'),array('lock_id'=>$LID,'actor_id'=>$PUP,'type'=>'verification','code'=>'TEST22','review'=>'','created_at'=>(new DateTime('$D2 10:00:00', wp_timezone()))->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s')));" >/dev/null
+r=$(act kh $KN verified_else -F "lock=$LID" -F "day=$D2")
+ok "a day with a photo waiting for review can't be marked (accept the photo instead)" $(echo "$r" | grep -q 'cl_verified_day' && echo 1 || echo 0)
+D8=$(ev "echo (new DateTime('-8 days', wp_timezone()))->format('Y-m-d');")
+r=$(act kh $KN verified_else -F "lock=$LID" -F "day=$D8")
+ok "more than 6 days back is refused" $(echo "$r" | grep -q 'cl_invalid' && echo 1 || echo 0)
+r=$(act kh $KN review -F "lock=$LID" -F "event=$(q "SELECT MAX(id) FROM $E_T WHERE lock_id=$LID AND type='verified_else'")" -F "verdict=accepted")
+ok "a 'verified elsewhere' mark isn't a photo to review" $(echo "$r" | grep -q 'cl_invalid' && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->delete(CMP_Install::table('lock_events'),array('lock_id'=>$LID,'code'=>'TEST22')); \$wpdb->update(CMP_Install::table('locks'),array('started_at'=>'$OLDSTART'),array('id'=>$LID));" >/dev/null
+
 echo "== Hygiene and release"
 r=$(act pup $PN hygiene_open -F "lock=$LID")
 ok "hygiene opening recorded" $([ -n "$(q "SELECT opened_at FROM $L_T WHERE id=$LID")" ] && echo 1 || echo 0)

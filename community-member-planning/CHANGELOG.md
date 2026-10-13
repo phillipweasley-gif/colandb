@@ -4,6 +4,27 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.28.0
+
+**Chastity: "Verified elsewhere"** (owner, 2026-10-13: "How does someone mark if their sub sent a photo verification on another platform?" … "yes build it that way").
+
+- Before, a day only counted as verified when the wearer uploaded a photo on COL&B. A verification sent by Telegram or text left the day unverified on the calendar.
+- **On the keyholder's view of a lock, under Verification:** a "Verified elsewhere" section. Choose the day (today or up to 6 days back, never before the lock started), optionally say where ("Telegram"), and press **Mark verified**.
+  - Recorded in the lock history as a new event type `verified_else` ("Verified elsewhere (marked by the keyholder; no photo kept)", with the note). Back-dated days are recorded at midday that day, site time, so they land on the right calendar day; the history shows the date without a time.
+  - The day shows as Verified on the wearer's month calendar, and the wearer's Verification panel says "Your keyholder marked today as verified (sent outside COL&B)."
+  - The wearer gets a notification.
+  - Refused: a day that already counts (a "verified elsewhere" mark, or a photo that's accepted or still waiting for review: accept the photo instead); a day outside the window; anyone but the current keyholder (the wearer can't mark their own day). A mark isn't a photo, so it can't be accepted or sent back.
+  - No photo or file is stored. The export lists marks with the rest of the lock history; erasure removes them with the lock.
+- No database change (`CMP_DB_VERSION` unchanged).
+- **Verification** (local WordPress test kit, macOS, PHP 8.4):
+  - `tests/chastity-e2e.sh`: 12 new checks, all pass (106 passed, 2 failed). New: the keyholder sees the section with only the days allowed; the wearer can't mark; marking today stores the note and no photo; the wearer is notified; a day can't be marked twice; the wearer sees today marked and the history line; a lock started 3 days ago offers 4 days; a back-dated mark lands on yesterday and shows on the month calendar; a day with a photo waiting is refused; more than 6 days back is refused; a mark can't be reviewed like a photo.
+  - **The 2 failures are not from this change:** "badge shown once the wearer turns it on, naming the keyholder (0.25.0)" and "keyholder's profile: Holds the key for the wearer, linked" fail the same way on unmodified `main` (0.27.0) in this setup (94 passed, 2 failed). The profile page the test fetches comes back without the badge; not investigated here.
+  - `php -l` on the changed file. No plugin warnings in `debug.log`.
+  - Mac setup: a local router script for PHP 8.4's built-in server and port 8898 (8899 is held by an old test server), in an uncommitted copy of the script.
+- **After this is live:** the Help & FAQ page's Chastity answers ("What can a keyholder do?", "How does daily verification work?") can mention it; that page is edited on the site, not in this plugin.
+
+---
+
 ## 0.27.0
 
 **Full control for the site team, and quiet by default** (owner, 2026-10-12: "I need full access in case the member is confused or can't understand how to do it", "I don't need to notify the members when I make the changes I will manually notify them via email").
