@@ -44,7 +44,9 @@ class CMP_Install {
 	}
 
 	private static function create_tables() {
+		global $wpdb;
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		$from = (int) get_option( self::DB_VERSION_OPTION );
 		foreach ( self::schema() as $sql ) {
 			dbDelta( $sql );
 		}
@@ -54,6 +56,11 @@ class CMP_Install {
 		CMP_Profile_Fields::upgrade_kinks();
 		CMP_Dynamics::migrate_addons(); // 0.16.0, once.
 		CMP_Calendar::migrate(); // 0.17.0, once.
+		// 0.25.0: locks that existed before keyholder names on badges keep
+		// their old badge ("Locked · N days") until the keyholder turns it on.
+		if ( $from && $from < 17 ) {
+			$wpdb->query( 'UPDATE ' . self::table( 'locks' ) . ' SET kh_show = 0' ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
+		}
 		update_option( self::DB_VERSION_OPTION, CMP_DB_VERSION, false );
 	}
 
@@ -263,6 +270,7 @@ class CMP_Install {
 			opened_at datetime NULL,
 			release_allowed tinyint(1) NOT NULL DEFAULT 0,
 			show_profile tinyint(1) NOT NULL DEFAULT 0,
+			kh_show tinyint(1) NOT NULL DEFAULT 1,
 			status varchar(10) NOT NULL DEFAULT 'locked',
 			ended_at datetime NULL,
 			ended_by bigint(20) unsigned NULL,

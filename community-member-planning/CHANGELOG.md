@@ -4,6 +4,27 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.25.0
+
+**Lock badges name both sides, with a lock and a key icon** (owner, 2026-10-12: "I would like a locked by and the keyholder's name as a badge and the opposite for the caged", "make it a lock icon and a key icon respectively").
+
+- **The sub's profile:** a padlock badge, "Locked by FoxxyForce · N days", linking to the keyholder's profile.
+- **The keyholder's profile:** a key badge, "Holds the key for gogootter24 · N days", one for each such lock, linking to the sub's profile.
+- **Both people control it.**
+  - Nothing shows on either profile unless the sub's badge switch is on. That switch is the sub's choice, as before.
+  - The keyholder has their own switch ("Show 'Holds the key for them' on my profile, and my name on their badge") in Rules, and on the Set up a lock form. With it off, the sub's badge reads just "Locked · N days" and the keyholder's profile shows nothing.
+  - Someone in a block with the person named sees only the plain badge.
+- **Setting up a lock** gains "Ask them to show 'Locked by me' on their profile". This pre-ticks the sub's badge switch on the accept screen, and the sub can untick it. The switch labels now say exactly what will show.
+- **Existing locks** start with the keyholder's name off (new column `locks.kh_show`, `CMP_DB_VERSION` 17), so no profile changes until a keyholder turns it on. New locks default to on.
+- **Uploads too large for the server:** PHP drops every field, so the request used to end on a blank page with nothing saved. It now returns to the member area with "That was too large to send, so nothing was saved." This is a likely cause of a silently failed Accept with a phone photo.
+- **Verification** (local WordPress from GitHub sources, SQLite, PHP 8.3):
+  - `tests/chastity-e2e.sh` 96/96, with new badge checks: names, links, keyholder switch, block, badge request.
+  - `dynamics-e2e.sh` 56/56, `profile-e2e.sh` 84/84, `directory-e2e.sh` 21/21.
+  - Checked by hand: the DB 16 → 17 upgrade turns `kh_show` off on an existing lock; a 3 MB post against `post_max_size=1M` redirects with `upload_too_large`.
+  - `php -l`. Not checked: a visual pass at phone widths.
+
+---
+
 ## 0.24.0
 
 **A keyholder can set up a lock for the person whose key they hold** (owner, 2026-10-12: "I need to be able to setup a lock for a submissive … right now it can only be done by the submissive").

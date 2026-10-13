@@ -160,8 +160,22 @@ echo "== Profile badge"
 get nosy n1 "$PAGE&cmp_member=$PUP"
 ok "badge off by default" $(hasnt $T/n1.html 'cmp-cl-badge')
 r=$(act pup $PN wearer_settings -F "lock=$LID" -F "show_profile=1")
+IFS='|' read OPT POL HYG <<< "$(lk $LID option_key release_policy hygiene_minutes)"
+r=$(act kh $KN rules -F "lock=$LID" -F "option=$OPT" -F "policy=$POL" -F "hygiene_minutes=$HYG" -F "kh_show=1")
 get nosy n2 "$PAGE&cmp_member=$PUP"
-ok "badge shown once the wearer turns it on" $(has $T/n2.html 'Locked · ')
+ok "badge shown once the wearer turns it on, naming the keyholder (0.25.0)" $([ "$(has $T/n2.html 'Locked by <a href=')$(has $T/n2.html "cmp_member=$KH")$(has $T/n2.html 'Sample Keyholder</a> · ')" = 111 ] && echo 1 || echo 0)
+get nosy n2k "$PAGE&cmp_member=$KH"
+ok "keyholder's profile: Holds the key for the wearer, linked" $([ "$(has $T/n2k.html 'Holds the key for <a href=')$(has $T/n2k.html "cmp_member=$PUP")$(has $T/n2k.html 'cmp-cl-badge is-key')" = 111 ] && echo 1 || echo 0)
+get kh k2b "$PAGE&cmp_tab=chastity&lock=$LID"
+ok "keyholder has a switch for their name" $(has $T/k2b.html 'name="kh_show"')
+r=$(act kh $KN rules -F "lock=$LID" -F "option=$OPT" -F "policy=$POL" -F "hygiene_minutes=$HYG")
+get nosy n2c "$PAGE&cmp_member=$PUP"; get nosy n2d "$PAGE&cmp_member=$KH"
+ok "keyholder switches it off: wearer badge without a name, nothing on the keyholder's profile" $([ "$(lk $LID kh_show)" = 0 ] && [ "$(has $T/n2c.html 'Locked · ')$(hasnt $T/n2c.html 'Locked by')$(hasnt $T/n2d.html 'Holds the key')" = 111 ] && echo 1 || echo 0)
+r=$(act kh $KN rules -F "lock=$LID" -F "option=$OPT" -F "policy=$POL" -F "hygiene_minutes=$HYG" -F "kh_show=1")
+ev "global \$wpdb; \$wpdb->insert(CMP_Install::table('blocks'),array('blocker_id'=>$KH,'blocked_id'=>$NOSY,'created_at'=>gmdate('Y-m-d H:i:s')));" >/dev/null
+get nosy n2e "$PAGE&cmp_member=$PUP"
+ok "a member in a block with the keyholder doesn't see their name" $([ "$(has $T/n2e.html 'Locked · ')$(hasnt $T/n2e.html 'Locked by')" = 11 ] && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->delete(CMP_Install::table('blocks'),array('blocker_id'=>$KH,'blocked_id'=>$NOSY));" >/dev/null
 
 echo "== Dynamic ends -> self-lock"
 ev "global \$wpdb; \$d=CMP_Dynamics::get($DYN); \$wpdb->update('$D_T',array('status'=>'ended'),array('id'=>$DYN)); do_action('cmp_dynamic_ended',\$d,$PUP);" >/dev/null
@@ -229,7 +243,7 @@ get kh s1 "$PAGE&cmp_tab=chastity"
 ok "keyholder sees Set up a lock with the wearer offered" $([ "$(has $T/s1.html 'Set up a lock for someone')$(grep -o 'id="cmp_cl_pw"[^/]*' $T/s1.html | grep -q "value=\"$SOLO\"" && echo 1 || echo 0)" = 11 ] && echo 1 || echo 0)
 r=$(act kh $SN propose -F "wearer=$SOLO" -F "option=custom" -F "option_name=" -F "length=1440" -F "hygiene_minutes=15")
 ok "custom without a name is refused" $(echo "$r" | grep -q 'cl_invalid' && echo 1 || echo 0)
-r=$(act kh $SN propose -F "wearer=$SOLO" -F "option=b" -F "length=4320" -F "hygiene_minutes=30" -F "hide_timer=1" -F "verify_daily=1" -F "note=Starting tonight")
+r=$(act kh $SN propose -F "wearer=$SOLO" -F "option=b" -F "length=4320" -F "hygiene_minutes=30" -F "hide_timer=1" -F "verify_daily=1" -F "ask_badge=1" -F "kh_show=1" -F "note=Starting tonight")
 PID=$(q "SELECT MAX(id) FROM $L_T WHERE wearer_id=$SOLO AND status='proposed'")
 ok "proposal saved, nothing locked yet" $(echo "$r" | grep -q 'cl_proposed' && [ -n "$PID" ] && [ "$(lk $PID keyholder_id hide_timer verify_daily hygiene_minutes)" = "$KH|1|1|30" ] && [ -z "$(q "SELECT id FROM $L_T WHERE wearer_id=$SOLO AND status='locked'")" ] && echo 1 || echo 0)
 ok "wearer told" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$SOLO AND message LIKE '%set up a lock for you%'")" -ge 1 ] && echo 1 || echo 0)
@@ -240,6 +254,7 @@ ok "keyholder sees it waiting, with Withdraw" $([ "$(has $T/s2.html 'waiting for
 ok "keyholder has no controls before acceptance" $(r=$(act kh $SN time -F "lock=$PID" -F "minutes=60" -F "direction=add"); echo "$r" | grep -q 'cl_gone' && [ -z "$(lk $PID planned_end)" ] && echo 1 || echo 0)
 get solo w0 "$PAGE&cmp_tab=chastity"
 ok "wearer sees the proposal with its terms, length hidden" $([ "$(has $T/w0.html 'Sample Keyholder set up a lock for you')$(has $T/w0.html 'One release a week')$(has $T/w0.html 'Hidden by your keyholder')$(has $T/w0.html 'Starting tonight')$(has $T/w0.html 'Accept and lock')$(has $T/w0.html 'Emergency unlock is always available')" = 111111 ] && echo 1 || echo 0)
+ok "badge request pre-ticks the wearer's switch, naming the keyholder" $([ "$(has $T/w0.html 'would like the badge shown')$(grep -o '<input type="checkbox" id="cmp_cl_ashow"[^>]*' $T/w0.html | grep -c checked)$(has $T/w0.html 'Locked by Sample Keyholder')" = 111 ] && echo 1 || echo 0)
 ok "wearer doesn't see the length (3 days) in the proposal" $(perl -0ne 'print $1 if /cmp-cl-proposal(.*?)<\/section>/s' $T/w0.html | grep -q '3 days' && echo 0 || echo 1)
 WN=$(hnonce $T/w0.html)
 r=$(act nosy $(hnonce $T/n0.html) accept -F "lock=$PID")
