@@ -528,6 +528,10 @@
 .cmp-member-area .cmp-cl-emergency p { margin: 8px 0 0; }
 .cmp-member-area .cmp-cl-badge { display: inline-flex !important; gap: 6px; align-items: center; margin: 6px 0 0 !important; background: rgba(255, 80, 215, .15) !important; color: #ffd0f4 !important; border: 1px solid rgba(255, 80, 215, .4); border-radius: 100px; padding: 4px 12px; font-size: 13px; font-weight: 700; }
 .cmp-member-area .cmp-cl-time .cmp-actions { margin-top: 8px; }
+.cmp-member-area .cmp-cl-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.cmp-member-area .cmp-cl-icon-svg { flex: 0 0 auto; display: block; }
+.cmp-member-area .cmp-cl-badge a { color: inherit !important; text-decoration: underline; text-underline-offset: 2px; }
+.cmp-member-area .cmp-cl-badge.is-key { background: rgba(120, 160, 255, .15) !important; color: #d6e2ff !important; border-color: rgba(120, 160, 255, .45); }
 
 /* Feed (0.9.0) */
 .cmp-member-area .cmp-fd-who { display: flex; gap: 10px; align-items: center; }

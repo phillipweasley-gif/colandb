@@ -25,6 +25,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   status 'proposed'). Nothing is locked until the wearer accepts; the timer
  *   starts then. The wearer can decline, the keyholder can withdraw, and a
  *   proposal disappears when the keyholder can no longer direct the wearer.
+ * - 0.25.0: profile badges name both sides. The wearer's badge (their
+ *   choice, show_profile) reads "Locked by <keyholder> · N days"; the
+ *   keyholder's profile shows "Holds the key for <wearer> · N days". The
+ *   keyholder can leave their name off (kh_show), and then neither profile
+ *   names them. A full POST over post_max_size (PHP drops every field) now
+ *   comes back with a "too large" notice instead of a blank page.
  */
 class CMP_Chastity {
 
@@ -38,6 +44,25 @@ class CMP_Chastity {
 		add_action( 'admin_post_nopriv_cmp_chastity', array( 'CMP_Member_Area', 'redirect_to_login' ) );
 		add_action( 'cmp_dynamic_ended', array( __CLASS__, 'on_dynamic_ended' ), 10, 2 );
 		add_action( 'template_redirect', array( __CLASS__, 'maybe_serve_photo' ), 1 );
+		add_action( 'admin_post', array( __CLASS__, 'too_large' ) );
+	}
+
+	/**
+	 * When a request is bigger than post_max_size, PHP drops every field,
+	 * "action" included, so admin-post.php fires the bare admin_post hook and
+	 * shows a blank page. Send a member back with a notice instead (0.25.0).
+	 */
+	public static function too_large() {
+		$len = isset( $_SERVER['CONTENT_LENGTH'] ) ? (int) $_SERVER['CONTENT_LENGTH'] : 0;
+		$max = wp_convert_hr_to_bytes( (string) ini_get( 'post_max_size' ) );
+		if ( 'POST' !== ( isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : '' ) || ! $max || $len <= $max ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+			return;
+		}
+		$back = wp_get_referer();
+		$home = CMP_Settings::member_page_url();
+		$back = $back && 0 === strpos( remove_query_arg( 'cmp_notice', $back ), strtok( $home, '?' ) ) ? $back : self::url();
+		wp_safe_redirect( add_query_arg( 'cmp_notice', 'upload_too_large', remove_query_arg( 'cmp_notice', $back ) ) );
+		exit;
 	}
 
 	/** The tracker's chastity options, plus Custom. */
@@ -96,6 +121,7 @@ class CMP_Chastity {
 			'cl_declined' => array( 'success', __( 'Declined. Your keyholder has been told.', 'cmp' ) ),
 			'cl_withdrawn'=> array( 'success', __( 'Withdrawn.', 'cmp' ) ),
 			'cl_pending'  => array( 'error', __( 'They already have a lock, or a lock from you waiting for an answer.', 'cmp' ) ),
+			'upload_too_large' => array( 'error', __( 'That was too large to send, so nothing was saved. Try a smaller photo, or send it without one.', 'cmp' ) ),
 		);
 	}
 
@@ -489,7 +515,8 @@ class CMP_Chastity {
 				'hide_timer'      => empty( $_POST['hide_timer'] ) ? 0 : 1, // phpcs:ignore WordPress.Security.NonceVerification.Missing
 				'verify_daily'    => empty( $_POST['verify_daily'] ) ? 0 : 1, // phpcs:ignore WordPress.Security.NonceVerification.Missing
 				'hygiene_minutes' => $hygiene,
-				'show_profile'    => 0,
+				'show_profile'    => empty( $_POST['ask_badge'] ) ? 0 : 1, // phpcs:ignore WordPress.Security.NonceVerification.Missing -- a request only; the wearer decides when accepting.
+				'kh_show'         => empty( $_POST['kh_show'] ) ? 0 : 1, // phpcs:ignore WordPress.Security.NonceVerification.Missing
 				'release_allowed' => 0,
 				'status'          => 'proposed',
 				'created_at'      => $now,
@@ -692,6 +719,7 @@ class CMP_Chastity {
 				'hide_timer'      => empty( $_POST['hide_timer'] ) ? 0 : 1, // phpcs:ignore WordPress.Security.NonceVerification.Missing
 				'verify_daily'    => empty( $_POST['verify_daily'] ) ? 0 : 1, // phpcs:ignore WordPress.Security.NonceVerification.Missing
 				'hygiene_minutes' => $hygiene,
+				'kh_show'         => empty( $_POST['kh_show'] ) ? 0 : 1, // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			)
 		);
 		self::add_event( $lock->id, $user_id, 'rules', array( 'note' => $name ) );
@@ -874,7 +902,7 @@ class CMP_Chastity {
 		$html .= '<p class="cmp-field"><label for="cmp_cl_rule">' . esc_html__( 'Rule', 'cmp' ) . '</label><input type="text" id="cmp_cl_rule" name="rule" maxlength="300" /></p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_pol">' . esc_html__( 'Release', 'cmp' ) . '</label>' . self::select( 'policy', 'cmp_cl_pol', self::policies(), 'none' ) . '</p></details>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_photo">' . esc_html__( 'Photo of the lock (optional)', 'cmp' ) . '</label><input type="file" id="cmp_cl_photo" name="photo" accept="image/jpeg,image/png,image/webp" /></p>';
-		$html .= self::check( 'show_profile', 'cmp_cl_show', __( 'Show "Locked · N days" on my profile', 'cmp' ), false );
+		$html .= self::check( 'show_profile', 'cmp_cl_show', __( 'Show "Locked · N days" on my profile (with your keyholder\'s name, if they allow it)', 'cmp' ), false );
 		$html .= '<button type="submit" class="cmp-btn">' . esc_html__( 'Lock', 'cmp' ) . '</button></form>';
 		if ( count( $keyholders ) < 3 ) {
 			$html .= '<p class="cmp-muted">' . esc_html__( 'To have a member as keyholder, agree chastity with them in a dynamic, with them holding the key (any type, or Keyholder / chastity wearer). See the Dynamics tab. If your keyholder doesn\'t have an account yet, choose "Someone without an account" and type their name.', 'cmp' ) . '</p>';
@@ -911,7 +939,10 @@ class CMP_Chastity {
 		} else {
 			$html .= self::form_open( 'accept', $lock->id, true );
 			$html .= '<p class="cmp-field"><label for="cmp_cl_aphoto">' . esc_html__( 'Photo of the lock (optional)', 'cmp' ) . '</label><input type="file" id="cmp_cl_aphoto" name="photo" accept="image/jpeg,image/png,image/webp" /></p>';
-			$html .= self::check( 'show_profile', 'cmp_cl_ashow', __( 'Show "Locked · N days" on my profile', 'cmp' ), false );
+			if ( (int) $lock->show_profile ) {
+				$html .= '<p class="cmp-muted">' . esc_html__( 'Your keyholder would like the badge shown on your profile. It\'s still your choice.', 'cmp' ) . '</p>';
+			}
+			$html .= self::check( 'show_profile', 'cmp_cl_ashow', self::badge_label( $lock ), (int) $lock->show_profile );
 			$html .= '<button type="submit" class="cmp-btn">' . esc_html__( 'Accept and lock', 'cmp' ) . '</button></form>';
 		}
 		$html .= self::form_open( 'decline', $lock->id, false, 'cmp-inline-form' ) . '<button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Decline', 'cmp' ) . '</button></form>';
@@ -950,6 +981,8 @@ class CMP_Chastity {
 		$html .= '<p class="cmp-field"><label for="cmp_cl_ppol">' . esc_html__( 'Release', 'cmp' ) . '</label>' . self::select( 'policy', 'cmp_cl_ppol', self::policies(), 'none' ) . '</p></details>';
 		$html .= self::check( 'hide_timer', 'cmp_cl_phide', __( 'Hide the time left from them', 'cmp' ), false );
 		$html .= self::check( 'verify_daily', 'cmp_cl_pvd', __( 'Daily verification photo', 'cmp' ), false );
+		$html .= self::check( 'ask_badge', 'cmp_cl_pbadge', __( 'Ask them to show "Locked by me" on their profile (they decide)', 'cmp' ), true );
+		$html .= self::check( 'kh_show', 'cmp_cl_pkhs', __( 'Show "Holds the key for them" on my profile', 'cmp' ), true );
 		$html .= '<p class="cmp-field"><label for="cmp_cl_pnote">' . esc_html__( 'Message (optional)', 'cmp' ) . '</label><input type="text" id="cmp_cl_pnote" name="note" maxlength="300" /></p>';
 		$html .= '<button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Send to them', 'cmp' ) . '</button></form></details>';
 		return $html;
@@ -1017,7 +1050,7 @@ class CMP_Chastity {
 
 		// Settings.
 		$html .= '<section class="cmp-panel"><h3 class="cmp-panel-title">' . esc_html__( 'Settings', 'cmp' ) . '</h3>' . self::form_open( 'wearer_settings', $lock->id );
-		$html .= self::check( 'show_profile', 'cmp_cl_show', __( 'Show "Locked · N days" on my profile', 'cmp' ), (int) $lock->show_profile );
+		$html .= self::check( 'show_profile', 'cmp_cl_show', self::badge_label( $lock ), (int) $lock->show_profile );
 		if ( ! $has_kh ) {
 			$html .= self::check( 'verify_daily', 'cmp_cl_vd', __( 'Remind me to verify every day', 'cmp' ), (int) $lock->verify_daily );
 			$html .= '<p class="cmp-field"><label for="cmp_cl_khn_edit">' . esc_html__( 'Keyholder without an account (optional)', 'cmp' ) . '</label><input type="text" id="cmp_cl_khn_edit" name="keyholder_name" maxlength="60" value="' . esc_attr( $lock->keyholder_name ) . '" aria-describedby="cmp_cl_khn_edit_help" /><span class="cmp-muted" id="cmp_cl_khn_edit_help">' . esc_html__( 'Just a name for your record. They can\'t sign in to manage the lock, so you keep control of it. Leave empty for a self-lock.', 'cmp' ) . '</span></p>';
@@ -1075,6 +1108,8 @@ class CMP_Chastity {
 		$html .= '<p class="cmp-field"><label for="cmp_cl_rrule">' . esc_html__( 'Rule', 'cmp' ) . '</label><input type="text" id="cmp_cl_rrule" name="rule" maxlength="300" value="' . esc_attr( $lock->rule ) . '" /></p>';
 		$html .= self::check( 'hide_timer', 'cmp_cl_hide', __( 'Hide the time left from them', 'cmp' ), (int) $lock->hide_timer );
 		$html .= self::check( 'verify_daily', 'cmp_cl_kvd', __( 'Daily verification photo', 'cmp' ), (int) $lock->verify_daily );
+		$html .= self::check( 'kh_show', 'cmp_cl_khs', __( 'Show "Holds the key for them" on my profile, and my name on their badge', 'cmp' ), (int) $lock->kh_show );
+		$html .= '<p class="cmp-muted">' . esc_html( (int) $lock->show_profile ? __( 'Their badge is on.', 'cmp' ) : __( 'Their badge is off: nothing shows on either profile until they turn it on.', 'cmp' ) ) . '</p>';
 		$html .= '<button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Save rules', 'cmp' ) . '</button></form>';
 		if ( 'permission' === $lock->release_policy && ! (int) $lock->release_allowed ) {
 			$html .= self::form_open( 'allow_release', $lock->id, false, 'cmp-inline-form' ) . '<button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Allow one release', 'cmp' ) . '</button></form>';
@@ -1176,15 +1211,64 @@ class CMP_Chastity {
 		return $html . '</div><p class="cmp-muted cmp-cl-legend"><span class="is-locked"></span> ' . esc_html__( 'Locked', 'cmp' ) . ' <span class="is-verified"></span> ' . esc_html__( 'Verified', 'cmp' ) . '</p></section>';
 	}
 
-	/** "Locked · N days" on a profile, only if the wearer turned it on. */
-	public static function profile_badge_html( $owner_id ) {
-		$lock = self::active_lock( $owner_id );
-		if ( ! $lock || ! (int) $lock->show_profile ) {
+	/** Small line icons for the profile badges (0.25.0), drawn in the badge's text colour. */
+	private static function icon( $kind ) {
+		$paths = array(
+			'lock' => '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><circle cx="12" cy="16" r="1.2" fill="currentColor"/>',
+			'key'  => '<circle cx="7.5" cy="15.5" r="4"/><path d="M10.5 12.5 20 3"/><path d="M16 7l3 3"/><path d="M14 9l2 2"/>',
+		);
+		return '<svg class="cmp-cl-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $paths[ $kind ] . '</svg>';
+	}
+
+	/** The wearer's badge switch, saying what it will show. */
+	private static function badge_label( $lock ) {
+		return $lock->keyholder_id && (int) $lock->kh_show
+			/* translators: %s: keyholder */
+			? sprintf( __( 'Show "Locked by %s · N days" on my profile (their profile shows they hold your key)', 'cmp' ), self::name( $lock->keyholder_id ) )
+			: __( 'Show "Locked · N days" on my profile', 'cmp' );
+	}
+
+	/** A member named on a badge: linked, unless the viewer and they are in a block. */
+	private static function badge_name( $user_id, $viewer ) {
+		if ( ! $user_id || ! get_userdata( $user_id ) || ( $viewer && CMP_Messages::is_blocked( $viewer, $user_id ) ) ) {
 			return '';
 		}
-		$days = intdiv( self::locked_seconds( $lock ), DAY_IN_SECONDS );
-		/* translators: %d: days */
-		return '<p class="cmp-cl-badge"><span aria-hidden="true">🔒</span> ' . esc_html( sprintf( _n( 'Locked · %d day', 'Locked · %d days', $days, 'cmp' ), $days ) ) . '</p>';
+		return '<a href="' . esc_url( CMP_Profiles::member_url( $user_id ) ) . '">' . esc_html( self::name( $user_id ) ) . '</a>';
+	}
+
+	/**
+	 * Profile badges (0.25.0). Only when the wearer turned their badge on.
+	 * Wearer: "Locked by <keyholder> · N days" (the name only when the
+	 * keyholder allows it). Keyholder: "Holds the key for <wearer> · N days"
+	 * for each such lock, when they allow it.
+	 */
+	public static function profile_badge_html( $owner_id ) {
+		global $wpdb;
+		$viewer = get_current_user_id();
+		$out    = '';
+		$lock   = self::active_lock( $owner_id );
+		if ( $lock && (int) $lock->show_profile ) {
+			$days = intdiv( self::locked_seconds( $lock ), DAY_IN_SECONDS );
+			$kh   = $lock->keyholder_id && (int) $lock->kh_show ? self::badge_name( (int) $lock->keyholder_id, $viewer ) : '';
+			$text = $kh
+				/* translators: 1: keyholder link, 2: days */
+				? sprintf( _n( 'Locked by %1$s · %2$d day', 'Locked by %1$s · %2$d days', $days, 'cmp' ), $kh, $days )
+				/* translators: %d: days */
+				: esc_html( sprintf( _n( 'Locked · %d day', 'Locked · %d days', $days, 'cmp' ), $days ) );
+			$out .= '<p class="cmp-cl-badge">' . self::icon( 'lock' ) . ' ' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . '</p>';
+		}
+		$held = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . self::t( 'locks' ) . " WHERE keyholder_id = %d AND status = 'locked' AND show_profile = 1 AND kh_show = 1 ORDER BY started_at", $owner_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		foreach ( $held as $h ) {
+			$who = self::badge_name( (int) $h->wearer_id, $viewer );
+			if ( ! $who ) {
+				continue;
+			}
+			$days = intdiv( self::locked_seconds( $h ), DAY_IN_SECONDS );
+			/* translators: 1: wearer link, 2: days */
+			$text = sprintf( _n( 'Holds the key for %1$s · %2$d day', 'Holds the key for %1$s · %2$d days', $days, 'cmp' ), $who, $days );
+			$out .= '<p class="cmp-cl-badge is-key">' . self::icon( 'key' ) . ' ' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . '</p>';
+		}
+		return $out ? '<div class="cmp-cl-badges">' . $out . '</div>' : '';
 	}
 
 	/* ------------------------------------------------------------------
