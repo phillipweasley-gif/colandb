@@ -14,9 +14,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Dynamics: end one, turn off an add-on, or cancel a request.
  *
  * Status, names and dates only: no verification photos, rules text, notes
- * or messages. Every change needs a reason, is written to the audit log with
- * the old and new values, and both members are told what changed. Nothing
- * here accepts a lock or a dynamic on someone's behalf.
+ * or messages. Every change needs a reason and is written to the audit log
+ * with the old and new values. Lock corrections also add a "Corrected by the
+ * site team" line to the lock's history. Members get no notification unless
+ * "Notify both members" is ticked (0.27.0: the owner tells them by email).
+ * Nothing here accepts a lock or a dynamic on someone's behalf.
  */
 class CMP_Member_Admin {
 
@@ -38,15 +40,16 @@ class CMP_Member_Admin {
 
 	private static function messages() {
 		return array(
-			'saved'     => array( 'success', __( 'Saved. Both members have been told what changed.', 'cmp' ) ),
-			'ended'     => array( 'success', __( 'Ended. Both members have been told.', 'cmp' ) ),
-			'removed'   => array( 'success', __( 'Removed. Both members have been told.', 'cmp' ) ),
-			'recorded'  => array( 'success', __( 'Lock recorded. Both members have been told.', 'cmp' ) ),
+			'saved'     => array( 'success', __( 'Saved.', 'cmp' ) ),
+			'ended'     => array( 'success', __( 'Ended.', 'cmp' ) ),
+			'removed'   => array( 'success', __( 'Removed.', 'cmp' ) ),
+			'recorded'  => array( 'success', __( 'Lock recorded.', 'cmp' ) ),
 			'same'      => array( 'warning', __( 'Nothing changed: the values were the same.', 'cmp' ) ),
 			'times'     => array( 'error', __( 'Those times don\'t work: the start must be in the past, an end must come after the start (and not be in the future), and a planned end must come after the start.', 'cmp' ) ),
 			'reason'    => array( 'error', __( 'Add a short reason. It goes in the audit log.', 'cmp' ) ),
 			'member'    => array( 'error', __( 'That member wasn\'t found. Use their username or email.', 'cmp' ) ),
 			'keyholder' => array( 'error', __( 'For a running lock, the keyholder must hold the wearer\'s key now (an active dynamic with chastity, them leading). Leave Keyholder empty for a self-lock.', 'cmp' ) ),
+			'invalid_settings' => array( 'error', __( 'Those settings couldn\'t be saved. A Custom option needs a name.', 'cmp' ) ),
 			'busy'      => array( 'error', __( 'That member already has a running lock. Correct or end it instead.', 'cmp' ) ),
 			'invalid'   => array( 'error', __( 'That couldn\'t be saved. Check the form.', 'cmp' ) ),
 			'gone'      => array( 'error', __( 'That isn\'t available any more.', 'cmp' ) ),
@@ -124,6 +127,29 @@ class CMP_Member_Admin {
 		if ( '' === $reason ) {
 			self::back( $ret, 'reason' );
 		}
+		CMP_Notifications::$muted = ! self::post( 'notify' );
+
+		if ( 'settings' === $do ) {
+			$in = array();
+			foreach ( array( 'show_profile', 'kh_show', 'hide_timer', 'verify_daily' ) as $k ) {
+				$in[ $k ] = self::post( $k ) ? 1 : 0;
+			}
+			$in['hygiene_minutes'] = absint( self::post( 'hygiene_minutes' ) );
+			$in['option']          = sanitize_key( self::post( 'option' ) );
+			$in['option_name']     = mb_substr( self::post( 'option_name' ), 0, 60 );
+			$in['release_policy']  = sanitize_key( self::post( 'release_policy' ) );
+			$kh_txt                = self::post( 'keyholder' );
+			$in['keyholder']       = '' === $kh_txt ? 0 : self::find_user( $kh_txt );
+			if ( '' !== $kh_txt && ! $in['keyholder'] ) {
+				self::back( $ret, 'member' );
+			}
+			$err = CMP_Chastity::admin_settings( $lock, $in, $admin, $reason );
+			self::back( $ret, $err ? ( 'invalid' === $err ? 'invalid_settings' : $err ) : 'saved' );
+		}
+
+		if ( 'dyn_show' === $do ) {
+			self::back( $ret, CMP_Dynamics::admin_set_show( absint( self::post( 'dynamic' ) ), absint( self::post( 'user' ) ), (bool) self::post( 'show' ), $admin, $reason ) ? 'saved' : 'gone' );
+		}
 
 		if ( 'times' === $do ) {
 			$l = CMP_Chastity::lock( $lock );
@@ -186,6 +212,9 @@ class CMP_Member_Admin {
 				$start = self::to_utc( ( '' !== $end ? strtotime( $end . ' UTC' ) : time() ) - $days );
 			}
 			$id = CMP_Chastity::admin_record( $wearer, $kh, sanitize_key( self::post( 'option' ) ), $start, '' !== $plan ? $plan : null, '' !== $end ? $end : null, $admin, $reason );
+			if ( is_int( $id ) && self::post( 'show_profile' ) ) {
+				CMP_Chastity::admin_settings( $id, array( 'show_profile' => 1 ), $admin, $reason );
+			}
 			self::back( is_int( $id ) ? array( 'lock' => $id ) : array( 'member' => $wearer ), is_int( $id ) ? 'recorded' : $id );
 		}
 
@@ -214,7 +243,11 @@ class CMP_Member_Admin {
 	}
 
 	private static function reason_field( $id ) {
-		return '<p><label for="' . esc_attr( $id ) . '"><strong>' . esc_html__( 'Reason (required, kept in the audit log)', 'cmp' ) . '</strong></label><br /><input type="text" class="regular-text" id="' . esc_attr( $id ) . '" name="reason" maxlength="200" required placeholder="' . esc_attr__( 'e.g. Accept failed on his phone; started 9pm Oct 12 per both', 'cmp' ) . '" /></p>';
+		return '<p><label for="' . esc_attr( $id ) . '"><strong>' . esc_html__( 'Reason (required, kept in the audit log)', 'cmp' ) . '</strong></label><br /><input type="text" class="regular-text" id="' . esc_attr( $id ) . '" name="reason" maxlength="200" required placeholder="' . esc_attr__( 'e.g. Accept failed on his phone; started 9pm Oct 12 per both', 'cmp' ) . '" /></p>' . self::notify_field( $id . '_n' );
+	}
+
+	private static function notify_field( $id ) {
+		return '<p><label for="' . esc_attr( $id ) . '"><input type="checkbox" id="' . esc_attr( $id ) . '" name="notify" value="1" /> ' . esc_html__( 'Notify both members on the site', 'cmp' ) . '</label></p>';
 	}
 
 	private static function local( $utc ) {
@@ -272,7 +305,7 @@ class CMP_Member_Admin {
 		if ( isset( $m[ $msg ] ) ) {
 			echo '<div class="notice notice-' . esc_attr( $m[ $msg ][0] ) . '"><p>' . esc_html( $m[ $msg ][1] ) . '</p></div>';
 		}
-		echo '<p class="description">' . esc_html__( 'For fixing problems members can\'t sort out themselves. You see names, status and dates only (no photos, rules, notes or messages). Every change needs a reason, is recorded in the audit log, and both members are told what changed. Locks and dynamics can\'t be accepted on someone\'s behalf.', 'cmp' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'For fixing problems members can\'t sort out themselves. You see names, status and dates only (no photos, rules, notes or messages). Every change needs a reason and is recorded in the audit log; lock changes also show as "Corrected by the site team" in the lock\'s history. Members aren\'t notified unless you tick "Notify both members". Locks and dynamics can\'t be accepted on someone\'s behalf.', 'cmp' ) . '</p>';
 		echo '<form method="get" action="' . esc_url( admin_url( 'users.php' ) ) . '"><input type="hidden" name="page" value="' . esc_attr( self::PAGE ) . '" /><p><label for="cmp_ma_q" class="screen-reader-text">' . esc_html__( 'Find a member', 'cmp' ) . '</label><input type="search" id="cmp_ma_q" name="q" class="regular-text" value="' . esc_attr( $q ) . '" placeholder="' . esc_attr__( 'Username, email or display name', 'cmp' ) . '" /> <button class="button">' . esc_html__( 'Find member', 'cmp' ) . '</button>' . ( $member || $lock ? ' <a href="' . esc_url( self::url() ) . '">' . esc_html__( 'All', 'cmp' ) . '</a>' : '' ) . '</p></form>';
 
 		if ( $lock ) {
@@ -305,7 +338,7 @@ class CMP_Member_Admin {
 		if ( ! $dyns ) {
 			echo '<p>' . esc_html__( 'No active or pending dynamics.', 'cmp' ) . '</p>';
 		} else {
-			echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'With', 'cmp' ) . '</th><th>' . esc_html__( 'Type', 'cmp' ) . '</th><th>' . esc_html__( 'Status', 'cmp' ) . '</th><th>' . esc_html__( 'Since', 'cmp' ) . '</th><th></th></tr></thead><tbody>';
+			echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'With', 'cmp' ) . '</th><th>' . esc_html__( 'Type', 'cmp' ) . '</th><th>' . esc_html__( 'Status', 'cmp' ) . '</th><th>' . esc_html__( 'Since', 'cmp' ) . '</th><th>' . esc_html__( 'Shown on profiles (needs both on)', 'cmp' ) . '</th><th></th></tr></thead><tbody>';
 			foreach ( $dyns as $d ) {
 				$other = CMP_Dynamics::other( $d, $member );
 				$lead  = CMP_Dynamics::lead_id( $d );
@@ -314,7 +347,7 @@ class CMP_Member_Admin {
 					$lu    = get_userdata( $lead );
 					$type .= ' · ' . sprintf( /* translators: %s: member */ __( 'led by %s', 'cmp' ), $lu ? $lu->display_name : '?' );
 				}
-				echo '<tr><td>' . self::who( $other ) . '</td><td>' . esc_html( $type ) . '</td><td>' . esc_html( 'active' === $d->status ? __( 'Active', 'cmp' ) : __( 'Invitation waiting', 'cmp' ) ) . '</td><td>' . esc_html( CMP_Chastity::site_time( $d->created_at ) ) . '</td><td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- who() escapes.
+				echo '<tr><td>' . self::who( $other ) . '</td><td>' . esc_html( $type ) . '</td><td>' . esc_html( 'active' === $d->status ? __( 'Active', 'cmp' ) : __( 'Invitation waiting', 'cmp' ) ) . '</td><td>' . esc_html( CMP_Chastity::site_time( $d->created_at ) ) . '</td><td>' . self::show_toggles( $d, $member ) . '</td><td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- who() and show_toggles() escape.
 				if ( 'active' === $d->status ) {
 					echo self::form( 'end_dynamic', array( 'dynamic' => $d->id, 'member' => $member ), __( 'End this dynamic for both members? Any lock it allowed becomes a self-lock.', 'cmp' ) ) . '<input type="text" name="reason" required maxlength="200" placeholder="' . esc_attr__( 'Reason', 'cmp' ) . '" /> <button class="button button-small">' . esc_html__( 'End dynamic', 'cmp' ) . '</button></form>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 				}
@@ -379,10 +412,52 @@ class CMP_Member_Admin {
 		echo '</table>' . self::reason_field( 'cmp_ma_tr' ) . '<p><button class="button button-primary">' . esc_html__( 'Save correction', 'cmp' ) . '</button></p></form>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 
 		if ( ! $ended ) {
+			echo self::settings_html( $l ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 			echo '<h3>' . esc_html__( 'End this lock', 'cmp' ) . '</h3>' . self::form( 'end_lock', array( 'lock' => $l->id ), __( 'End this lock now? Both members are told.', 'cmp' ) ) . self::reason_field( 'cmp_ma_er' ) . '<p><button class="button">' . esc_html__( 'End lock', 'cmp' ) . '</button></p></form>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		}
 		echo '<h3>' . esc_html__( 'Remove this record', 'cmp' ) . '</h3><p class="description">' . esc_html__( 'Only for a duplicate or a lock that shouldn\'t exist. Deletes it and its history for both members; this can\'t be undone (the audit log keeps the dates).', 'cmp' ) . '</p>';
 		echo self::form( 'remove_lock', array( 'lock' => $l->id ), __( 'Delete this lock and its history permanently?', 'cmp' ) ) . self::reason_field( 'cmp_ma_dr' ) . '<p><button class="button button-link-delete">' . esc_html__( 'Delete lock record', 'cmp' ) . '</button></p></form>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
+	}
+
+	/** Each member's "Show on my profile" switch for a dynamic, with a button to flip it. */
+	private static function show_toggles( $d, $member ) {
+		$html = '';
+		foreach ( array( array( (int) $d->proposer_id, (int) $d->proposer_show ), array( (int) $d->partner_id, (int) $d->partner_show ) ) as list( $uid, $on ) ) {
+			$u     = get_userdata( $uid );
+			$html .= self::form( 'dyn_show', array( 'dynamic' => $d->id, 'user' => $uid, 'show' => $on ? '' : '1', 'member' => $member ) );
+			$html .= esc_html( ( $u ? $u->display_name : '?' ) . ': ' . ( $on ? __( 'on', 'cmp' ) : __( 'off', 'cmp' ) ) ) . ' <input type="text" name="reason" required maxlength="200" size="12" placeholder="' . esc_attr__( 'Reason', 'cmp' ) . '" /> <button class="button button-small">' . esc_html( $on ? __( 'Turn off', 'cmp' ) : __( 'Turn on', 'cmp' ) ) . '</button></form>';
+		}
+		return $html;
+	}
+
+	/** Everything the wearer and keyholder can set on a lock (0.27.0). */
+	private static function settings_html( $l ) {
+		$opts = '';
+		foreach ( CMP_Chastity::options() as $k => $o ) {
+			$opts .= '<option value="' . esc_attr( $k ) . '"' . selected( $l->option_key, $k, false ) . '>' . esc_html( $o[0] ) . '</option>';
+		}
+		$pol = '';
+		foreach ( CMP_Chastity::policies() as $k => $label ) {
+			$pol .= '<option value="' . esc_attr( $k ) . '"' . selected( $l->release_policy, $k, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		$hyg = '';
+		foreach ( CMP_Chastity::hygiene_choices() as $k => $label ) {
+			$hyg .= '<option value="' . esc_attr( $k ) . '"' . selected( (int) $l->hygiene_minutes, (int) $k, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		$ku   = $l->keyholder_id ? get_userdata( $l->keyholder_id ) : null;
+		$box  = function ( $name, $label, $on ) {
+			return '<label><input type="checkbox" name="' . esc_attr( $name ) . '" value="1"' . checked( (bool) $on, true, false ) . ' /> ' . esc_html( $label ) . '</label><br />';
+		};
+		$html  = '<h3>' . esc_html__( 'Settings', 'cmp' ) . '</h3><p class="description">' . esc_html__( 'What the wearer and keyholder can set themselves. Saves the whole form, so change only what\'s wrong.', 'cmp' ) . '</p>';
+		$html .= self::form( 'settings', array( 'lock' => $l->id ) ) . '<table class="form-table" role="presentation">';
+		$html .= '<tr><th scope="row">' . esc_html__( 'Profile badges', 'cmp' ) . '</th><td>' . $box( 'show_profile', __( 'Show the badge on the wearer\'s profile ("Locked by …" / "Locked · N days")', 'cmp' ), $l->show_profile ) . $box( 'kh_show', __( 'Name the keyholder on it, and show "Holds the key for …" on the keyholder\'s profile', 'cmp' ), $l->kh_show ) . '</td></tr>';
+		$html .= '<tr><th scope="row">' . esc_html__( 'Keyholder controls', 'cmp' ) . '</th><td>' . $box( 'hide_timer', __( 'Hide the time left from the wearer', 'cmp' ), $l->hide_timer ) . $box( 'verify_daily', __( 'Daily verification photo', 'cmp' ), $l->verify_daily ) . '</td></tr>';
+		$html .= '<tr><th scope="row"><label for="cmp_ma_hyg">' . esc_html__( 'Hygiene opening', 'cmp' ) . '</label></th><td><select id="cmp_ma_hyg" name="hygiene_minutes">' . $hyg . '</select></td></tr>';
+		$html .= '<tr><th scope="row"><label for="cmp_ma_opt">' . esc_html__( 'Option', 'cmp' ) . '</label></th><td><select id="cmp_ma_opt" name="option">' . $opts . '</select> <input type="text" name="option_name" maxlength="60" value="' . esc_attr( 'custom' === $l->option_key ? $l->option_name : '' ) . '" placeholder="' . esc_attr__( 'Name, for Custom', 'cmp' ) . '" aria-label="' . esc_attr__( 'Custom option name', 'cmp' ) . '" /></td></tr>';
+		$html .= '<tr><th scope="row"><label for="cmp_ma_pol">' . esc_html__( 'Release', 'cmp' ) . '</label></th><td><select id="cmp_ma_pol" name="release_policy">' . $pol . '</select></td></tr>';
+		$html .= '<tr><th scope="row"><label for="cmp_ma_kh">' . esc_html__( 'Keyholder', 'cmp' ) . '</label></th><td><input type="text" id="cmp_ma_kh" name="keyholder" class="regular-text" value="' . esc_attr( $ku ? $ku->user_login : '' ) . '" placeholder="' . esc_attr__( 'Empty = self-lock', 'cmp' ) . '" /><p class="description">' . esc_html__( 'Username or email of a member who holds the wearer\'s key (an active dynamic with chastity, them leading). Empty makes it a self-lock.', 'cmp' ) . '</p></td></tr>';
+		$html .= '</table>' . self::reason_field( 'cmp_ma_sr' ) . '<p><button class="button button-primary">' . esc_html__( 'Save settings', 'cmp' ) . '</button></p></form>';
+		return $html;
 	}
 
 	/** Record a lock that should exist. */
@@ -403,6 +478,7 @@ class CMP_Member_Admin {
 		$html .= '<tr><th scope="row"><label for="cmp_ma_rs">' . esc_html__( 'Started', 'cmp' ) . '</label></th><td><input type="datetime-local" id="cmp_ma_rs" name="started_at" /> ' . esc_html__( 'or', 'cmp' ) . ' <input type="number" name="days" min="0" max="3650" class="small-text" aria-label="' . esc_attr__( 'Days', 'cmp' ) . '" /> ' . esc_html__( 'days', 'cmp' ) . ' <input type="number" name="hours" min="0" max="23" class="small-text" aria-label="' . esc_attr__( 'Hours', 'cmp' ) . '" /> ' . esc_html__( 'hours locked so far', 'cmp' ) . '</td></tr>';
 		$html .= '<tr><th scope="row"><label for="cmp_ma_rp">' . esc_html__( 'Planned end', 'cmp' ) . '</label></th><td><input type="datetime-local" id="cmp_ma_rp" name="planned_end" /> <span class="description">' . esc_html__( 'Empty = open-ended', 'cmp' ) . '</span></td></tr>';
 		$html .= '<tr><th scope="row"><label for="cmp_ma_re">' . esc_html__( 'Ended', 'cmp' ) . '</label></th><td><input type="datetime-local" id="cmp_ma_re" name="ended_at" /> <span class="description">' . esc_html__( 'Only for a past lock', 'cmp' ) . '</span></td></tr>';
+		$html .= '<tr><th scope="row">' . esc_html__( 'Profile badges', 'cmp' ) . '</th><td><label><input type="checkbox" name="show_profile" value="1" /> ' . esc_html__( 'Show "Locked by …" on the wearer\'s profile and "Holds the key for …" on the keyholder\'s', 'cmp' ) . '</label></td></tr>';
 		$html .= '</table>' . self::reason_field( 'cmp_ma_rec' ) . '<p><button class="button button-primary">' . esc_html__( 'Record lock', 'cmp' ) . '</button></p></form>';
 		return $html;
 	}

@@ -2,8 +2,9 @@
 # End-to-end test of Users -> Member Dynamics & Locks (Community Member
 # Planning 0.26.0): who can use it, removing a stuck waiting lock, recording
 # a lock that never started, correcting start / days / planned end / end,
-# hidden-timer privacy, ending a lock, ending a dynamic, turning off an
-# add-on, reasons, notifications and the audit log.
+# hidden-timer privacy, ending a lock, lock settings and keyholder (0.27.0),
+# dynamic profile switches, ending a dynamic, turning off an add-on,
+# reasons, notifications (only when ticked) and the audit log.
 # Usage: WPTEST=<folder from tests/setup.sh> bash tests/member-admin-e2e.sh
 S=${WPTEST:?set WPTEST to the folder created by tests/setup.sh}
 REPO=$(cd "$(dirname "$0")/.." && pwd)
@@ -71,7 +72,7 @@ get admin a2 "$ADMIN&lock=$PID"
 ok "its page offers Remove and Record, nothing to accept for them" $([ "$(has $T/a2.html 'Remove waiting lock')$(has $T/a2.html 'Record lock')$(hasnt $T/a2.html 'value="accept"')" = 111 ] && echo 1 || echo 0)
 r=$(adm admin remove_lock -F "lock=$PID")
 ok "no reason, no change" $(echo "$r" | grep -q 'msg=reason' && [ "$(lk $PID status)" = proposed ] && echo 1 || echo 0)
-r=$(adm admin remove_lock -F "lock=$PID" -F "reason=Accept failed on his phone")
+r=$(adm admin remove_lock -F "lock=$PID" -F "reason=Accept failed on his phone" -F "notify=1")
 ok "removed with a reason; both told" $(echo "$r" | grep -q 'msg=removed' && [ "$(lk $PID status)" = none ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id IN ($SUB,$KH) AND message LIKE '%site team removed a lock that was waiting%'")" = 2 ] && echo 1 || echo 0)
 ok "audit log keeps it with the reason" $([ "$(q "SELECT COUNT(*) FROM $AU_T WHERE action='lock_admin_removed' AND object_id=$PID AND reason='Accept failed on his phone'")" = 1 ] && echo 1 || echo 0)
 
@@ -81,7 +82,7 @@ ok "a keyholder who doesn't hold their key is refused for a running lock" $(echo
 FUT=$(ev "echo wp_date('Y-m-d\TH:i', time()+86400);")
 r=$(adm admin record -F "wearer=masub" -F "keyholder=makh" -F "option=a" -F "started_at=$FUT" -F "reason=test")
 ok "a start in the future is refused" $(echo "$r" | grep -q 'msg=times' && echo 1 || echo 0)
-r=$(adm admin record -F "wearer=masub" -F "keyholder=makh" -F "option=b" -F "days=5" -F "hours=3" -F "reason=Accept failed; locked since Thursday per both")
+r=$(adm admin record -F "wearer=masub" -F "keyholder=makh" -F "option=b" -F "days=5" -F "hours=3" -F "reason=Accept failed; locked since Thursday per both" -F "notify=1")
 RID=$(q "SELECT id FROM $L_T WHERE wearer_id=$SUB AND status='locked'")
 ok "recorded as running with the keyholder" $(echo "$r" | grep -q 'msg=recorded' && [ "$(lk $RID status keyholder_id option_key)" = "locked|$KH|b" ] && echo 1 || echo 0)
 ok "exactly 5 days 3 hours locked" $(near $(secs $RID) $(( 5*86400 + 3*3600 )))
@@ -93,7 +94,7 @@ get masub w0 "$PAGE&cmp_tab=chastity"
 ok "wearer sees the timer and the site-team line in history" $([ "$(has $T/w0.html '5d 3h')$(has $T/w0.html 'Corrected by the site team: a lock was recorded')" = 11 ] && echo 1 || echo 0)
 
 echo "== Correct days, start and planned end"
-r=$(adm admin times -F "lock=$RID" -F "days=10" -F "reason=Started earlier than recorded")
+r=$(adm admin times -F "lock=$RID" -F "days=10" -F "reason=Started earlier than recorded" -F "notify=1")
 ok "set days locked: exactly 10 days" $(echo "$r" | grep -q 'msg=saved' && near $(secs $RID) 864000)
 ok "both told old and new start and the new total" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id IN ($SUB,$KH) AND message LIKE '%start changed from%now 10d 0h%'")" = 2 ] && echo 1 || echo 0)
 ok "audit has old and new start" $([ "$(q "SELECT COUNT(*) FROM $AU_T WHERE action='lock_admin_fix' AND object_id=$RID AND old_value LIKE '%started_at%' AND new_value LIKE '%started_at%'")" -ge 1 ] && echo 1 || echo 0)
@@ -105,7 +106,7 @@ ok "nothing changed -> told so" $(echo "$r" | grep -q 'msg=same' && echo 1 || ec
 ev "global \$wpdb; \$wpdb->update('$L_T',array('hide_timer'=>1),array('id'=>$RID));" >/dev/null
 before=$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$SUB AND message LIKE '%planned end%'")
 PE=$(ev "echo wp_date('Y-m-d\TH:i', time()+30*86400);")
-r=$(adm admin times -F "lock=$RID" -F "planned_end=$PE" -F "reason=Keyholder asked")
+r=$(adm admin times -F "lock=$RID" -F "planned_end=$PE" -F "reason=Keyholder asked" -F "notify=1")
 ok "planned end corrected" $(echo "$r" | grep -q 'msg=saved' && [ -n "$(lk $RID planned_end)" ] && echo 1 || echo 0)
 ok "timer hidden: wearer told only that something was corrected" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$SUB AND message LIKE '%planned end%'")" = "$before" ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$SUB AND message='The site team made a correction to your lock.'")" -ge 1 ] && echo 1 || echo 0)
 get masub w1 "$PAGE&cmp_tab=chastity"
@@ -125,14 +126,35 @@ ok "end and days corrected on a past lock" $(echo "$r" | grep -q 'msg=saved' && 
 r=$(adm admin times -F "lock=$RID" -F "ended_at=$FUT" -F "reason=bad")
 ok "an end in the future is refused" $(echo "$r" | grep -q 'msg=times' && echo 1 || echo 0)
 
+echo "== Settings, quietly (0.27.0)"
+ev "global \$wpdb; \$wpdb->update('$L_T',array('status'=>'locked','ended_at'=>null),array('id'=>$RID));" >/dev/null
+nbefore=$(q "SELECT COUNT(*) FROM $N_T WHERE user_id IN ($SUB,$KH)")
+r=$(adm admin settings -F "lock=$RID" -F "show_profile=1" -F "kh_show=1" -F "verify_daily=1" -F "hygiene_minutes=30" -F "option=custom" -F "option_name=Weekday cage" -F "release_policy=permission" -F "keyholder=makh" -F "reason=He couldn't find the switch")
+ok "badge, keyholder name, verification, hygiene, option, release all set" $(echo "$r" | grep -q 'msg=saved' && [ "$(lk $RID show_profile kh_show hide_timer verify_daily hygiene_minutes option_key option_name release_policy keyholder_id)" = "1|1|0|1|30|custom|Weekday cage|permission|$KH" ] && echo 1 || echo 0)
+ok "no notifications sent without the Notify box" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id IN ($SUB,$KH)")" = "$nbefore" ] && echo 1 || echo 0)
+ok "history line and audit row still kept" $([ "$(q "SELECT COUNT(*) FROM $E_T WHERE lock_id=$RID AND type='admin_fix' AND note LIKE '%profile badge on%'")" = 1 ] && [ "$(q "SELECT COUNT(*) FROM $AU_T WHERE action='lock_admin_settings' AND object_id=$RID AND reason LIKE 'He couldn%'")" = 1 ] && echo 1 || echo 0)
+login maother maother maotherpass123; get maother o1 "$PAGE&cmp_member=$SUB"
+ok "the badge now shows on his profile, naming the keyholder" $(has $T/o1.html 'Locked by <a href=')
+r=$(adm admin settings -F "lock=$RID" -F "option=custom" -F "option_name=" -F "release_policy=none" -F "hygiene_minutes=15" -F "keyholder=makh" -F "reason=x")
+ok "Custom without a name is refused, nothing changed" $(echo "$r" | grep -q 'msg=invalid_settings' && [ "$(lk $RID option_name)" = "Weekday cage" ] && echo 1 || echo 0)
+r=$(adm admin settings -F "lock=$RID" -F "option=a" -F "release_policy=none" -F "hygiene_minutes=15" -F "keyholder=maother" -F "reason=x")
+ok "can't hand the key to someone who doesn't hold it" $(echo "$r" | grep -q 'msg=keyholder' && [ "$(lk $RID keyholder_id)" = "$KH" ] && echo 1 || echo 0)
+r=$(adm admin settings -F "lock=$RID" -F "show_profile=1" -F "option=a" -F "release_policy=none" -F "hygiene_minutes=15" -F "keyholder=" -F "reason=Keyholder stepped away")
+ok "empty keyholder makes it a self-lock" $([ "$(lk $RID keyholder_id hide_timer)" = "0|0" ] && echo 1 || echo 0)
+r=$(adm admin settings -F "lock=$RID" -F "show_profile=1" -F "option=a" -F "release_policy=none" -F "hygiene_minutes=15" -F "keyholder=makh" -F "reason=Back with keyholder")
+ok "and back to the keyholder" $([ "$(lk $RID keyholder_id)" = "$KH" ] && echo 1 || echo 0)
+r=$(adm admin dyn_show -F "dynamic=$DYN" -F "user=$SUB" -F "show=" -F "member=$SUB" -F "reason=He wants it private")
+ok "dynamic 'show on profile' switched off for one member, quietly" $(echo "$r" | grep -q 'msg=saved' && [ "$(q "SELECT partner_show FROM $D_T WHERE id=$DYN")" = 0 ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$SUB AND message LIKE '%Show on my profile%'")" = 0 ] && echo 1 || echo 0)
+r=$(adm admin end_lock -F "lock=$RID" -F "reason=Back to test flow")
+
 echo "== Dynamics"
 get admin a3 "$ADMIN&member=$SUB"
 ok "member page lists the dynamic, the chastity add-on and locks" $([ "$(has $T/a3.html 'Keyholder / chastity wearer')$(has $T/a3.html 'Turn off')$(has $T/a3.html "lock=$RID")" = 111 ] && echo 1 || echo 0)
 ok "no photos, rules or notes on the admin screen" $([ "$(hasnt $T/a3.html 'cmp_lockpic')$(hasnt $T/a3.html 'Wear it 24/7')" = 11 ] && echo 1 || echo 0)
 AD=$(q "SELECT id FROM $A_T WHERE kind='chastity' AND status='active'")
-r=$(adm admin addon_off -F "addon=$AD" -F "member=$SUB" -F "reason=They asked")
+r=$(adm admin addon_off -F "addon=$AD" -F "member=$SUB" -F "reason=They asked" -F "notify=1")
 ok "turn off chastity: both told" $(echo "$r" | grep -q 'msg=saved' && [ "$(q "SELECT status FROM $A_T WHERE id=$AD")" = ended ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id IN ($SUB,$KH) AND message LIKE '%site team turned off chastity%'")" = 2 ] && echo 1 || echo 0)
-r=$(adm admin end_dynamic -F "dynamic=$DYN" -F "member=$SUB" -F "reason=They asked")
+r=$(adm admin end_dynamic -F "dynamic=$DYN" -F "member=$SUB" -F "reason=They asked" -F "notify=1")
 ok "end the dynamic: both told" $(echo "$r" | grep -q 'msg=ended' && [ "$(q "SELECT status FROM $D_T WHERE id=$DYN")" = ended ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id IN ($SUB,$KH) AND message LIKE '%site team ended your dynamic%'")" = 2 ] && echo 1 || echo 0)
 
 echo "== Remove a record"

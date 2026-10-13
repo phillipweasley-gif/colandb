@@ -314,6 +314,29 @@ class CMP_Dynamics {
 		return true;
 	}
 
+	/** Site team (0.27.0): whether a dynamic shows on one member's profile. That member is told. */
+	public static function admin_set_show( $dyn_id, $user_id, $show, $admin_id, $reason ) {
+		global $wpdb;
+		$dyn = self::get( $dyn_id );
+		if ( ! $dyn || ! in_array( (int) $user_id, array( (int) $dyn->proposer_id, (int) $dyn->partner_id ), true ) ) {
+			return false;
+		}
+		$col = (int) $dyn->proposer_id === (int) $user_id ? 'proposer_show' : 'partner_show';
+		$wpdb->update( CMP_Install::table( 'dynamics' ), array( $col => $show ? 1 : 0 ), array( 'id' => $dyn->id ), array( '%d' ), array( '%d' ) );
+		CMP_Audit::log( 'dynamic_admin_show', 'dynamic', $dyn->id, array( $col => (int) $dyn->$col ), array( $col => $show ? 1 : 0 ), $reason, $admin_id );
+		CMP_Notifications::add(
+			(int) $user_id,
+			'access_change',
+			$show
+				/* translators: %s: dynamic type */
+				? sprintf( __( 'The site team turned on "Show on my profile" for your dynamic (%s). It shows when you both have it on.', 'cmp' ), self::types()[ $dyn->type ]['label'] )
+				/* translators: %s: dynamic type */
+				: sprintf( __( 'The site team turned off "Show on my profile" for your dynamic (%s).', 'cmp' ), self::types()[ $dyn->type ]['label'] ),
+			self::url()
+		);
+		return true;
+	}
+
 	/** Site team (0.26.0): turn off an active add-on, or cancel a request. Both members are told. */
 	public static function admin_addon_off( $addon_id, $admin_id ) {
 		$ad = self::get_addon( $addon_id );

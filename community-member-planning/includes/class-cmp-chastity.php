@@ -37,6 +37,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   correction is an 'admin_fix' history entry both members see (planned-end
  *   changes stay hidden from a wearer whose timer is hidden), a notification
  *   to both, and an audit-log row with the old and new values.
+ * - 0.27.0: the site team can also change a lock's settings (badge,
+ *   keyholder's name on badges, hidden timer, daily verification, hygiene,
+ *   option and release rule) and its keyholder, for members who can't.
  */
 class CMP_Chastity {
 
@@ -865,6 +868,104 @@ class CMP_Chastity {
 		}
 		if ( $end_line ) {
 			self::admin_note( $lock, $admin_id, $end_line . '.', true );
+		}
+		return '';
+	}
+
+	/**
+	 * Change a lock's settings for a member who can't (0.27.0). $in holds any
+	 * of show_profile, kh_show, hide_timer, verify_daily (0/1),
+	 * hygiene_minutes, option, option_name, release_policy, and keyholder
+	 * (member id, 0 = self-lock). Returns an error code or ''.
+	 */
+	public static function admin_settings( $lock_id, $in, $admin_id, $reason ) {
+		$lock = self::lock( $lock_id );
+		if ( ! $lock || 'ended' === $lock->status ) {
+			return 'gone';
+		}
+		$set     = array();
+		$lines   = array();
+		$yes     = function ( $v ) {
+			return $v ? __( 'on', 'cmp' ) : __( 'off', 'cmp' );
+		};
+		$flags   = array(
+			'show_profile' => __( 'profile badge', 'cmp' ),
+			'kh_show'      => __( 'keyholder\'s name on badges', 'cmp' ),
+			'hide_timer'   => __( 'time left hidden from the wearer', 'cmp' ),
+			'verify_daily' => __( 'daily verification photo', 'cmp' ),
+		);
+		foreach ( $flags as $k => $label ) {
+			if ( isset( $in[ $k ] ) && (int) $in[ $k ] !== (int) $lock->$k ) {
+				$set[ $k ] = (int) $in[ $k ] ? 1 : 0;
+				/* translators: 1: setting, 2: on/off */
+				$lines[] = sprintf( __( '%1$s %2$s', 'cmp' ), $label, $yes( $set[ $k ] ) );
+			}
+		}
+		if ( isset( $in['hygiene_minutes'] ) && (int) $in['hygiene_minutes'] !== (int) $lock->hygiene_minutes ) {
+			if ( ! isset( self::hygiene_choices()[ (int) $in['hygiene_minutes'] ] ) ) {
+				return 'invalid';
+			}
+			$set['hygiene_minutes'] = (int) $in['hygiene_minutes'];
+			/* translators: %s: allowance */
+			$lines[] = sprintf( __( 'hygiene opening: %s', 'cmp' ), mb_strtolower( self::hygiene_choices()[ $set['hygiene_minutes'] ] ) );
+		}
+		if ( isset( $in['option'] ) ) {
+			$options = self::options();
+			$opt     = $in['option'];
+			$policy  = isset( $in['release_policy'] ) ? $in['release_policy'] : $lock->release_policy;
+			if ( ! isset( $options[ $opt ] ) || ! isset( self::policies()[ $policy ] ) ) {
+				return 'invalid';
+			}
+			$name = 'custom' === $opt ? trim( (string) ( isset( $in['option_name'] ) ? $in['option_name'] : '' ) ) : $options[ $opt ][0];
+			if ( '' === $name ) {
+				return 'invalid';
+			}
+			if ( $opt !== $lock->option_key || $name !== $lock->option_name ) {
+				$set['option_key']  = $opt;
+				$set['option_name'] = mb_substr( $name, 0, 60 );
+				if ( 'custom' !== $opt ) {
+					$set['rule'] = $options[ $opt ][1];
+				}
+				/* translators: %s: option */
+				$lines[] = sprintf( __( 'option: %s', 'cmp' ), $set['option_name'] );
+			}
+			if ( $policy !== $lock->release_policy ) {
+				$set['release_policy'] = $policy;
+				/* translators: %s: release policy */
+				$lines[] = sprintf( __( 'release: %s', 'cmp' ), mb_strtolower( self::policies()[ $policy ] ) );
+			}
+		}
+		$old_kh = (int) $lock->keyholder_id;
+		if ( isset( $in['keyholder'] ) && (int) $in['keyholder'] !== $old_kh ) {
+			$kh = (int) $in['keyholder'];
+			if ( $kh && ( ! get_userdata( $kh ) || ! CMP_Dynamics::lead_can_direct( $kh, $lock->wearer_id, 'chastity' ) ) ) {
+				return 'keyholder';
+			}
+			$set['keyholder_id'] = $kh;
+			if ( ! $kh ) {
+				$set['hide_timer']      = 0;
+				$set['release_allowed'] = 0;
+			}
+			$lines[] = $kh
+				/* translators: %s: member */
+				? sprintf( __( 'keyholder is now %s', 'cmp' ), self::name( $kh ) )
+				: __( 'it\'s now a self-lock', 'cmp' );
+		}
+		if ( ! $set ) {
+			return 'same';
+		}
+		$old = array();
+		foreach ( array_keys( $set ) as $k ) {
+			$old[ $k ] = $lock->$k;
+		}
+		self::update_lock( $lock->id, $set );
+		CMP_Audit::log( 'lock_admin_settings', 'lock', $lock->id, $old, $set, $reason, $admin_id );
+		$after = self::lock( $lock->id );
+		$text  = implode( '; ', $lines ) . '.';
+		self::admin_note( $after, $admin_id, $text );
+		if ( isset( $set['keyholder_id'] ) && $old_kh && $old_kh !== (int) $set['keyholder_id'] ) {
+			/* translators: %s: wearer */
+			CMP_Notifications::add( $old_kh, 'lock', sprintf( __( 'The site team moved %s\'s lock to another keyholder or made it a self-lock. You no longer manage it.', 'cmp' ), self::name( $lock->wearer_id ) ), self::url() );
 		}
 		return '';
 	}
