@@ -303,7 +303,36 @@ class CEC_Meta_Boxes {
 		}
 	}
 
+	/** True while save() runs, so nested saves are ignored (see save()). */
+	private static $saving = false;
+
+	/**
+	 * save_post_cec_event handler for the wp-admin edit screen. Only the
+	 * event being edited is saved from the form: saving a series root
+	 * inserts or updates its dates (and publishing it cascades to them),
+	 * which fires this hook again for each date with the same $_POST.
+	 * Before 1.45.1 that copied the root's start onto every date (a
+	 * monthly series approved in wp-admin showed six times on one day),
+	 * and a schedule change regenerated dates of dates without end.
+	 */
 	public static function save( $post_id, $post ) {
+		if ( self::$saving ) {
+			return;
+		}
+		// Publishing a root cascades to its dates before WordPress saves the
+		// root itself, so the flag isn't set yet: check the form's own post.
+		if ( isset( $_POST['post_ID'] ) && absint( $_POST['post_ID'] ) !== (int) $post_id ) {
+			return;
+		}
+		self::$saving = true;
+		try {
+			self::save_form( $post_id, $post );
+		} finally {
+			self::$saving = false;
+		}
+	}
+
+	private static function save_form( $post_id, $post ) {
 		if ( ! isset( $_POST[ self::NONCE_NAME ] ) || ! wp_verify_nonce( $_POST[ self::NONCE_NAME ], self::NONCE_ACTION ) ) {
 			return;
 		}

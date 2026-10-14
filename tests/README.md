@@ -23,6 +23,7 @@ bash tests/setup-e2e.sh              # profiles v2 + step-by-step setup: 32 chec
 bash tests/dob-e2e.sh                # date of birth at sign-up, one-time step, under-18 lock, Show switches: 33 checks
 bash tests/org-e2e.sh                # organization & titleholder submissions, pages, grid, member links, page editor, menus, titleholder events, state and city filter, multiple titles, homepage limit and See More: 146 checks
 bash tests/import-e2e.sh             # importing .ics/.csv events for an organizer, and "Copy for Facebook, FetLife or Telegram": 30 checks
+bash tests/recurrence-e2e.sh         # recurring series saved from wp-admin: approving keeps each date, a schedule change regenerates once, no per-date emails: 5 checks
 ```
 
 | File | What it does |
@@ -47,6 +48,7 @@ bash tests/import-e2e.sh             # importing .ics/.csv events for an organiz
 | `dob-e2e.sh` | Date of birth (CMP 0.4.0 + CEC 1.27.1 sign-up hooks): `[cec_register]` refusals and success, existing member asked once, under-18 lock and site-team unlock, calculated age, "a filled-in field starts shown", export/erase. Creates its own `[cec_register]` page and turns on registration. |
 | `profile-e2e.sh` | Member profiles: options admin, validation, who-sees-what, photos (upload checks, metadata stripping, permission-checked serving), preferences, export/erasure, sign-in-aware menus and `[cmp_account_bar]`. Starts the test server with 12 MB upload limits; test photos are made with PHP's GD. |
 | `updater-e2e.sh` + `mock-github.php` | COL&B Plugin Updater: 27 checks against a local stand-in for GitHub (tokens, staging vs live channel, install, background auto-update, rejected zips, token never sent to the storage server). Run with `WPTEST` set, after `setup.sh`. The mock's release list expects member plugin releases 0.1.0/0.2.0; update `mock-github.php` if that test data needs to move. |
+| `recurrence-e2e.sh` + `recurrence-e2e.php` | Recurring events (CEC 1.45.1) through the wp-admin save hooks with the form post.php sends: a pending monthly series published from the edit screen keeps each date's day, only the series emails subscribers, and changing "Repeat until" regenerates the dates once. Runs in `wp eval-file` (no web server); creates and deletes its own "ZZ Recurrence Series" events. |
 | `snap.php` | `wp eval-file tests/snap.php <dir>` saves the public month calendar's HTML for 12 cases. Run it before and after any change to `CEC_Month_Grid` and `diff -r` the two folders: they must be identical. |
 | `shots.js` | `node tests/shots.js <outdir> <member-page-id>` (Playwright): screenshots of each member-area state and a horizontal-overflow check at 320/375/768/1440 px. Expects users `unv`, `att`, `mem` (password `pass1234`) in the matching states. |
 
