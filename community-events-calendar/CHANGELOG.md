@@ -6,6 +6,20 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.45.1
+
+**Repeating events: every date was moved to the first date** (owner, 2026-10-15, "Crate Training: A Mosh-101 Course/ Vinyl Record Night", every 2nd Tuesday: all six dates showed on Tue, Nov 10).
+
+- **Cause:** `CEC_Meta_Boxes::save()` (the wp-admin event screen) didn't check which event its form belonged to. Saving a series root in wp-admin updates the series' other dates with `wp_update_post()` (`CEC_Recurrence::sync_content_to_occurrences()` and the status cascade), which fires `save_post_cec_event` again for each of them while `$_POST` still holds the root's form, so each date was given the root's start and end (and its other form fields). The first save of a new series was fine; any later save of the root in wp-admin, even just approving it or editing the text, collapsed every date onto the first. The front-end edit forms (Calendar Admin, My Events, Manage My Submission, Submit an Event) don't use this hook and weren't affected.
+- **Fix:** the save only applies to the event whose form was posted (`post_ID`, or `?post=` for the block editor's meta box request).
+- **Repair (runs once on upgrade):** `CEC_Recurrence::repair_collapsed_dates()` finds any series with a date that starts at the same moment as its first date (impossible for a healthy series), recomputes the schedule from the series' own rule, and gives each existing date back its own start and end, oldest first, in place: same posts, links and RSVPs. Each repaired date gets an audit log entry ("event_series_date_repaired"). Gated on the option `cec_migrated_1451_series_dates`, which records when it ran and which series it fixed. On colandb.com this should repair one series (#921, dates #923–#927); a read-only check of the live feeds found no others.
+- **Verification** (local WordPress test kit, macOS, PHP 8.4):
+  - New `tests/series-e2e.sh`: 13/13. Builds a 2nd-Tuesday series, saves it through wp-admin over real HTTP (the block editor's meta box save, with its nonces) and checks the dates keep their own days and posts; collapses a series the way it happened live and checks the repair restores the same 2nd Tuesdays and end times on the same posts, leaves a healthy series alone, and runs once from the upgrade. The save check **fails on 1.45.0** (the dates collapse), so it reproduces the live bug.
+  - `tests/calendar-e2e.sh` 73/73, `tests/import-e2e.sh` 30/30, `tests/org-e2e.sh` 147/147. No plugin warnings. `php -l` on every changed file.
+  - Mac setup as before (local router script, port 8898, uncommitted copies of the scripts).
+
+---
+
 ## 1.45.0
 
 **Import events for an organizer, and "Copy for Facebook, FetLife or Telegram"** (owner, 2026-10-13, from a member asking: "Is there a way to import events already posted to other socials … As an organizer, it is exhausting having to cross post to so many different formats." Owner: "build both").

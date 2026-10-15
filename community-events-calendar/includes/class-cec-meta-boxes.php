@@ -313,6 +313,14 @@ class CEC_Meta_Boxes {
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
 			return;
 		}
+		// 1.45.1: only the event this form belongs to. Saving a series root
+		// updates its other dates with wp_update_post(), which fires this
+		// hook again for each of them while $_POST still holds the root's
+		// form, so every date was overwritten with the root's start and end.
+		$editing = isset( $_POST['post_ID'] ) ? (int) $_POST['post_ID'] : ( isset( $_GET['post'] ) ? (int) $_GET['post'] : 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- the nonce was checked above.
+		if ( $editing !== (int) $post_id ) {
+			return;
+		}
 
 		$fields = array(
 			'cec_host_org_name'          => 'sanitize_text_field',

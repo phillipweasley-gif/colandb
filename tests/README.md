@@ -23,6 +23,7 @@ bash tests/setup-e2e.sh              # profiles v2 + step-by-step setup: 32 chec
 bash tests/dob-e2e.sh                # date of birth at sign-up, one-time step, under-18 lock, Show switches: 33 checks
 bash tests/org-e2e.sh                # organization & titleholder submissions, pages, grid, member links, page editor, menus, titleholder events, state and city filter, multiple titles, homepage limit and See More: 146 checks
 bash tests/import-e2e.sh             # importing .ics/.csv events for an organizer, and "Copy for Facebook, FetLife or Telegram": 30 checks
+bash tests/series-e2e.sh             # repeating events keep their own dates when saved in wp-admin, and the 1.45.1 repair: 13 checks
 ```
 
 | File | What it does |

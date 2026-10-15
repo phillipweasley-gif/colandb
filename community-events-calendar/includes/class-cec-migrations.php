@@ -15,6 +15,10 @@ class CEC_Migrations {
 			self::phase1a_admission_and_location();
 			update_option( 'cec_migrated_phase1a_admission_location', 1 );
 		}
+		// 1.45.1: series whose dates were all overwritten with the first one.
+		if ( ! get_option( 'cec_migrated_1451_series_dates' ) ) {
+			update_option( 'cec_migrated_1451_series_dates', array( 'at' => gmdate( 'Y-m-d H:i:s' ), 'series' => CEC_Recurrence::repair_collapsed_dates() ) );
+		}
 	}
 
 	/**
