@@ -24,6 +24,7 @@ bash tests/dob-e2e.sh                # date of birth at sign-up, one-time step, 
 bash tests/org-e2e.sh                # organization & titleholder submissions, pages, grid, member links, page editor, menus, titleholder events, state and city filter, multiple titles, homepage limit and See More: 146 checks
 bash tests/import-e2e.sh             # importing .ics/.csv events for an organizer, and "Copy for Facebook, FetLife or Telegram": 30 checks
 bash tests/recurrence-e2e.sh         # recurring series saved from wp-admin: approving keeps each date, a schedule change regenerates once, no per-date emails: 5 checks
+bash tests/series-e2e.sh             # a series saved in wp-admin keeps its dates (1.45.1), and the 1.45.2 in-place repair: 13 checks
 ```
 
 | File | What it does |
