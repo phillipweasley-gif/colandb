@@ -6,6 +6,29 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.45.3
+
+**Events that end before they start** (owner, 2026-10-15: after 1.45.2 put the "Crate Training" series back on its own Tuesdays, its later dates read "Tue, Dec 8, 2026 7:00 pm – Tue, Nov 10, 2026 12:00 am"; "House of Pan Fall Zoo Adventure" ends in 2006. Chose: past-midnight ends become the next day, earlier dates are refused, plus an in-place repair).
+
+- **Cause:** no form checked that the end is after the start. "Crate Training" was entered as 7:00 PM to 12:00 AM on **Nov 10** (midnight at the start of that day, not the end), and its other dates copied that end; while 1.45.1's bug kept them all on Nov 10 it only looked odd. Calendar apps subscribed to the .ics feed may skip events whose end is before their start.
+- **The rule, everywhere an end is saved** (the five edit forms, imports, repeating dates; `CEC_Event_Helper::normalize_end()` on the `add/update_post_metadata` filters):
+  - same date, earlier time ("7 PM to 12 AM", "8 PM to 2 AM"): the event runs past midnight, so the end is saved as the next day;
+  - an earlier date: no end is kept (a safety net; see below).
+- **On the front-end forms** (Submit an Event, Calendar Admin, My Events, Manage My Submission): an end on an earlier date than the start is refused before sending, with "The end is on an earlier date than the start. Check the end date. …", and a same-day earlier time shows "Ends after midnight, on the next day." (`frontend.js`).
+- **Repeating series:** each date's end now follows its own start (the series' first date is fixed by the rule, so the length is right).
+- **Repair, once on upgrade** (`CEC_Migrations::fix_event_ends()`, option `cec_migrated_1453_event_ends` with `fixed` / `left` ids):
+  - a single event or a series' first date whose end is earlier the same day: moved to the next day;
+  - a series' other dates: each ends the same length of time after its own start as the first date does;
+  - an end on an earlier date (the 2006 typo): **left for a person to correct** and listed under `left`. Each fix gets an audit log entry (`event_end_fixed`).
+  - On colandb.com this should fix the six "Crate Training" dates (#921, #923–#927: each ends at midnight after its Tuesday) and list "House of Pan Fall Zoo Adventure" (#1044) to correct by hand.
+- **Verification** (local WordPress test kit, macOS, PHP 8.4):
+  - New `tests/ends-e2e.sh`: 18/18 (the rule; saving through the meta filter; a wp-admin save over HTTP storing 8 PM–2 AM as 2 AM the next day, and the event page showing it; a 7 PM–12 AM series' dates each ending at midnight after their own Tuesday; the repair on data shaped like the live events, leaving the 2006 typo listed and a correct event untouched, running once from the upgrade; the .ics feed with no end before a start). On 1.45.2 its rule and save checks fail.
+  - Headless Chrome on the Submit an Event form: the past-midnight note shows, a 2006 end is refused and the form isn't sent, a normal end shows nothing.
+  - `tests/series-e2e.sh` 13/13, `tests/recurrence-e2e.sh` 5/5, `tests/calendar-e2e.sh` 73/73, `tests/import-e2e.sh` 30/30, `tests/org-e2e.sh` 147/147. No plugin warnings. `php -l` on every changed file.
+  - Mac setup as before (router script, port 8898, `timeout` stand-in; nothing committed).
+
+---
+
 ## 1.45.2
 
 **Automatic, in-place repair of series whose dates were collapsed before 1.45.1** (owner, 2026-10-15: "Crate Training: A Mosh-101 Course/ Vinyl Record Night" shows six times on Tue Nov 10; chose this over 1.45.1's manual fix).
