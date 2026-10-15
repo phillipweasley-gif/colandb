@@ -6,6 +6,20 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.45.1
+
+**A recurring event approved in wp-admin showed every date on the first day** (owner, 2026-10-14: "Why are there repeat events for this one event that was approved?", about "Crate Training: A Mosh-101 Course/ Vinyl Record Night", listed six times on Tue Nov 10).
+
+- **Cause:** the event is a monthly "2nd Tuesday" series (Nov 10 plus five more dates, Dec 8 to Apr 13, each its own post). Publishing a series root cascades the status to its dates, and each of those updates fired the wp-admin meta-box save again with the root's form still in `$_POST`, so every date was saved with the root's start. All six then sat on Nov 10. Any series approved or edited from the wp-admin edit screen was affected; the front-end dashboard's Approve and edit weren't.
+- **Worse, same cause:** changing a series' schedule (start, "Repeat until", the rule) in wp-admin regenerated the dates, and each new date ran the meta-box save as a series root of its own, creating dates of dates until PHP stopped the request (527 posts in two minutes in the test kit).
+- **Fix:** `CEC_Meta_Boxes::save()` now saves only the post the edit screen submitted (`post_ID`), and ignores saves nested inside its own run. `CEC_Recurrence::generate_occurrences()` sets `_cec_recurrence_parent_id` during the insert, so a regenerated date is an occurrence from its first hook: before, each published regenerated date sent subscribers its own "New event" email.
+- **Live data:** the six posts are not copies; they are the series with wrong dates. Saving the series again does not repair them on its own (an unchanged schedule only syncs content). Once 1.45.1 is live, change its "Repeat until" in wp-admin and Update: the five later dates are rebuilt on their own days. Don't change the schedule in wp-admin before 1.45.1 is live (runaway above).
+- **Verification** (local WordPress test kit, Linux, PHP 8.3):
+  - New `tests/recurrence-e2e.sh`: 5/5. A submitted pending monthly series published with the form wp-admin sends keeps each date's day; only the series triggers a "New event" email; changing "Repeat until" regenerates three dates once, with no per-date email. On 1.45.0 the publish check fails (all dates on the first) and the run never finishes (runaway).
+  - `tests/import-e2e.sh` 30/30 and `tests/calendar-e2e.sh` 73/73 still pass. No plugin warnings in `debug.log`. `php -l` on every changed PHP file. No month-grid change, so no `snap.php` comparison.
+
+---
+
 ## 1.45.0
 
 **Import events for an organizer, and "Copy for Facebook, FetLife or Telegram"** (owner, 2026-10-13, from a member asking: "Is there a way to import events already posted to other socials … As an organizer, it is exhausting having to cross post to so many different formats." Owner: "build both").

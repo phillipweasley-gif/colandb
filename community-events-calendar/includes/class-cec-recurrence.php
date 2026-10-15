@@ -236,6 +236,9 @@ class CEC_Recurrence {
 					'post_content' => $parent->post_content,
 					'post_status'  => $parent->post_status,
 					'post_author'  => $parent->post_author,
+					// Set during the insert, so its status-change hooks already
+					// see an occurrence: no "New event" email per date.
+					'meta_input'   => array( '_cec_recurrence_parent_id' => $parent_id ),
 				)
 			);
 			if ( is_wp_error( $new_id ) || ! $new_id ) {
