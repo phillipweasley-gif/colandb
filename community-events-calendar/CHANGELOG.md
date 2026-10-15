@@ -6,6 +6,20 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.45.2
+
+**Automatic, in-place repair of series whose dates were collapsed before 1.45.1** (owner, 2026-10-15: "Crate Training: A Mosh-101 Course/ Vinyl Record Night" shows six times on Tue Nov 10; chose this over 1.45.1's manual fix).
+
+- 1.45.1 stops a wp-admin save from moving a series' dates onto its first date, but a series already collapsed stays that way, and its fix ("change Repeat until and Update") deletes the later dates and creates new ones (new pages and links, RSVPs on them lost).
+- **On upgrade, once:** `CEC_Recurrence::repair_collapsed_dates()` finds any series with a date that starts at the same moment as its first date (impossible for a healthy series), recomputes the schedule from the series' own rule, and gives each existing date back its own start and end, oldest first (the order they were created in), **in place**: same posts, links and RSVPs. Each repaired date gets an audit log entry (`event_series_date_repaired`). Gated on the option `cec_migrated_1452_series_dates`, which records when it ran and which series it fixed. Healthy series are untouched.
+- On colandb.com this should repair one series (#921, dates #923–#927); a read-only check of the live calendar feeds on 2026-10-15 found no others. **No manual step is needed after updating.**
+- **Verification** (local WordPress test kit, macOS, PHP 8.4):
+  - New `tests/series-e2e.sh`: 13/13. Builds a 2nd-Tuesday series and saves it through wp-admin over real HTTP (the block editor's meta box save) to check 1.45.1 keeps the dates; collapses a series the way it happened live and checks the repair restores the same 2nd Tuesdays and end times on the same posts, leaves a healthy series alone, and runs once from the upgrade.
+  - `tests/recurrence-e2e.sh` (1.45.1) 5/5, `tests/calendar-e2e.sh` 73/73, `tests/import-e2e.sh` 30/30. No plugin warnings. `php -l` on the changed files.
+  - Mac setup: a local router script and port 8898, and a small `timeout` stand-in (macOS has none) for `recurrence-e2e.sh`; nothing committed.
+
+---
+
 ## 1.45.1
 
 **A recurring event approved in wp-admin showed every date on the first day** (owner, 2026-10-14: "Why are there repeat events for this one event that was approved?", about "Crate Training: A Mosh-101 Course/ Vinyl Record Night", listed six times on Tue Nov 10).

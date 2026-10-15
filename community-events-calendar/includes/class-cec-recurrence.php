@@ -276,6 +276,74 @@ class CEC_Recurrence {
 		}
 	}
 
+	/**
+	 * 1.45.2: one-time repair for series whose other dates were all
+	 * overwritten with the first date (the wp-admin save bug fixed in
+	 * 1.45.1). An occurrence can never start at the same
+	 * moment as its root, so any series with one that does is recomputed
+	 * from the root's schedule, and each existing occurrence (oldest first,
+	 * the order they were created in) gets its own date back in place, so
+	 * its page, link and RSVPs stay. Returns the series ids repaired.
+	 */
+	public static function repair_collapsed_dates() {
+		$fixed = array();
+		$roots = get_posts(
+			array(
+				'post_type'      => 'cec_event',
+				'post_status'    => array( 'publish', 'pending', 'draft', 'cec_in_review' ),
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+					array( 'key' => '_cec_recurrence_rule', 'value' => array( 'weekly', 'monthly_date', 'monthly_weekday' ), 'compare' => 'IN' ),
+					array( 'key' => '_cec_recurrence_parent_id', 'compare' => 'NOT EXISTS' ),
+				),
+			)
+		);
+		foreach ( $roots as $root_id ) {
+			$start = get_post_meta( $root_id, '_cec_start', true );
+			$until = get_post_meta( $root_id, '_cec_recurrence_until', true );
+			$children = get_posts(
+				array(
+					'post_type'      => 'cec_event',
+					'post_status'    => array( 'publish', 'pending', 'draft', 'cec_in_review' ),
+					'posts_per_page' => -1,
+					'fields'         => 'ids',
+					'orderby'        => 'ID',
+					'order'          => 'ASC',
+					'meta_key'       => '_cec_recurrence_parent_id', // phpcs:ignore WordPress.DB.SlowDBQuery
+					'meta_value'     => $root_id, // phpcs:ignore WordPress.DB.SlowDBQuery
+				)
+			);
+			$collapsed = false;
+			foreach ( $children as $child_id ) {
+				if ( get_post_meta( $child_id, '_cec_start', true ) === $start ) {
+					$collapsed = true;
+					break;
+				}
+			}
+			if ( ! $collapsed || ! $start || ! $until ) {
+				continue;
+			}
+			$start_ts = strtotime( $start );
+			$until_ts = strtotime( $until . ' 23:59:59' );
+			$end      = get_post_meta( $root_id, '_cec_end', true );
+			$duration = $end ? ( strtotime( $end ) - $start_ts ) : 0;
+			$dates    = self::compute_dates( get_post_meta( $root_id, '_cec_recurrence_rule', true ), $start_ts, $until_ts, self::get_ordinals( $root_id, $start_ts ), self::get_weekdays( $root_id, $start_ts ) );
+			foreach ( array_values( $children ) as $i => $child_id ) {
+				if ( ! isset( $dates[ $i ] ) ) {
+					break;
+				}
+				update_post_meta( $child_id, '_cec_start', date( 'Y-m-d\TH:i', $dates[ $i ] ) );
+				if ( $duration > 0 ) {
+					update_post_meta( $child_id, '_cec_end', date( 'Y-m-d\TH:i', $dates[ $i ] + $duration ) );
+				}
+				CEC_Audit_Log::log( $child_id, 'event_series_date_repaired' );
+			}
+			$fixed[] = (int) $root_id;
+		}
+		return $fixed;
+	}
+
 	private static function delete_future_occurrences( $parent_id ) {
 		$children = get_posts(
 			array(
