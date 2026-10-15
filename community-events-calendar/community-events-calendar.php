@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Community Events Calendar
  * Description: Member and admin-managed community events calendar with submissions, approval workflow, partner organizations & titleholders, recurring events, postponed/cancelled status, RSS/email subscriptions, volunteer inquiries, RSVP, and Elementor widgets. Shortcodes: [cec_calendar] month view, [cec_submit_org] organization/titleholder listing form, [cec_partner_orgs kind="organization|titleholder" limit="6" shuffle="yes" more="/organizations/"] listed groups grid, [cec_events view="grid|list"] filterable grid/list, [cec_upcoming count="8"] scrolling upcoming events, [cec_submit_event] front-end submission form, [cec_admin_dashboard] front-end approval dashboard for delegated Calendar Managers, [cec_my_events] lets a submitter manage their own events, [cec_login]/[cec_register] styled account forms, [cec_manage_submission] guest email-link editing, [cec_subscribe] email subscriptions to all events or specific organizations, [cec_volunteer_form] volunteer inquiry form. Full docs on the Events > Settings page.
- * Version: 1.45.2
+ * Version: 1.45.3
  * Author: RA Marketing
  * Text Domain: cec
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CEC_VERSION', '1.45.2' );
+define( 'CEC_VERSION', '1.45.3' );
 define( 'CEC_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CEC_URL', plugin_dir_url( __FILE__ ) );
 define( 'CEC_TABLE_RSVP', 'cec_rsvps' );
@@ -73,6 +73,9 @@ final class CEC_Plugin {
 		add_action( 'init', array( 'CEC_Term_Meta', 'init' ) );
 		add_action( 'add_meta_boxes', array( 'CEC_Meta_Boxes', 'add' ) );
 		add_action( 'save_post_cec_event', array( 'CEC_Meta_Boxes', 'save' ), 10, 2 );
+		// 1.45.3: an end before the start is fixed (past midnight) or dropped, on every save path.
+		add_filter( 'add_post_metadata', array( 'CEC_Event_Helper', 'filter_end_meta' ), 10, 4 );
+		add_filter( 'update_post_metadata', array( 'CEC_Event_Helper', 'filter_end_meta' ), 10, 4 );
 		add_action( 'admin_footer-post.php', array( 'CEC_Post_Types', 'inject_in_review_status_js' ) );
 		add_action( 'admin_footer-post-new.php', array( 'CEC_Post_Types', 'inject_in_review_status_js' ) );
 

@@ -25,6 +25,7 @@ bash tests/org-e2e.sh                # organization & titleholder submissions, p
 bash tests/import-e2e.sh             # importing .ics/.csv events for an organizer, and "Copy for Facebook, FetLife or Telegram": 30 checks
 bash tests/recurrence-e2e.sh         # recurring series saved from wp-admin: approving keeps each date, a schedule change regenerates once, no per-date emails: 5 checks
 bash tests/series-e2e.sh             # a series saved in wp-admin keeps its dates (1.45.1), and the 1.45.2 in-place repair: 13 checks
+bash tests/ends-e2e.sh               # event ends: past midnight is the next day, earlier dates refused, the 1.45.3 repair: 18 checks
 ```
 
 | File | What it does |

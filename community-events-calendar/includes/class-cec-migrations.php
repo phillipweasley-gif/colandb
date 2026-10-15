@@ -19,6 +19,61 @@ class CEC_Migrations {
 		if ( ! get_option( 'cec_migrated_1452_series_dates' ) ) {
 			update_option( 'cec_migrated_1452_series_dates', array( 'at' => gmdate( 'Y-m-d H:i:s' ), 'series' => CEC_Recurrence::repair_collapsed_dates() ) );
 		}
+		// 1.45.3: events saved with an end before their start.
+		if ( ! get_option( 'cec_migrated_1453_event_ends' ) ) {
+			update_option( 'cec_migrated_1453_event_ends', array_merge( array( 'at' => gmdate( 'Y-m-d H:i:s' ) ), self::fix_event_ends() ) );
+		}
+	}
+
+	/**
+	 * 1.45.3: events saved with an end before their start, in two passes so
+	 * a series' first date is fixed before its other dates follow it.
+	 * 1. A series' first date or a single event whose end is earlier the
+	 *    same day ("7 PM to 12 AM"): the end moves to the next day.
+	 * 2. A series' other dates: each ends the same length of time after its
+	 *    own start as the first date does (they used to copy its end).
+	 * Anything else (an end on an earlier date, like a 2006 typo) is left
+	 * for a person to correct and listed under 'left'.
+	 *
+	 * @return array{fixed:int[],left:int[]}
+	 */
+	public static function fix_event_ends() {
+		global $wpdb;
+		$fixed = array();
+		$left  = array();
+		$rows  = $wpdb->get_results(
+			"SELECT p.ID, s.meta_value AS start_raw, e.meta_value AS end_raw, r.meta_value AS parent_id
+			FROM {$wpdb->posts} p
+			JOIN {$wpdb->postmeta} s ON s.post_id = p.ID AND s.meta_key = '_cec_start'
+			JOIN {$wpdb->postmeta} e ON e.post_id = p.ID AND e.meta_key = '_cec_end'
+			LEFT JOIN {$wpdb->postmeta} r ON r.post_id = p.ID AND r.meta_key = '_cec_recurrence_parent_id'
+			WHERE p.post_type = 'cec_event' AND p.post_status NOT IN ('trash','auto-draft') AND e.meta_value <> '' AND e.meta_value < s.meta_value
+			ORDER BY ( r.meta_value IS NULL ) DESC, p.ID ASC"
+		); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		foreach ( $rows as $row ) {
+			$id = (int) $row->ID;
+			if ( ! $row->parent_id ) {
+				if ( substr( $row->end_raw, 0, 10 ) === substr( $row->start_raw, 0, 10 ) ) {
+					update_post_meta( $id, '_cec_end', CEC_Event_Helper::normalize_end( $row->start_raw, $row->end_raw ) );
+					CEC_Audit_Log::log( $id, 'event_end_fixed' );
+					$fixed[] = $id;
+				} else {
+					$left[] = $id;
+				}
+				continue;
+			}
+			$root_start = get_post_meta( (int) $row->parent_id, '_cec_start', true );
+			$root_end   = get_post_meta( (int) $row->parent_id, '_cec_end', true );
+			$duration   = ( $root_start && $root_end ) ? strtotime( $root_end ) - strtotime( $root_start ) : 0;
+			if ( $duration > 0 ) {
+				update_post_meta( $id, '_cec_end', date( 'Y-m-d\TH:i', strtotime( $row->start_raw ) + $duration ) );
+				CEC_Audit_Log::log( $id, 'event_end_fixed' );
+				$fixed[] = $id;
+			} else {
+				$left[] = $id;
+			}
+		}
+		return array( 'fixed' => $fixed, 'left' => $left );
 	}
 
 	/**

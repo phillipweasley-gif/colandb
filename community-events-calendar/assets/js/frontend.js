@@ -39,6 +39,38 @@
 	// Desktop always gets the icon menu instead, which needs no OS handoff.
 	var isTouchDevice = ( 'ontouchstart' in window ) || ( navigator.maxTouchPoints > 0 );
 
+	// 1.45.3: an end before the start, on every event form. Same date and
+	// an earlier time (7 PM to 12 AM) means past midnight, which the site
+	// saves as the next day, so say so; an earlier date is refused.
+	function checkEventEnd( $form ) {
+		var $start = $form.find( 'input[name="cec_start"]' );
+		var $end   = $form.find( 'input[name="cec_end"]' );
+		if ( ! $start.length || ! $end.length ) {
+			return true;
+		}
+		var start = $start.val(), end = $end.val(), $hint = $form.find( '.cec-end-hint' );
+		$end[ 0 ].setCustomValidity( '' );
+		$hint.remove();
+		if ( ! start || ! end || end >= start ) {
+			return true;
+		}
+		if ( end.slice( 0, 10 ) === start.slice( 0, 10 ) ) {
+			$end.after( $( '<span class="cec-field-hint cec-end-hint"></span>' ).text( 'Ends after midnight, on the next day.' ) );
+			return true;
+		}
+		$end[ 0 ].setCustomValidity( 'The end is on an earlier date than the start. Check the end date. (An event that runs past midnight can end on the same date: it\'s read as the next day.)' );
+		return false;
+	}
+	$( document ).on( 'input change', 'input[name="cec_start"], input[name="cec_end"]', function () {
+		checkEventEnd( $( this ).closest( 'form' ) );
+	} );
+	$( document ).on( 'submit', 'form', function ( e ) {
+		if ( ! checkEventEnd( $( this ) ) ) {
+			e.preventDefault();
+			$( this ).find( 'input[name="cec_end"]' )[ 0 ].reportValidity();
+		}
+	} );
+
 	// 1.45.0: "Copy for Facebook, FetLife or Telegram" on the event page.
 	$( document ).on( 'click', '.cec-post-copy-btn', function () {
 		var $btn = $( this );

@@ -1065,6 +1065,49 @@ class CEC_Event_Helper {
 		return implode( "\n", $lines );
 	}
 
+	/**
+	 * 1.45.3: an end that's before its start. Both are site-local
+	 * "Y-m-d\TH:i" strings, which sort as text.
+	 * - Same date, earlier time ("7:00 PM to 12:00 AM" on one date): the
+	 *   event runs past midnight, so the end is the next day.
+	 * - An earlier date (a typo such as 2006 for 2026): no end is kept,
+	 *   rather than an impossible one. The front-end forms refuse this
+	 *   before sending (frontend.js), so this is only a safety net.
+	 */
+	public static function normalize_end( $start, $end ) {
+		$start = (string) $start;
+		$end   = (string) $end;
+		if ( '' === $start || '' === $end || $end >= $start ) {
+			return $end;
+		}
+		if ( substr( $end, 0, 10 ) === substr( $start, 0, 10 ) ) {
+			$d = date_create( $end );
+			return $d ? $d->modify( '+1 day' )->format( 'Y-m-d\TH:i' ) : $end;
+		}
+		return '';
+	}
+
+	/**
+	 * 1.45.3: applies normalize_end() wherever an event's _cec_end is saved
+	 * (the five edit forms, imports, repeating dates), via the
+	 * add/update_post_metadata filters. Every form saves the start first.
+	 */
+	public static function filter_end_meta( $check, $object_id, $meta_key, $meta_value ) {
+		static $busy = false;
+		if ( '_cec_end' !== $meta_key || $busy || 'cec_event' !== get_post_type( $object_id ) ) {
+			return $check;
+		}
+		$value = is_string( $meta_value ) ? $meta_value : '';
+		$fixed = self::normalize_end( get_post_meta( $object_id, '_cec_start', true ), $value );
+		if ( $fixed === $value ) {
+			return $check;
+		}
+		$busy = true;
+		update_post_meta( $object_id, '_cec_end', $fixed );
+		$busy = false;
+		return true;
+	}
+
 	public static function share_links( $data ) {
 		$url   = $data['permalink'];
 		$title = $data['title_plain'];
