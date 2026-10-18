@@ -1,0 +1,76 @@
+/* Community Events Calendar 1.46.0: [cec_meeting_notes] and [cec_meeting_admin].
+   Form fields, buttons and notices come from frontend.css (.cec-field,
+   .cec-btn, .cec-notice), as on Calendar Admin. Visual properties of links
+   and buttons use !important because the theme styles them globally. */
+
+.cec-mt-wrap {
+	--mt-pink: #FF50D7;
+	--mt-lime: #E1F577;
+	--mt-ink: #100F0F;
+	--mt-panel: #1A1A1A;
+	--mt-line: #34313b;
+	--mt-text: #FFFFFF;
+	--mt-muted: #CCCCCC;
+	max-width: 60rem;
+	margin: 0 auto 4rem;
+	color: var(--mt-text);
+	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	box-sizing: border-box;
+}
+.cec-mt-wrap * { box-sizing: border-box; }
+.cec-mt-muted { color: var(--mt-muted); font-size: 0.9rem; }
+.cec-mt-empty { text-align: center; color: var(--mt-muted); }
+.cec-mt-wrap .screen-reader-text { border: 0; clip: rect(1px, 1px, 1px, 1px); clip-path: inset(50%); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute !important; width: 1px; }
+.cec-mt-wrap a { color: var(--mt-lime) !important; text-decoration: underline !important; text-underline-offset: 2px; }
+.cec-mt-wrap a.cec-btn { color: var(--mt-ink) !important; text-decoration: none !important; }
+
+/* Public list */
+.cec-mt-year { margin: 2.5rem 0 1rem; font-family: 'Montserrat', 'Arial Black', sans-serif; font-weight: 800; color: var(--mt-pink); }
+.cec-mt-item { background: var(--mt-panel); border: 1px solid var(--mt-line); border-left: 4px solid var(--mt-pink); margin: 0 0 0.75rem; }
+.cec-mt-item > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; padding: 1rem 1.25rem; cursor: pointer; list-style: none; }
+.cec-mt-item > summary::-webkit-details-marker { display: none; }
+.cec-mt-item > summary::before { content: '+'; font-weight: 800; color: var(--mt-pink); width: 1rem; }
+.cec-mt-item[open] > summary::before { content: '−'; }
+.cec-mt-item > summary:focus-visible { outline: 3px solid var(--mt-lime); outline-offset: -3px; }
+.cec-mt-date { font-weight: 700; color: var(--mt-lime); }
+.cec-mt-title { font-weight: 700; color: var(--mt-text); }
+.cec-mt-type { margin-left: auto; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mt-muted); }
+.cec-mt-body { padding: 0 1.25rem 1.25rem 2.25rem; color: var(--mt-muted); line-height: 1.6; }
+.cec-mt-body h3 { margin: 1.25rem 0 0.5rem; font-family: 'Montserrat', 'Arial Black', sans-serif; font-size: 0.85rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mt-pink); }
+.cec-mt-notes > :first-child { margin-top: 0; }
+.cec-mt-motions { padding-left: 1.25rem; }
+.cec-mt-motions li { margin-bottom: 0.75rem; }
+.cec-mt-motion-text { margin: 0; color: var(--mt-text); }
+.cec-mt-motion-meta { margin: 0.2rem 0 0; font-size: 0.9rem; }
+.cec-mt-result { color: var(--mt-lime); }
+.cec-mt-result.is-failed, .cec-mt-result.is-withdrawn { color: #ff8fa3; }
+.cec-mt-result.is-tabled { color: var(--mt-muted); }
+.cec-mt-files { padding-left: 1.25rem; }
+
+/* Portal */
+.cec-mt-portal-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.cec-mt-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+.cec-mt-table th, .cec-mt-table td { padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--mt-line); text-align: left; vertical-align: top; }
+.cec-mt-status { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; }
+.cec-mt-status.is-approved { background: var(--mt-lime); color: var(--mt-ink); }
+.cec-mt-status.is-draft { background: var(--mt-line); color: var(--mt-text); }
+.cec-mt-actions { white-space: nowrap; }
+.cec-mt-actions form { display: inline; margin-left: 0.75rem; }
+.cec-mt-link-btn { background: none !important; border: 0 !important; padding: 0 !important; color: #ff8fa3 !important; text-decoration: underline !important; cursor: pointer; font: inherit !important; }
+.cec-mt-form .cec-field input[type="text"], .cec-mt-form .cec-field input[type="date"], .cec-mt-form .cec-field input[type="number"], .cec-mt-form .cec-field select, .cec-mt-form .cec-field textarea { width: 100%; }
+.cec-mt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0 1rem; }
+.cec-mt-grid-6 { grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); }
+.cec-mt-fieldset { margin: 1.5rem 0; padding: 1rem 1.25rem; border: 1px solid var(--mt-line); }
+.cec-mt-fieldset legend { padding: 0 0.4rem; font-weight: 800; color: var(--mt-pink); }
+.cec-mt-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.4rem 1rem; margin-bottom: 1rem; }
+.cec-mt-motion { padding: 0.75rem 0; border-top: 1px solid var(--mt-line); }
+.cec-mt-motion:first-of-type { border-top: 0; }
+.cec-mt-radio { display: block; margin: 0.3rem 0; }
+.cec-mt-form .wp-editor-wrap { background: #fff; color: #111; }
+@media (max-width: 600px) {
+	.cec-mt-type { margin-left: 0; width: 100%; }
+	.cec-mt-body { padding-left: 1.25rem; }
+	.cec-mt-table thead { display: none; }
+	.cec-mt-table td { display: block; border: 0; padding: 0.25rem 0; }
+	.cec-mt-table tr { display: block; padding: 0.75rem 0; border-bottom: 1px solid var(--mt-line); }
+}

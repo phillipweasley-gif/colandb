@@ -6,6 +6,33 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.46.0
+
+**Public fundraising tracker and meeting notes** (owner, 2026-10-18: "a fundraising tracker … visible to the public and can be listed on a page under the About COL&B"; "another page for the secretary to submit meeting notes in via an admin portal kind of like how the calendar is managed". Chose: the site team enters donations, several fundraisers at once, totals only (no donor names), a donate link per fundraiser; meeting notes public once approved, a Secretary role, with attendance, motions, files and Draft/Approved).
+
+**Fundraisers** (`includes/class-cec-fundraisers.php`, `assets/css/fundraisers.css`)
+- **Events → Fundraisers** in wp-admin (site administrators): title, description, photo, goal, optional start and end dates, optional organization or titleholder it's for, a donate link with its button text, and "other ways to give".
+- **Donations (private)** box: each donation's amount, date, how it was given (online, cash, Venmo, Cash App, PayPal, check, other) and a private note; three empty rows each time; Remove boxes. Amounts like "$1,250.50" are accepted; anything that isn't an amount, and zero, is skipped. The total and count are cached (`_cec_fr_raised`, `_cec_fr_count`).
+- **Public, totals only:** `[cec_fundraisers]` shows current and upcoming fundraisers (ending soonest first), then **Completed fundraisers**. Each card: photo, title, "For <group>" (linked), "Through …" / "Starts …" / "Ended …", a progress bar (`role="progressbar"`, with "$450 raised of $1,000 goal" for screen readers), "$450 raised of $1,000 goal · 45% · 12 donations", "Goal reached. Thank you!" at 100%+, the description, the donate button (new tab) and other ways to give. Completed ones have no button. Donation dates, methods, notes and individual amounts are never output. `show="current"` / `show="ended"`; `[cec_fundraiser id="123"]` for one card. Drafts aren't shown.
+- A published **Fundraising** page with `[cec_fundraisers]` is created on upgrade and linked under Events → Settings, like the plugin's other pages. Saving or trashing a fundraiser re-saves the pages showing it so the CDN serves the new totals.
+
+**Meeting notes** (`includes/class-cec-meetings.php`, `assets/css/meetings.css`)
+- **Secretary role** (`cec_secretary`, capability `cec_manage_meetings`; administrators have it too). Assign it under Users. A Secretary is sent from wp-admin to the portal, and gets **Meeting Notes Admin** in the signed-in menu (via Community Member Planning's `cmp_account_bar_items` filter, so no change to that plugin).
+- **Portal** `[cec_meeting_admin]` on the new **Meeting Notes Admin** page: a list (date, meeting, Draft/Approved, Edit, Delete with a confirm), and the form: meeting date (required), type (General / Board / Special / Committee / Other), title (empty = "General Meeting, Oct 14, 2026"), the notes in a simple editor, organizations present (organizations, not titleholders) and others present, motions (text, moved by, seconded by, result Passed/Failed/Tabled/Withdrawn, votes for/against/abstaining; two empty each time; clear the text to remove), files (PDF, Word, OpenDocument, text, JPEG, PNG, up to 10 MB each; others are refused and named; Remove deletes the file), and Draft / Approved. Signed out it asks to sign in; others are told only the Secretary and administrators can use it. Never cached.
+- **Public** `[cec_meeting_notes]` on the new **Meeting Notes** page: approved notes only, newest first, grouped by year, each collapsible (the newest open) with Present, Notes, Motions ("Moved by …, seconded by …. Passed (6 for, 0 against, 1 abstaining)") and Files. Approving, editing or deleting re-saves the page for the CDN. Deleting moves notes to the trash (restorable).
+- Attached files live in the media library: their links work as soon as they're uploaded, before the notes are approved, though nothing links to a draft's files.
+
+**After updating:** add **Fundraising** and **Meeting Notes** under **About COL&B** in the site menu; give the Secretary the Secretary role. Meeting Notes Admin, like Calendar Admin, needn't be in the menu.
+
+- **Verification** (local WordPress test kit, macOS, PHP 8.4):
+  - New `tests/fundraisers-e2e.sh` 21/21: the page; adding a fundraiser and donations through the real wp-admin edit screen (amount parsing, skipped rows, date order); the public card (numbers, accessible bar, button, other ways to give); **no private details on the page**; removing a donation; over the goal; upcoming / completed / drafts / order; the single card and `show`; a member can't edit; no warnings.
+  - New `tests/meetings-e2e.sh` 27/27: the pages; signed out / member / Secretary access; the menu link; wp-admin sending the Secretary to the portal; the form; a draft with an empty title, a stripped `<script>`, organizations (titleholder ignored), motions (empty dropped), a PDF attached and an .exe refused; drafts not public; editing; approving; the public page (years, order, open newest, type, present, formatted notes, motions with votes, the PDF); removing a file; an invalid date; a member can't save even with a nonce; deleting; the portal never cached; no warnings.
+  - Screenshots on the test site (desktop and phone) of the Fundraising page, the Meeting Notes page, the portal list and the form.
+  - All other suites still pass: calendar 73, import 30, org 147, series 13, ends 18, recurrence 5. `php -l` on every changed file.
+  - Mac setup as before (router script, port 8898, `timeout`/`sed`/`wc` stand-ins; nothing committed).
+
+---
+
 ## 1.45.3
 
 **Events that end before they start** (owner, 2026-10-15: after 1.45.2 put the "Crate Training" series back on its own Tuesdays, its later dates read "Tue, Dec 8, 2026 7:00 pm – Tue, Nov 10, 2026 12:00 am"; "House of Pan Fall Zoo Adventure" ends in 2006. Chose: past-midnight ends become the next day, earlier dates are refused, plus an in-place repair).

@@ -49,6 +49,7 @@ require_once CEC_DIR . 'includes/class-cec-org-submissions.php';
 require_once CEC_DIR . 'includes/class-cec-org-editor.php';
 require_once CEC_DIR . 'includes/class-cec-ics-import.php';
 require_once CEC_DIR . 'includes/class-cec-fundraisers.php';
+require_once CEC_DIR . 'includes/class-cec-meetings.php';
 require_once CEC_DIR . 'includes/class-cec-ajax.php';
 require_once CEC_DIR . 'includes/class-cec-elementor.php';
 require_once CEC_DIR . 'includes/class-cec-migrations.php';
@@ -169,6 +170,7 @@ final class CEC_Plugin {
 		CEC_Next_Event::init();
 		CEC_Orgs::init();
 		CEC_Fundraisers::init();
+		CEC_Meetings::init();
 		CEC_Org_Submissions::init();
 		CEC_Org_Editor::init();
 		add_action( 'updated_post_meta', array( 'CEC_RSVP', 'on_start_meta_updated' ), 10, 4 );

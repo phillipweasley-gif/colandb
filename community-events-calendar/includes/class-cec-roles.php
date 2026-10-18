@@ -66,6 +66,9 @@ class CEC_Roles {
 	private static function front_end_home_for_current_user() {
 		if ( current_user_can( self::CAP ) ) {
 			$url = CEC_Admin_Settings::get( 'dashboard_page_url' );
+		} elseif ( current_user_can( 'cec_manage_meetings' ) ) {
+			// 1.46.0: the Secretary's home is the meeting notes portal.
+			$url = CEC_Admin_Settings::get( 'meeting_admin_page_url' );
 		} else {
 			$url = CEC_Admin_Settings::get( 'submit_page_url' );
 		}

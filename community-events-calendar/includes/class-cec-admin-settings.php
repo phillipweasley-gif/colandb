@@ -27,6 +27,8 @@ class CEC_Admin_Settings {
 			'manage_submission_page_url' => '',
 			'subscribe_page_url'         => '',
 			'fundraising_page_url'       => '',
+			'meeting_notes_page_url'     => '',
+			'meeting_admin_page_url'     => '',
 			'volunteer_interest_areas'   => 'Event Support, Administrative, Outreach, Fundraising, Community Education',
 			'volunteer_notify_email'     => '',
 		);
@@ -133,6 +135,8 @@ class CEC_Admin_Settings {
 		$out['manage_submission_page_url'] = isset( $input['manage_submission_page_url'] ) ? esc_url_raw( $input['manage_submission_page_url'] ) : '';
 		$out['subscribe_page_url']         = isset( $input['subscribe_page_url'] ) ? esc_url_raw( $input['subscribe_page_url'] ) : '';
 		$out['fundraising_page_url']       = isset( $input['fundraising_page_url'] ) ? esc_url_raw( $input['fundraising_page_url'] ) : '';
+		$out['meeting_notes_page_url']     = isset( $input['meeting_notes_page_url'] ) ? esc_url_raw( $input['meeting_notes_page_url'] ) : '';
+		$out['meeting_admin_page_url']     = isset( $input['meeting_admin_page_url'] ) ? esc_url_raw( $input['meeting_admin_page_url'] ) : '';
 		$out['volunteer_interest_areas']   = isset( $input['volunteer_interest_areas'] ) ? sanitize_text_field( $input['volunteer_interest_areas'] ) : $out['volunteer_interest_areas'];
 		$out['volunteer_notify_email']     = isset( $input['volunteer_notify_email'] ) ? sanitize_email( $input['volunteer_notify_email'] ) : '';
 		return $out;
@@ -296,6 +300,18 @@ class CEC_Admin_Settings {
 							<p class="description"><?php esc_html_e( 'The public page with the [cec_fundraisers] tracker. Add or edit fundraisers under Events > Fundraisers.', 'cec' ); ?></p>
 						</td>
 					</tr>
+					<tr>
+						<th><label for="cec_meeting_notes_page_url"><?php esc_html_e( 'Meeting Notes Page URL', 'cec' ); ?></label></th>
+						<td><input type="url" class="regular-text" name="<?php echo esc_attr( self::OPTION ); ?>[meeting_notes_page_url]" id="cec_meeting_notes_page_url" value="<?php echo esc_attr( $opts['meeting_notes_page_url'] ); ?>" />
+							<p class="description"><?php esc_html_e( 'The public page with approved meeting notes ([cec_meeting_notes]).', 'cec' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th><label for="cec_meeting_admin_page_url"><?php esc_html_e( 'Meeting Notes Admin Page URL', 'cec' ); ?></label></th>
+						<td><input type="url" class="regular-text" name="<?php echo esc_attr( self::OPTION ); ?>[meeting_admin_page_url]" id="cec_meeting_admin_page_url" value="<?php echo esc_attr( $opts['meeting_admin_page_url'] ); ?>" />
+							<p class="description"><?php esc_html_e( 'The Secretary\'s portal ([cec_meeting_admin]) for writing and approving meeting notes. Give someone the Secretary role (Users > their profile > Role) to let them use it.', 'cec' ); ?></p>
+						</td>
+					</tr>
 				</table>
 				<p class="description"><?php esc_html_e( 'RSS is always available with no setup: the whole calendar feeds at [your site]/events/feed/, and each organization has its own feed from its archive page (shown as a "Subscribe (RSS)" link).', 'cec' ); ?></p>
 
@@ -357,6 +373,8 @@ class CEC_Admin_Settings {
 				<tr><td><code>[cec_login]</code></td><td><?php esc_html_e( 'Styled login form', 'cec' ); ?></td></tr>
 				<tr><td><code>[cec_register]</code></td><td><?php esc_html_e( 'Styled account registration form (name, email, password)', 'cec' ); ?></td></tr>
 				<tr><td><code>[cec_manage_submission]</code></td><td><?php esc_html_e( 'Lets a guest (no account) request an emailed edit link, or use one to edit/postpone/cancel/withdraw their event', 'cec' ); ?></td></tr>
+				<tr><td><code>[cec_meeting_notes]</code></td><td><?php esc_html_e( 'Public meeting notes: approved notes, newest first, grouped by year, with attendance, motions and files.', 'cec' ); ?></td></tr>
+				<tr><td><code>[cec_meeting_admin]</code></td><td><?php esc_html_e( 'The Secretary\'s portal for writing, approving and deleting meeting notes (Secretaries and administrators only).', 'cec' ); ?></td></tr>
 				<tr><td><code>[cec_fundraisers]</code></td><td><?php esc_html_e( 'Public fundraising tracker: current fundraisers with their progress and donate buttons, then completed ones. show="current" or show="ended" for one part; [cec_fundraiser id="123"] for a single card.', 'cec' ); ?></td></tr>
 				<tr><td><code>[cec_subscribe]</code></td><td><?php esc_html_e( 'Email subscription form — all events and/or specific organizations or titleholders', 'cec' ); ?></td></tr>
 				<tr><td><code>[cec_volunteer_form]</code></td><td><?php esc_html_e( 'Volunteer inquiry form — reviewed privately under Events > Volunteer Inquiries', 'cec' ); ?></td></tr>
@@ -379,6 +397,8 @@ class CEC_Admin_Settings {
 			'manage_submission_page_url'  => array( 'title' => __( 'Manage My Submission', 'cec' ), 'shortcode' => '[cec_manage_submission]' ),
 			'subscribe_page_url'          => array( 'title' => __( 'Subscribe to Events', 'cec' ), 'shortcode' => '[cec_subscribe]' ),
 			'fundraising_page_url'        => array( 'title' => __( 'Fundraising', 'cec' ), 'shortcode' => '[cec_fundraisers]' ),
+			'meeting_notes_page_url'      => array( 'title' => __( 'Meeting Notes', 'cec' ), 'shortcode' => '[cec_meeting_notes]' ),
+			'meeting_admin_page_url'      => array( 'title' => __( 'Meeting Notes Admin', 'cec' ), 'shortcode' => '[cec_meeting_admin]' ),
 		);
 	}
 
