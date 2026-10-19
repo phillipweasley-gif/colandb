@@ -110,6 +110,8 @@ The separate member-planning plugin (Phase 2/3) reads events only through these,
 | `[cec_upcoming count="8"]` | `CEC_Shortcodes::upcoming` | Horizontal scroll widget; default count from Settings. Not changed by Phase 1a–1d beyond picking up the new admission-badge labels automatically. |
 | `[cec_submit_event]` | `CEC_Submission_Form` | Main front-end submission form; login/guest gating per Settings. One of the five duplicated forms — see §2. |
 | `[cec_admin_dashboard]` | `CEC_Frontend_Dashboard` | Requires `cec_manage_events` capability. Approve/reject/edit/delete events, manage partner orgs & venues, manage series dates, import `.ics` or `.csv` (1.45.0: optionally for an organizer: a group, and a member or email who manages them) calendar files. As of 1.25.0, an event's edit screen here also shows the Phase 1d editor preview (see Appendix A, item 10). |
+| `[cec_fundraisers]` / `[cec_fundraiser id]` | `CEC_Fundraisers` | 1.46.0. Public fundraising tracker (totals only). Fundraisers (`cec_fundraiser`, non-public) and their private donations are edited in wp-admin under Events → Fundraisers. |
+| `[cec_meeting_notes]` / `[cec_meeting_admin]` | `CEC_Meetings` | 1.46.0. Approved meeting notes (`cec_meeting`, non-public) on a public page; the Secretary's front-end portal (role `cec_secretary`, capability `cec_manage_meetings`). |
 | `[cec_my_events]` | `CEC_My_Events` | A logged-in submitter's own events: edit (→ back to `pending`), postpone/cancel, withdraw, manage series dates. |
 | `[cec_login]` / `[cec_register]` | `CEC_Auth` | Styled equivalents of wp-login.php; register has an email/password path plus a honeypot field. |
 | `[cec_manage_submission]` | `CEC_Guest_Edit` | Guest (no-account) editing via emailed bearer-token link. See §5. |

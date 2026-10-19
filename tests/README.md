@@ -26,6 +26,8 @@ bash tests/import-e2e.sh             # importing .ics/.csv events for an organiz
 bash tests/recurrence-e2e.sh         # recurring series saved from wp-admin: approving keeps each date, a schedule change regenerates once, no per-date emails: 5 checks
 bash tests/series-e2e.sh             # a series saved in wp-admin keeps its dates (1.45.1), and the 1.45.2 in-place repair: 13 checks
 bash tests/ends-e2e.sh               # event ends: past midnight is the next day, earlier dates refused, the 1.45.3 repair: 18 checks
+bash tests/fundraisers-e2e.sh        # public fundraising tracker: wp-admin entry, totals-only cards, private donations: 21 checks
+bash tests/meetings-e2e.sh           # meeting notes: Secretary portal, drafts/approval, motions, files, public page: 27 checks
 ```
 
 | File | What it does |

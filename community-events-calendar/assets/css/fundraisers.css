@@ -1,0 +1,49 @@
+/* Community Events Calendar 1.46.0: [cec_fundraisers] / [cec_fundraiser].
+   Same look as the organization cards (orgs.css). Visual properties of links
+   and buttons use !important because the theme styles them globally. */
+
+.cec-fr-wrap {
+	--fr-pink: #FF50D7;
+	--fr-lime: #E1F577;
+	--fr-ink: #100F0F;
+	--fr-panel: #1A1A1A;
+	--fr-track: #2E2B33;
+	--fr-text: #FFFFFF;
+	--fr-muted: #CCCCCC;
+	max-width: 75rem;
+	margin: 0 auto 4rem;
+	color: var(--fr-text);
+	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	box-sizing: border-box;
+}
+.cec-fr-wrap * { box-sizing: border-box; }
+.cec-fr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); gap: 1.5rem; }
+.cec-fr-card { display: flex; flex-direction: column; background: var(--fr-panel); border: 1px solid var(--fr-pink); overflow: hidden; }
+.cec-fr-media { aspect-ratio: 16 / 9; overflow: hidden; background: #000; }
+.cec-fr-media img, .cec-fr-photo { display: block; width: 100% !important; height: 100% !important; object-fit: cover; }
+.cec-fr-body { display: flex; flex-direction: column; gap: 0.75rem; padding: 1.5rem; flex: 1; }
+.cec-fr-title { margin: 0; font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 800 !important; font-size: 1.3rem; text-transform: uppercase; color: var(--fr-text) !important; overflow-wrap: anywhere; }
+.cec-fr-meta { margin: 0; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fr-lime); }
+.cec-fr-meta a { color: var(--fr-lime) !important; text-decoration: underline !important; text-underline-offset: 2px; }
+.cec-fr-bar { height: 14px; background: var(--fr-track); border-radius: 999px; overflow: hidden; }
+.cec-fr-bar > span { display: block; height: 100%; min-width: 4px; background: linear-gradient(90deg, var(--fr-pink), var(--fr-lime)); border-radius: 999px; }
+.cec-fr-numbers { margin: 0; color: var(--fr-muted); font-size: 0.95rem; }
+.cec-fr-numbers strong { color: var(--fr-text); font-size: 1.35rem; font-family: 'Montserrat', 'Arial Black', sans-serif; font-weight: 800; }
+.cec-fr-reached { margin: 0; font-weight: 700; color: var(--fr-lime); }
+.cec-fr-desc { color: var(--fr-muted); font-size: 0.95rem; line-height: 1.55; }
+.cec-fr-desc > :first-child { margin-top: 0; }
+.cec-fr-desc > :last-child { margin-bottom: 0; }
+.cec-fr-give { margin: auto 0 0; padding-top: 0.25rem; }
+a.cec-fr-btn, .cec-fr-btn {
+	display: inline-block !important; padding: 0.8rem 1.6rem !important; background: var(--fr-pink) !important; color: var(--fr-ink) !important;
+	font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 900 !important; font-size: 0.9rem !important;
+	letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none !important; border: 0 !important; border-radius: 0 !important;
+}
+a.cec-fr-btn:hover, a.cec-fr-btn:focus-visible { background: var(--fr-lime) !important; }
+a.cec-fr-btn:focus-visible { outline: 3px solid var(--fr-lime); outline-offset: 2px; }
+.cec-fr-other { margin: 0; font-size: 0.9rem; color: var(--fr-muted); }
+.cec-fr-heading { margin: 3rem 0 1.25rem; font-family: 'Montserrat', 'Arial Black', sans-serif; font-weight: 800; text-transform: uppercase; color: var(--fr-pink); }
+.cec-fr-list.is-ended .cec-fr-card { border-color: #444; }
+.cec-fr-list.is-ended .cec-fr-bar > span { background: #8a8794; }
+.cec-fr-empty { text-align: center; color: var(--fr-muted); }
+.cec-fr-wrap .screen-reader-text { border: 0; clip: rect(1px, 1px, 1px, 1px); clip-path: inset(50%); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute !important; width: 1px; }
