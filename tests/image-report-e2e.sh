@@ -90,6 +90,7 @@ ok "admin marks it Removed with a note; reporter emailed with the note" $([ "$(q
 
 echo "== Remove a private photo by link"
 JPG=$T/p.jpg; php -r '$i=imagecreatetruecolor(50,50); imagejpeg($i,$argv[1]);' $JPG
+ev "global \$wpdb; \$wpdb->query('DELETE FROM '.CMP_Install::table('task_entries').' WHERE task_id = 0');" >/dev/null # an earlier run's row would block the insert (unique task + day)
 SETUP=$(ev "global \$wpdb; \$j=file_get_contents('$JPG'); \$u=get_user_by('login','irmember')->ID;
 \$wpdb->insert(CMP_Install::table('locks'),array('wearer_id'=>\$u,'keyholder_id'=>0,'status'=>'locked','option_key'=>'a','option_name'=>'x','release_policy'=>'none','started_at'=>gmdate('Y-m-d H:i:s'),'created_at'=>gmdate('Y-m-d H:i:s'),'updated_at'=>gmdate('Y-m-d H:i:s'))); \$l=\$wpdb->insert_id;
 \$wpdb->insert(CMP_Install::table('lock_events'),array('lock_id'=>\$l,'actor_id'=>\$u,'type'=>'verification','photo'=>CMP_Photo_Vault::seal(\$j,\$l,\$u),'photo_sha'=>hash('sha256',\$j),'created_at'=>gmdate('Y-m-d H:i:s'))); \$e=\$wpdb->insert_id;
@@ -116,7 +117,7 @@ ev 'CMP_Retention::run();' >/dev/null
 ok "reports older than 3 years are cleared; newer kept" $([ "$(q "SELECT COUNT(*) FROM $R_T WHERE id=$RID")" = 0 ] && [ "$(q "SELECT COUNT(*) FROM $R_T")" -ge 1 ] && echo 1 || echo 0)
 
 pkill -f "php -S 127.0.0.1:8899" 2>/dev/null
-ev "global \$wpdb; \$wpdb->query(\"DELETE FROM $R_T\");" >/dev/null
+ev "global \$wpdb; \$wpdb->query(\"DELETE FROM $R_T\"); \$wpdb->query('DELETE FROM '.CMP_Install::table('task_entries').' WHERE task_id = 0');" >/dev/null
 $W post delete $PID --force >/dev/null 2>&1; $W user delete irmember --yes >/dev/null 2>&1
 echo; echo "debug.log (plugin-related):"; grep -i 'cmp\|member-planning' wp-content/debug.log 2>/dev/null | grep -v 'Upgrad\|upgraded' | tail -5
 echo "RESULT: $PASS passed, $FAIL failed"

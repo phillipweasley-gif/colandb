@@ -4,6 +4,55 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.33.0
+
+**Optional end-to-end encryption for chastity photos** (owner, 2026-10-21: encryption so nobody but the wearer and keyholder can see the photos; chose both server-side and end-to-end, then "start the end-to-end encryption … until completed"). Design: `docs/privacy-security-plan.md` §7.
+
+- **What it does.** A member can turn on **End-to-end photos** on the Chastity tab.
+  - Their verification photos are then encrypted in their own browser, for themselves and their keyholder, before being sent.
+  - The site stores and serves data it can't decrypt. Someone holding the database, `wp-config.php` and the backups still can't see those photos.
+  - Server-side encryption (0.31.0) still applies on top.
+- **Keys** (`CMP_E2E`, new; `assets/js/e2e-photos.js`, new):
+  - Each member's browser makes an ECDH P-256 key pair.
+  - The private key is wrapped with AES-256-GCM under a key from their **photo passphrase** (PBKDF2-SHA-256, 600,000 rounds, random salt), and only that box is stored (`cmp_e2e_box`), with the public key (`cmp_e2e_pub`).
+  - Passphrase fields have no `name`, so a passphrase is never posted, even without JavaScript.
+  - Unlocking keeps the key in that browser's IndexedDB as a non-extractable `CryptoKey`. **Forget on this device** clears it.
+  - **Change photo passphrase** re-boxes the same key.
+  - **Forgot your passphrase?** removes the key; there's no recovery, and the UI says so.
+- **Photos:**
+  - the browser re-saves the photo through a canvas (drops EXIF/GPS, max 1600 px, JPEG 0.82);
+  - it encrypts it with a random AES-256-GCM key (with associated data `cmp-e2e-v1`);
+  - it wraps that key for the wearer and, if they've set up a key, the member keyholder (ephemeral ECDH + HKDF-SHA-256 + AES-GCM).
+  - Envelope: `CMPE2E1` + header length + JSON header + ciphertext.
+- **Server checks:**
+  - `CMP_E2E::validate()` accepts only a well-formed envelope: sizes match P-256 and AES-GCM, it includes the wearer, recipients are only the lock's wearer and keyholder, and it's no bigger than 8 MB.
+  - It's stored with `photo_e2e = 1` (`CMP_DB_VERSION` 20) and sealed by the vault as well.
+  - While end-to-end is on, an unencrypted or malformed upload is refused ("Nothing was sent…"), so a broken script never silently downgrades. The optional photo when starting or accepting a lock is hidden (send it as a verification).
+- **Seeing photos:**
+  - Authorised viewers (wearer, current keyholder) get the envelope as `application/octet-stream`. Their browser decrypts it and shows it from a `blob:` URL, in Your photos and the keyholder's review.
+  - Download decrypts in the browser.
+  - A keyholder without a key sees "wasn't encrypted for you". The wearer is warned before sending if the keyholder hasn't set up a key.
+- **Share links** for end-to-end photos:
+  - The wearer's browser puts the photo's key in the link after `#k=`; browsers never send that part to a server.
+  - The share page allows one inline script (CSP nonce, `img-src blob: data:`), which decrypts after **View photo** and then removes the key from the address bar.
+  - Without the `#k=` part, the page explains and doesn't offer View, so the link isn't used up.
+- **Privacy:** export says whether a key is set up; erase removes it.
+- **Verification** (local WordPress test kit, PHP 8.3, plus real Chromium through Playwright):
+  - `tests/e2e-photos-e2e.sh` 33/33 (new). It covers:
+    - setup with in-page validation, passphrase fields never posted, and the box not containing the passphrase;
+    - the keyholder's setup, and the verify form encrypting for both;
+    - the stored envelope (also sealed; no JPEG or GPS bytes; exactly two recipients);
+    - the wearer and keyholder seeing it decrypted; 1600 px; Download giving a clean JPEG;
+    - Forget on this device; a wrong passphrase refused and the right one working;
+    - another member getting 404; authorised viewers getting only the envelope;
+    - unencrypted and malformed uploads refused;
+    - share links: the key in the fragment, never stored; View decrypting in a fresh browser and removing the key from the URL; a link without its key explaining instead of offering View; a wrong key failing; the CSP nonce;
+    - passphrase change (old fails on a new device, new works); turning it off.
+  - Found and fixed while testing: the upload posted to `form.action`, which a hidden field named "action" hides; it now uses the form's `action` attribute.
+  - Regression suites: `tests/chastity-e2e.sh` 176/176, `tests/image-report-e2e.sh` 24/24 (its test now clears a homework row an earlier run could leave behind), `tests/member-admin-e2e.sh` 43/43, `tests/account-e2e.sh` 69/69. `php -l` on every changed file; no plugin warnings in `debug.log`.
+
+---
+
 ## 0.32.1
 
 **The image report page is never cached.** I found this on colandb.com straight after 0.32.0 went live: the host's CDN (Elementor Hosting) cached `/report-an-image/` for up to 7 days (`s-maxage=604800`, `ec-cdn-status: hit`).

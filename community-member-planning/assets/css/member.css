@@ -805,3 +805,11 @@
 .cmp-member-area .cmp-photo-consent { font-size: 14px; line-height: 1.45; }
 .cmp-member-area .cmp-photo-consent label { display: inline; }
 .cmp-member-area .cmp-cl-photo-acts { margin: 0; font-size: 14px; }
+
+/* 0.33.0: end-to-end photos. */
+.cmp-member-area .cmp-e2e > details > summary { cursor: pointer; }
+.cmp-member-area .cmp-e2e [data-cmp-e2e-status]:empty, .cmp-member-area [data-cmp-e2e-msg]:empty { display: none; }
+.cmp-member-area [data-cmp-e2e-msg].is-error, .cmp-member-area [data-cmp-e2e-status].is-error { color: #FF50D7; }
+.cmp-member-area .cmp-e2e.is-unlocked [data-cmp-e2e-unlock] .cmp-field, .cmp-member-area .cmp-e2e.is-unlocked [data-cmp-e2e-unlock] button[type="submit"] { display: none; }
+.cmp-member-area .cmp-e2e-photo img { max-width: 100%; max-height: 320px; border-radius: 8px; display: block; }
+.cmp-member-area .cmp-e2e-badge { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #E1F577; color: #100F0F; }

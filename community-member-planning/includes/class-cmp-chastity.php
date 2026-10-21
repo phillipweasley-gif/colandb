@@ -62,6 +62,9 @@ class CMP_Chastity {
 	const CODE_CHARS  = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 	const PURGED      = 'purged';
 	const DELETED     = 'deleted';
+
+	/** 0.33.0: the photo just posted is an end-to-end envelope. */
+	private static $posted_e2e = false;
 	const PHOTO_DAYS  = 90;
 
 	public static function init() {
@@ -150,6 +153,12 @@ class CMP_Chastity {
 			'cl_kh_set'   => array( 'success', __( 'Your keyholder now holds this lock. They\'ve been told.', 'cmp' ) ),
 			'cl_verified_day' => array( 'error', __( 'That day already counts as verified, or has a photo waiting for you to review.', 'cmp' ) ),
 			'cl_shared'   => array( 'success', __( 'Link made. Copy it below and send it to the person you want to show. Anyone with the link can see the photo until it stops working.', 'cmp' ) ),
+			'cl_e2e_ready' => CMP_E2E::notices()['cl_e2e_ready'],
+			'cl_e2e_rewrapped' => CMP_E2E::notices()['cl_e2e_rewrapped'],
+			'cl_e2e_reset' => CMP_E2E::notices()['cl_e2e_reset'],
+			'cl_e2e_bad'  => CMP_E2E::notices()['cl_e2e_bad'],
+			'cl_e2e_needed' => CMP_E2E::notices()['cl_e2e_needed'],
+			'cl_e2e_lockphoto' => CMP_E2E::notices()['cl_e2e_lockphoto'],
 			'cl_consent'  => array( 'error', __( 'Nothing was saved. To send a photo, tick the box to agree to how it\'s kept.', 'cmp' ) ),
 			'cl_photo_deleted' => array( 'success', __( 'Photo deleted. Any links to it have stopped working.', 'cmp' ) ),
 			'cl_unshared' => array( 'success', __( 'Link turned off. It no longer shows the photo.', 'cmp' ) ),
@@ -212,7 +221,7 @@ class CMP_Chastity {
 
 	public static function events( $lock_id, $limit = 30 ) {
 		global $wpdb;
-		return $wpdb->get_results( $wpdb->prepare( 'SELECT id, lock_id, actor_id, type, minutes, note, photo_sha, code, review, created_at FROM ' . self::t( 'lock_events' ) . ' WHERE lock_id = %d ORDER BY id DESC LIMIT %d', $lock_id, $limit ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return $wpdb->get_results( $wpdb->prepare( 'SELECT id, lock_id, actor_id, type, minutes, note, photo_sha, photo_e2e, code, review, created_at FROM ' . self::t( 'lock_events' ) . ' WHERE lock_id = %d ORDER BY id DESC LIMIT %d', $lock_id, $limit ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
 	public static function event( $id ) {
@@ -225,6 +234,7 @@ class CMP_Chastity {
 		if ( isset( $extra['photo'] ) && is_string( $extra['photo'] ) && '' !== $extra['photo'] ) {
 			$lock               = self::lock( $lock_id );
 			$extra['photo_sha'] = hash( 'sha256', $extra['photo'] );
+			$extra['photo_e2e'] = self::$posted_e2e ? 1 : 0; // 0.33.0: the envelope is sealed as well.
 			$extra['photo']     = CMP_Photo_Vault::seal( $extra['photo'], $lock_id, $lock ? $lock->wearer_id : 0 ); // 0.31.0
 		}
 		$wpdb->insert( self::t( 'lock_events' ), array_merge( array( 'lock_id' => $lock_id, 'actor_id' => $actor_id, 'type' => $type, 'minutes' => 0, 'note' => '', 'photo_sha' => '', 'code' => '', 'review' => '', 'created_at' => gmdate( 'Y-m-d H:i:s' ) ), $extra ) );
@@ -278,7 +288,7 @@ class CMP_Chastity {
 	/** 0.31.0: the wearer's photos still kept, across their locks, newest first. */
 	public static function wearer_photos( $wearer_id, $limit = 30 ) {
 		global $wpdb;
-		return $wpdb->get_results( $wpdb->prepare( 'SELECT e.id, e.lock_id, e.type, e.photo_sha, e.code, e.review, e.created_at FROM ' . self::t( 'lock_events' ) . ' e JOIN ' . self::t( 'locks' ) . ' l ON l.id = e.lock_id WHERE l.wearer_id = %d AND e.photo IS NOT NULL ORDER BY e.id DESC LIMIT %d', $wearer_id, $limit ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return $wpdb->get_results( $wpdb->prepare( 'SELECT e.id, e.lock_id, e.type, e.photo_sha, e.photo_e2e, e.code, e.review, e.created_at FROM ' . self::t( 'lock_events' ) . ' e JOIN ' . self::t( 'locks' ) . ' l ON l.id = e.lock_id WHERE l.wearer_id = %d AND e.photo IS NOT NULL ORDER BY e.id DESC LIMIT %d', $wearer_id, $limit ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
 	/** Who the wearer may choose as keyholder: members holding their key through a chastity add-on (0.16.0). */
@@ -418,6 +428,16 @@ class CMP_Chastity {
 		header( 'Cache-Control: private, no-cache, max-age=0' );
 		header( 'ETag: "' . $event->photo_sha . '"' );
 		status_header( 200 );
+		if ( (int) $event->photo_e2e ) {
+			// 0.33.0: an envelope only the wearer's and keyholder's browsers can open.
+			header( 'Content-Type: application/octet-stream' );
+			header( 'X-CMP-E2E: 1' );
+			header( 'Content-Length: ' . strlen( $photo ) );
+			header( 'Content-Disposition: attachment; filename="lock-' . (int) $event->id . '.cmpe2e"' );
+			header( "Content-Security-Policy: default-src 'none'" );
+			echo $photo; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- encrypted bytes.
+			exit;
+		}
 		header( 'Content-Type: image/jpeg' );
 		header( 'Content-Length: ' . strlen( $photo ) );
 		header( 'Content-Disposition: ' . ( isset( $_GET['dl'] ) ? 'attachment' : 'inline' ) . '; filename="' . ( isset( $_GET['dl'] ) ? 'colandb-lock-' . gmdate( 'Y-m-d', self::ts( $event->created_at ) ) . '-' . (int) $event->id : 'lock' ) . '.jpg"' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -427,7 +447,7 @@ class CMP_Chastity {
 	}
 
 	/** An uploaded photo field: null when none was sent, JPEG bytes, or a redirect on error. */
-	private static function posted_photo( $back ) {
+	private static function posted_photo( $back, $lock = null ) {
 		$file = isset( $_FILES['photo'] ) && is_array( $_FILES['photo'] ) ? $_FILES['photo'] : null; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput,WordPress.Security.NonceVerification.Missing
 		if ( ! $file || ! isset( $file['error'] ) || UPLOAD_ERR_NO_FILE === (int) $file['error'] ) {
 			return null;
@@ -437,6 +457,18 @@ class CMP_Chastity {
 		}
 		if ( ! CMP_Photo_Consent::check( get_current_user_id() ) ) {
 			self::go( $back, 'cl_consent' ); // 0.32.0
+		}
+		// 0.33.0: with end-to-end on, only an envelope made in the browser is accepted.
+		if ( CMP_E2E::is_on( get_current_user_id() ) ) {
+			if ( ! $lock ) {
+				self::go( $back, 'cl_e2e_lockphoto' );
+			}
+			$bytes = empty( $_POST['e2e'] ) ? '' : (string) file_get_contents( $file['tmp_name'] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.WP.AlternativeFunctions
+			if ( ! CMP_E2E::validate( $bytes, $lock ) ) {
+				self::go( $back, 'cl_e2e_needed' );
+			}
+			self::$posted_e2e = true;
+			return $bytes;
 		}
 		$photo = CMP_Homework::process_photo( $file['tmp_name'] );
 		if ( is_wp_error( $photo ) ) {
@@ -490,6 +522,9 @@ class CMP_Chastity {
 		}
 		if ( 'propose' === $do ) {
 			self::propose( $user_id );
+		}
+		if ( 0 === strpos( $do, 'e2e_' ) ) {
+			CMP_E2E::handle( $do, $user_id ); // 0.33.0
 		}
 		if ( 'share' === $do || 'unshare' === $do || 'unphoto' === $do ) {
 			self::do_share( $do, $user_id ); // 0.31.0: any of the wearer's own locks, running or past.
@@ -706,7 +741,7 @@ class CMP_Chastity {
 	/* Wearer ---------------------------------------------------------- */
 
 	private static function do_verify( $lock, $user_id ) {
-		$photo = self::posted_photo( array() );
+		$photo = self::posted_photo( array(), $lock );
 		if ( ! $photo ) {
 			self::go( array(), 'cl_photo' );
 		}
@@ -1361,6 +1396,7 @@ class CMP_Chastity {
 			echo self::start_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		}
 		echo self::calendar_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
+		echo CMP_E2E::panel_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		echo self::photos_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		?>
 		<section class="cmp-panel">
@@ -1406,7 +1442,9 @@ class CMP_Chastity {
 		$html .= '<p class="cmp-field"><label for="cmp_cl_name">' . esc_html__( 'Name', 'cmp' ) . '</label><input type="text" id="cmp_cl_name" name="option_name" maxlength="60" /></p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_rule">' . esc_html__( 'Rule', 'cmp' ) . '</label><input type="text" id="cmp_cl_rule" name="rule" maxlength="300" /></p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_pol">' . esc_html__( 'Release', 'cmp' ) . '</label>' . self::select( 'policy', 'cmp_cl_pol', self::policies(), 'none' ) . '</p></details>';
-		$html .= '<p class="cmp-field"><label for="cmp_cl_photo">' . esc_html__( 'Photo of the lock (optional)', 'cmp' ) . '</label><input type="file" id="cmp_cl_photo" name="photo" accept="image/jpeg,image/png,image/webp" /></p>' . CMP_Photo_Consent::field_html( $user_id, 'cmp_cl_consent_s' );
+		if ( ! CMP_E2E::is_on( $user_id ) ) { // 0.33.0: with end-to-end on, photos go in as verifications.
+			$html .= '<p class="cmp-field"><label for="cmp_cl_photo">' . esc_html__( 'Photo of the lock (optional)', 'cmp' ) . '</label><input type="file" id="cmp_cl_photo" name="photo" accept="image/jpeg,image/png,image/webp" /></p>' . CMP_Photo_Consent::field_html( $user_id, 'cmp_cl_consent_s' );
+		}
 		$html .= self::check( 'show_profile', 'cmp_cl_show', __( 'Show "Locked · N days · last verified" on my profile (with your keyholder\'s name, if they allow it)', 'cmp' ), false );
 		$html .= '<button type="submit" class="cmp-btn">' . esc_html__( 'Lock', 'cmp' ) . '</button></form>';
 		if ( count( $keyholders ) < 3 ) {
@@ -1443,7 +1481,9 @@ class CMP_Chastity {
 			$html .= '<p class="cmp-muted">' . esc_html__( 'End your current lock to accept this one.', 'cmp' ) . '</p>';
 		} else {
 			$html .= self::form_open( 'accept', $lock->id, true );
-			$html .= '<p class="cmp-field"><label for="cmp_cl_aphoto">' . esc_html__( 'Photo of the lock (optional)', 'cmp' ) . '</label><input type="file" id="cmp_cl_aphoto" name="photo" accept="image/jpeg,image/png,image/webp" /></p>' . CMP_Photo_Consent::field_html( $lock->wearer_id, 'cmp_cl_consent_a' );
+			if ( ! CMP_E2E::is_on( $lock->wearer_id ) ) {
+				$html .= '<p class="cmp-field"><label for="cmp_cl_aphoto">' . esc_html__( 'Photo of the lock (optional)', 'cmp' ) . '</label><input type="file" id="cmp_cl_aphoto" name="photo" accept="image/jpeg,image/png,image/webp" /></p>' . CMP_Photo_Consent::field_html( $lock->wearer_id, 'cmp_cl_consent_a' );
+			}
 			if ( (int) $lock->show_profile ) {
 				$html .= '<p class="cmp-muted">' . esc_html__( 'Your keyholder would like the badge shown on your profile. It\'s still your choice.', 'cmp' ) . '</p>';
 			}
@@ -1535,7 +1575,18 @@ class CMP_Chastity {
 			$state = 'accepted' === $today->review ? __( 'accepted', 'cmp' ) : ( 'again' === $today->review ? __( 'your keyholder asked for another', 'cmp' ) : __( 'sent', 'cmp' ) );
 			$html .= '<p class="cmp-muted">' . esc_html( sprintf( /* translators: 1: time, 2: state */ __( 'Today\'s photo: %1$s, %2$s.', 'cmp' ), wp_date( 'g:i A', self::ts( $today->created_at ) ), $state ) ) . '</p>';
 		}
-		$html .= self::form_open( 'verify', $lock->id, true ) . '<p class="cmp-field"><label for="cmp_cl_vphoto">' . esc_html__( 'Photo', 'cmp' ) . '</label><input type="file" id="cmp_cl_vphoto" name="photo" accept="image/jpeg,image/png,image/webp" required /></p>' . CMP_Photo_Consent::field_html( $lock->wearer_id, 'cmp_cl_consent_v', true ) . '<button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Send verification', 'cmp' ) . '</button></form></section>';
+		if ( CMP_E2E::is_on( $lock->wearer_id ) ) {
+			// 0.33.0: the browser re-saves and encrypts the photo for these people before sending it.
+			$rcpt  = CMP_E2E::recipients( $lock );
+			$html .= '<p class="cmp-muted cmp-e2e-on">' . esc_html__( 'End-to-end is on: this photo is encrypted on your device before it\'s sent.', 'cmp' ) . '</p>';
+			if ( $lock->keyholder_id && ! CMP_E2E::has_key( $lock->keyholder_id ) ) {
+				$html .= '<p class="cmp-hw-std">' . esc_html__( 'Your keyholder hasn\'t set up end-to-end photos, so they won\'t be able to see photos you send now. Ask them to set it up on their Chastity tab, or turn end-to-end off for now.', 'cmp' ) . '</p>';
+			}
+			$html .= str_replace( '<form ', '<form data-cmp-e2e-upload="' . esc_attr( wp_json_encode( $rcpt ) ) . '" ', self::form_open( 'verify', $lock->id, true ) ) . '<p class="cmp-muted" data-cmp-e2e-msg role="alert"></p>';
+		} else {
+			$html .= self::form_open( 'verify', $lock->id, true );
+		}
+		$html .= '<p class="cmp-field"><label for="cmp_cl_vphoto">' . esc_html__( 'Photo', 'cmp' ) . '</label><input type="file" id="cmp_cl_vphoto" name="photo" accept="image/jpeg,image/png,image/webp" required /></p>' . CMP_Photo_Consent::field_html( $lock->wearer_id, 'cmp_cl_consent_v', true ) . '<button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Send verification', 'cmp' ) . '</button></form></section>';
 
 		// Hygiene, release, unlock.
 		$html .= '<section class="cmp-panel"><h3 class="cmp-panel-title">' . esc_html__( 'Opening and release', 'cmp' ) . '</h3>';
@@ -1612,6 +1663,9 @@ class CMP_Chastity {
 		$html   .= '<p class="cmp-field"><label for="cmp_cl_endat">' . esc_html__( 'Ends', 'cmp' ) . '</label><input type="datetime-local" id="cmp_cl_endat" name="end_at" value="' . esc_attr( $end_val ) . '" min="' . esc_attr( wp_date( 'Y-m-d\TH:i' ) ) . '" aria-describedby="cmp_cl_endat_help" /><span class="cmp-muted" id="cmp_cl_endat_help">' . esc_html( sprintf( /* translators: %s: timezone */ __( 'Site time (%s).', 'cmp' ), wp_timezone_string() ) ) . '</span></p>';
 		$html   .= '<div class="cmp-actions"><button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Set end date', 'cmp' ) . '</button>' . ( $lock->planned_end ? '<button type="submit" name="open_ended" value="1" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Make it open-ended', 'cmp' ) . '</button>' : '' ) . '</div></form></details></section>';
 
+		// 0.33.0: unlock end-to-end photos here too.
+		$html .= CMP_E2E::panel_html( get_current_user_id(), 'keyholder' );
+
 		// Verification photos waiting.
 		$events = self::events( $lock->id, 40 );
 		$html  .= '<section class="cmp-panel"><h3 class="cmp-panel-title">' . esc_html( sprintf( /* translators: %s: code */ __( 'Verification · today\'s code %s', 'cmp' ), self::code( $lock->id ) ) ) . '</h3>';
@@ -1627,7 +1681,7 @@ class CMP_Chastity {
 			} elseif ( self::DELETED === $e->photo_sha ) {
 				$html .= '<p class="cmp-muted">' . esc_html__( 'Photo deleted.', 'cmp' ) . '</p>';
 			} elseif ( self::has_photo( $e ) ) {
-				$html .= '<a href="' . esc_url( self::photo_url( $e ) ) . '" target="_blank" rel="noopener"><img src="' . esc_url( self::photo_url( $e ) ) . '" alt="' . esc_attr__( 'Verification photo', 'cmp' ) . '" loading="lazy" /></a>';
+				$html .= self::img_html( $e, __( 'Verification photo', 'cmp' ) );
 			}
 			$html .= self::form_open( 'review', $lock->id ) . '<input type="hidden" name="event" value="' . (int) $e->id . '" /><div class="cmp-actions"><button type="submit" name="verdict" value="accepted" class="cmp-btn cmp-btn-small">' . esc_html__( 'Accept', 'cmp' ) . '</button><button type="submit" name="verdict" value="again" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Ask for another', 'cmp' ) . '</button></div></form></div>';
 		}
@@ -1736,6 +1790,14 @@ class CMP_Chastity {
 	 * 0.31.0: the wearer's own photos (closed by default, so nothing intimate
 	 * shows the moment the tab opens), when each is deleted, and private links.
 	 */
+	/** 0.33.0: a photo, or a placeholder the browser fills in after decrypting an end-to-end one. */
+	private static function img_html( $e, $alt ) {
+		if ( (int) ( $e->photo_e2e ?? 0 ) ) {
+			return '<span class="cmp-e2e-photo"><img data-cmp-e2e-src="' . esc_url( self::photo_url( $e ) ) . '" alt="' . esc_attr( $alt ) . '" hidden /><span class="cmp-muted" data-cmp-e2e-note>' . esc_html__( 'End-to-end photo: unlock above to see it.', 'cmp' ) . '</span></span>';
+		}
+		return '<a href="' . esc_url( self::photo_url( $e ) ) . '" target="_blank" rel="noopener"><img src="' . esc_url( self::photo_url( $e ) ) . '" alt="' . esc_attr( $alt ) . '" loading="lazy" /></a>';
+	}
+
 	private static function photos_html( $user_id ) {
 		$photos = self::wearer_photos( $user_id );
 		$links  = CMP_Photo_Shares::live_for_wearer( $user_id );
@@ -1750,15 +1812,16 @@ class CMP_Chastity {
 		$html   .= '<p class="cmp-muted">' . esc_html( sprintf( /* translators: %d: days */ __( 'Only you and your current keyholder can see these. They\'re stored encrypted and deleted %d days after you take them; you can download or delete any of them sooner. To show one to someone else, make a private link: they don\'t need an account, it stops working when you choose, and you can turn it off at any time. Your daily code is only for the photo; it doesn\'t open anything.', 'cmp' ), self::photo_days() ) ) . '</p>';
 		$html   .= '<div class="cmp-cl-photo-grid">';
 		foreach ( $photos as $e ) {
-			$html .= '<figure class="cmp-hw-proof cmp-cl-photo"><a href="' . esc_url( self::photo_url( $e ) ) . '" target="_blank" rel="noopener"><img src="' . esc_url( self::photo_url( $e ) ) . '" alt="' . esc_attr( 'verification' === $e->type ? __( 'Verification photo', 'cmp' ) : __( 'Photo of the lock', 'cmp' ) ) . '" loading="lazy" /></a>';
+			$e2e   = (int) $e->photo_e2e;
+			$html .= '<figure class="cmp-hw-proof cmp-cl-photo">' . self::img_html( $e, 'verification' === $e->type ? __( 'Verification photo', 'cmp' ) : __( 'Photo of the lock', 'cmp' ) ) . ( $e2e ? '<span class="cmp-e2e-badge">' . esc_html__( 'End to end', 'cmp' ) . '</span>' : '' );
 			$html .= '<figcaption><b>' . esc_html( wp_date( 'M j, g:i A', self::ts( $e->created_at ) ) ) . '</b><br /><span class="cmp-muted">' . esc_html( sprintf( /* translators: %s: date */ __( 'Deleted %s', 'cmp' ), wp_date( 'M j, Y', self::photo_delete_at( $e->created_at ) ) ) ) . '</span></figcaption>';
 			foreach ( isset( $links[ (int) $e->id ] ) ? $links[ (int) $e->id ] : array() as $sh ) {
 				$fid   = 'cmp_cl_share_' . (int) $sh->id;
-				$html .= '<div class="cmp-cl-share' . ( $new === (int) $sh->id ? ' is-new' : '' ) . '"><span class="cmp-cal-feed-copy"><input type="text" id="' . esc_attr( $fid ) . '" value="' . esc_attr( CMP_Photo_Shares::url( $sh ) ) . '" readonly aria-label="' . esc_attr__( 'Private link', 'cmp' ) . '" /><button type="button" class="cmp-btn cmp-btn-small cmp-btn-outline" data-cmp-copy="#' . esc_attr( $fid ) . '" data-cmp-copied="' . esc_attr__( 'Copied', 'cmp' ) . '" data-cmp-select="' . esc_attr__( 'Link selected, copy it', 'cmp' ) . '">' . esc_html__( 'Copy link', 'cmp' ) . '</button></span>';
+				$html .= '<div class="cmp-cl-share' . ( $new === (int) $sh->id ? ' is-new' : '' ) . '"><span class="cmp-cal-feed-copy"><input type="text" id="' . esc_attr( $fid ) . '" value="' . ( $e2e ? '' : esc_attr( CMP_Photo_Shares::url( $sh ) ) ) . '" readonly aria-label="' . esc_attr__( 'Private link', 'cmp' ) . '"' . ( $e2e ? ' disabled placeholder="' . esc_attr__( 'Unlock end-to-end photos to copy this link', 'cmp' ) . '" data-cmp-e2e-share="' . esc_url( self::photo_url( $e ) ) . '" data-base="' . esc_url( CMP_Photo_Shares::url( $sh ) ) . '"' : '' ) . ' /><button type="button" class="cmp-btn cmp-btn-small cmp-btn-outline"' . ( $e2e ? ' disabled' : '' ) . ' data-cmp-copy="#' . esc_attr( $fid ) . '" data-cmp-copied="' . esc_attr__( 'Copied', 'cmp' ) . '" data-cmp-select="' . esc_attr__( 'Link selected, copy it', 'cmp' ) . '">' . esc_html__( 'Copy link', 'cmp' ) . '</button></span>';
 				$html .= '<p class="cmp-muted">' . esc_html( sprintf( /* translators: 1: date and time, 2: views */ __( 'Works until %1$s · viewed %2$d times', 'cmp' ), wp_date( 'M j, g:i A', self::ts( $sh->expires_at ) ), (int) $sh->views ) . ( (int) $sh->max_views ? ' · ' . __( 'works once', 'cmp' ) : '' ) ) . '</p>';
 				$html .= self::form_open( 'unshare', 0, false, 'cmp-form cmp-cl-unshare' ) . '<input type="hidden" name="share" value="' . (int) $sh->id . '" /><button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline cmp-btn-danger">' . esc_html__( 'Turn off link', 'cmp' ) . '</button></form></div>';
 			}
-			$html .= '<p class="cmp-cl-photo-acts"><a href="' . esc_url( add_query_arg( 'dl', 1, self::photo_url( $e ) ) ) . '" download>' . esc_html__( 'Download', 'cmp' ) . '</a></p>';
+			$html .= '<p class="cmp-cl-photo-acts">' . ( $e2e ? '<a href="#" data-cmp-e2e-dl="' . esc_url( self::photo_url( $e ) ) . '" download="colandb-lock-' . esc_attr( gmdate( 'Y-m-d', self::ts( $e->created_at ) ) . '-' . (int) $e->id ) . '.jpg" hidden>' . esc_html__( 'Download', 'cmp' ) . '</a>' : '<a href="' . esc_url( add_query_arg( 'dl', 1, self::photo_url( $e ) ) ) . '" download>' . esc_html__( 'Download', 'cmp' ) . '</a>' ) . '</p>';
 			$html .= self::form_open( 'unphoto', 0, false, 'cmp-form cmp-cl-unphoto' ) . '<input type="hidden" name="event" value="' . (int) $e->id . '" /><button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline cmp-btn-danger" data-cmp-confirm="' . esc_attr__( 'Delete this photo now? Your keyholder won\'t see it any more and its links stop working. This can\'t be undone.', 'cmp' ) . '">' . esc_html__( 'Delete photo', 'cmp' ) . '</button></form>';
 			$sid   = 'cmp_cl_exp_' . (int) $e->id;
 			$html .= '<details class="cmp-hw-taskedit"><summary>' . esc_html__( 'Share privately', 'cmp' ) . '</summary>' . self::form_open( 'share', 0, false, 'cmp-form cmp-cl-shareform' ) . '<input type="hidden" name="event" value="' . (int) $e->id . '" />';
@@ -1931,13 +1994,14 @@ class CMP_Chastity {
 				}
 			}
 		}
-		return array_merge( $rows, CMP_Photo_Shares::export_rows( $user_id ) );
+		return array_merge( $rows, CMP_Photo_Shares::export_rows( $user_id ), CMP_E2E::export_rows( $user_id ) );
 	}
 
 	/** The wearer's locks go entirely; as keyholder, locks become self-locks. */
 	public static function erase( $user_id ) {
 		global $wpdb;
 		$n = CMP_Photo_Shares::erase( $user_id );
+		CMP_E2E::erase( $user_id ); // 0.33.0
 		foreach ( $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM ' . self::t( 'locks' ) . ' WHERE wearer_id = %d', $user_id ) ) as $id ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			$n += (int) $wpdb->delete( self::t( 'lock_events' ), array( 'lock_id' => $id ), array( '%d' ) );
 			$n += (int) $wpdb->delete( self::t( 'locks' ), array( 'id' => $id ), array( '%d' ) );
