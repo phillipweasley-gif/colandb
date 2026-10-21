@@ -38,15 +38,7 @@ class CEC_Meetings {
 		add_shortcode( 'cec_meeting_notes', array( __CLASS__, 'shortcode_public' ) );
 		add_shortcode( 'cec_meeting_admin', array( __CLASS__, 'shortcode_admin' ) );
 		add_filter( 'cmp_account_bar_items', array( __CLASS__, 'account_bar_item' ), 10, 2 );
-		add_action( 'template_redirect', array( __CLASS__, 'no_cache' ) );
-	}
-
-	/** The portal page is never cached (headers have to go out before the shortcode renders). */
-	public static function no_cache() {
-		$post = get_queried_object();
-		if ( is_singular() && $post instanceof WP_Post && ( has_shortcode( $post->post_content, 'cec_meeting_admin' ) || false !== strpos( (string) get_post_meta( $post->ID, '_elementor_data', true ), 'cec_meeting_admin' ) ) ) {
-			nocache_headers();
-		}
+		// The portal page is never cached: CEC_No_Cache (1.46.1) covers [cec_meeting_admin].
 	}
 
 	public static function register() {

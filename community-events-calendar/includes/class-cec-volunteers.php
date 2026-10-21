@@ -45,6 +45,7 @@ class CEC_Volunteers {
 	}
 
 	public static function render_shortcode( $atts ) {
+		CEC_No_Cache::send();
 		$notice = '';
 		if ( isset( $_GET['cec_volunteer_submitted'] ) ) {
 			$notice = '1' === $_GET['cec_volunteer_submitted']
@@ -93,7 +94,7 @@ class CEC_Volunteers {
 	public static function handle_submit() {
 		$redirect = isset( $_POST['cec_redirect'] ) ? esc_url_raw( wp_unslash( $_POST['cec_redirect'] ) ) : home_url();
 
-		if ( ! isset( $_POST['cec_volunteer_nonce'] ) || ! wp_verify_nonce( $_POST['cec_volunteer_nonce'], self::NONCE_ACTION ) || ! empty( $_POST['cec_website'] ) ) {
+		if ( ! CEC_No_Cache::form_nonce_ok( 'cec_volunteer_nonce', self::NONCE_ACTION ) || ! empty( $_POST['cec_website'] ) ) {
 			wp_safe_redirect( add_query_arg( 'cec_volunteer_submitted', '0', $redirect ) );
 			exit;
 		}

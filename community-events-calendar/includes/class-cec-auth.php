@@ -52,6 +52,7 @@ class CEC_Auth {
 
 	public static function render_login_shortcode( $atts ) {
 		$atts = shortcode_atts( array( 'note' => '' ), $atts, 'cec_login' );
+		CEC_No_Cache::send();
 		if ( is_user_logged_in() ) {
 			return self::account_links_html();
 		}
@@ -92,7 +93,7 @@ class CEC_Auth {
 	public static function handle_login() {
 		$redirect = isset( $_POST['cec_redirect'] ) ? esc_url_raw( wp_unslash( $_POST['cec_redirect'] ) ) : '';
 
-		if ( ! isset( $_POST['cec_login_nonce'] ) || ! wp_verify_nonce( $_POST['cec_login_nonce'], self::LOGIN_NONCE ) ) {
+		if ( ! CEC_No_Cache::form_nonce_ok( 'cec_login_nonce', self::LOGIN_NONCE ) ) {
 			wp_safe_redirect( add_query_arg( 'cec_login', '0', wp_get_referer() ) );
 			exit;
 		}
@@ -133,6 +134,7 @@ class CEC_Auth {
 	}
 
 	public static function render_register_shortcode( $atts ) {
+		CEC_No_Cache::send();
 		if ( is_user_logged_in() ) {
 			return self::account_links_html();
 		}
@@ -196,7 +198,7 @@ class CEC_Auth {
 		$redirect = isset( $_POST['cec_redirect'] ) ? esc_url_raw( wp_unslash( $_POST['cec_redirect'] ) ) : home_url();
 		$back     = wp_get_referer() ? wp_get_referer() : $redirect;
 
-		if ( ! isset( $_POST['cec_register_nonce'] ) || ! wp_verify_nonce( $_POST['cec_register_nonce'], self::REGISTER_NONCE ) ) {
+		if ( ! CEC_No_Cache::form_nonce_ok( 'cec_register_nonce', self::REGISTER_NONCE ) ) {
 			wp_safe_redirect( add_query_arg( 'cec_register_error', 'failed', $back ) );
 			exit;
 		}
