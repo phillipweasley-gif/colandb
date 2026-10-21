@@ -4,6 +4,40 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.34.0
+
+**"Need help?" under the account box** (owner, 2026-10-21: "I also want a 'Need Help?' link below the member box in the upper right hand corner for people to submit feedback or report issues").
+
+- **The link.** `[cmp_account_bar]` (the header's "Log In / Create an Account" or "Hello, <name>" box) now has a small underlined **Need help?** link under it, signed in or out.
+  - It opens the page holding the new `[cmp_feedback]` form and passes along the page the visitor was on (`?from=`). Query arguments that could carry a token (`cmp_*`, `token`, `key`, `_wpnonce`) are stripped.
+  - The link doesn't appear until a published page has the shortcode.
+- **The form** (`CMP_Feedback`, new; table `cmp_feedback`, `CMP_DB_VERSION` 21):
+  - What it's about: Something isn't working / I have a question / Feedback or an idea.
+  - The message, and the page (prefilled from the link).
+  - Visitors give an email (and optionally a name). Signed-in members aren't asked: their account email is used, and a posted email is ignored.
+  - For "Something isn't working" the browser's user agent is kept, to help fix it. The form says so.
+  - Spam limits as on the image report form: honeypot, signed timestamp (3 seconds to 8 days), 5 a day per address or email. The page is never cached (`no-store`, no CDN hint).
+- **Delivery:**
+  - each message is emailed to the site's admin address with `Reply-To:` the sender, so replying answers them;
+  - the sender gets a copy;
+  - **Users → Help requests** (with a count) lists them; **Mark done** can email a reply.
+- **Privacy:**
+  - kept 2 years (`cmp_retention_periods['feedback']`);
+  - export and erase by email, for members and visitors alike.
+  - Also fixed: an erase request's "items removed" flag now includes everything removed before the notifications step.
+- **Verification** (local WordPress test kit, PHP 8.3):
+  - `tests/feedback-e2e.sh` 20/20 (new). It covers:
+    - the link signed out and signed in, the back-link without tokens, no back-link on the form page itself;
+    - the form's fields and the prefilled page; never cached;
+    - too fast, honeypot and bad email refused; a valid message stored with the browser for problems only;
+    - the team email with Reply-To, and the sender's copy; the thank-you;
+    - a member's account email used instead of a posted one; the daily limit;
+    - the admin list, a non-admin unable to close, a reply emailed;
+    - export, erase and the 2-year clean-up.
+  - Regression suites: `tests/profile-e2e.sh` 84/84 (it covers the account bar), `tests/account-e2e.sh` 69/69, `tests/retention-e2e.sh` 17/17. `php -l` on every changed file; no plugin warnings in `debug.log`.
+
+---
+
 ## 0.33.0
 
 **Optional end-to-end encryption for chastity photos** (owner, 2026-10-21: encryption so nobody but the wearer and keyholder can see the photos; chose both server-side and end-to-end, then "start the end-to-end encryption … until completed"). Design: `docs/privacy-security-plan.md` §7.

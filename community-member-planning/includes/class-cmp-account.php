@@ -488,6 +488,10 @@ class CMP_Account {
 		}
 		// 0.32.0: image reports this address made (members or not).
 		$reports = 1 === (int) $page ? CMP_Image_Reports::export_rows( $email ) : array();
+		$help    = 1 === (int) $page ? CMP_Feedback::export_rows( $email ) : array(); // 0.34.0
+		if ( $help ) {
+			$data[] = array( 'group_id' => 'cmp-help-requests', 'group_label' => __( 'Help requests', 'cmp' ), 'item_id' => 'cmp-help-' . md5( $email ), 'data' => $help );
+		}
 		if ( $reports ) {
 			$data[] = array( 'group_id' => 'cmp-image-reports', 'group_label' => __( 'Image reports', 'cmp' ), 'item_id' => 'cmp-image-reports-' . md5( $email ), 'data' => $reports );
 		}
@@ -497,9 +501,9 @@ class CMP_Account {
 	public static function erase( $email, $page = 1 ) {
 		global $wpdb;
 		$user    = get_user_by( 'email', $email );
-		$removed = false;
+		$removed = CMP_Feedback::erase( $email ) > 0; // 0.34.0: members or not.
 		if ( $user ) {
-			$removed = (bool) $wpdb->delete( CMP_Install::table( 'notifications' ), array( 'user_id' => $user->ID ), array( '%d' ) );
+			$removed = (bool) $wpdb->delete( CMP_Install::table( 'notifications' ), array( 'user_id' => $user->ID ), array( '%d' ) ) || $removed;
 			$removed = CMP_Profiles::delete_all( $user->ID ) > 0 || $removed;
 			$removed = CMP_Profile_Images::delete_all( $user->ID ) > 0 || $removed;
 			$removed = CMP_Birth_Date::erase( $user->ID ) || $removed;

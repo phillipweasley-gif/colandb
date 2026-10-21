@@ -14,6 +14,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * or a click elsewhere. Signed-in pages aren't cached by the host, and
  * Elementor never caches Shortcode widget output, so nobody ever sees
  * another visitor's name.
+ * 0.34.0: a "Need help?" link sits under the bar (signed in or out) and
+ * opens the [cmp_feedback] page.
  */
 class CMP_Account_Bar {
 
@@ -68,7 +70,13 @@ class CMP_Account_Bar {
 		return $items;
 	}
 
+	/** 0.34.0: the bar, with a small "Need help?" link under it (CMP_Feedback). */
 	public static function render() {
+		$help = CMP_Feedback::link_url();
+		return '<div class="cmp-account-wrap">' . self::bar_html() . ( '' !== $help ? '<a class="cmp-bar-help" href="' . esc_url( $help ) . '">' . esc_html__( 'Need help?', 'cmp' ) . '</a>' : '' ) . '</div>';
+	}
+
+	private static function bar_html() {
 		if ( ! is_user_logged_in() ) {
 			$login    = self::cec_url( 'login_page_url' );
 			$register = self::cec_url( 'register_page_url' );
