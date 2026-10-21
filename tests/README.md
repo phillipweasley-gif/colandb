@@ -12,7 +12,7 @@ bash tests/profile-e2e.sh            # member plugin profiles, photos, preferenc
 bash tests/dynamics-e2e.sh           # dynamics between members: 34 checks
 bash tests/homework-e2e.sh           # homework programs: 44 checks
 bash tests/chastity-e2e.sh           # chastity tracking, incl. keyholder-proposed locks, "verified elsewhere", last verified on badges, handing a running lock to a keyholder and setting the end date, encrypted photos, share links, the 90-day purge, consent, download and delete: 176 checks
-bash tests/image-report-e2e.sh        # intimate-image reports (CMP 0.32.0): public form, limits, emails, admin screen, remove a photo by link: 22 checks
+bash tests/image-report-e2e.sh        # intimate-image reports (CMP 0.32.0): public form, limits, emails, admin screen, remove a photo by link, never cached: 24 checks
 bash tests/feed-e2e.sh               # member feed: 41 checks
 bash tests/messages-e2e.sh           # member messages: 46 checks
 bash tests/follows-e2e.sh            # follow / unfollow: 27 checks

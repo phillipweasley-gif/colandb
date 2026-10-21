@@ -66,6 +66,14 @@ TS=$(fresh); sleep 3
 r=$(post "$TS" "${GOOD[@]}")
 ok "6th report from the same email in a day: limit" $(echo "$r" | grep -q 'cmp_ir=limit' && echo 1 || echo 0)
 
+mkdir -p wp-content/mu-plugins && echo "<?php add_action('send_headers', function () { header('ec-cdn-cache-control: public, max-age=300, s-maxage=604800'); });" > wp-content/mu-plugins/zz-cdn-hint.php
+H1=$(curl -s -D - -o /dev/null "$URL"); H2=$(curl -s -D - -o /dev/null "$H/?page_id=$($W post list --post_type=page --field=ID --posts_per_page=1 --post__not_in=$PID 2>/dev/null | head -1)")
+rm -f wp-content/mu-plugins/zz-cdn-hint.php
+ok "the report page is never cached (no-store, no CDN hint); other pages keep the hint (0.32.1)" $(echo "$H1" | grep -qi '^cache-control: no-store' && ! echo "$H1" | grep -qi '^ec-cdn-cache-control' && echo "$H2" | grep -qi '^ec-cdn-cache-control' && echo 1 || echo 0)
+OLDT=$(ev "\$t=time()-3*DAY_IN_SECONDS; echo \$t.'.'.substr(hash_hmac('sha256','cmp-ir|'.\$t,wp_salt('nonce')),0,16);")
+r=$(post "$OLDT" -d "relation=behalf" -d "location=old form" -d "email=old@example.com" -d "statement=1" -d "signature=Old Form")
+ok "a form opened 3 days ago still sends (0.32.1)" $(echo "$r" | grep -q 'cmp_ir=sent' && echo 1 || echo 0)
+
 echo "== Admin"
 login admin admin admin
 curl -s -b $T/admin.jar -o $T/adm.html "$H/wp-admin/users.php?page=cmp-image-reports"
