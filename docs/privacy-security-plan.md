@@ -12,16 +12,18 @@ This is not legal advice. Items marked **(owner)** need the owner, a lawyer or t
 | 90-day purge, chastity photos | Done, CMP 0.31.0 |
 | Share a photo without an account (not the daily code) | Done, CMP 0.31.0 |
 | Host CDN never caches private photos | Done, CMP 0.31.1 |
-| Explicit consent before the first intimate photo | CMP 0.32.0 |
-| Homework proof photos: encryption and 90-day purge | CMP 0.32.0 |
-| Members can download and delete their own private photos | CMP 0.32.0 |
-| Report an intimate image (TAKE IT DOWN Act, 48-hour removal) | CMP 0.32.0, plus a public page on the site |
-| Remove a private photo the site team can't see | CMP 0.32.0 (admin tool that works from the photo's link) |
+| Explicit consent before the first intimate photo | Done, CMP 0.32.0 |
+| Homework proof photos: encryption and 90-day purge | Done, CMP 0.32.0 |
+| Members can download and delete their own private photos | Done, CMP 0.32.0 |
+| Report an intimate image (TAKE IT DOWN Act, 48-hour removal) | Done, CMP 0.32.0/0.32.1: https://colandb.com/report-an-image/ (in the footer menu) |
+| Remove a private photo the site team can't see | Done, CMP 0.32.0 (Users → Image reports) |
 | Child sexual abuse material: response plan | This document, below |
-| Optional end-to-end encryption | CMP 0.33.0 |
+| Optional end-to-end encryption | Done, CMP 0.33.0 |
 | Dedicated photo key (`CMP_PHOTO_KEY` in wp-config.php) | **(owner)**: an automated session wasn't allowed to write secrets to wp-config.php |
-| Backup retention, fill in privacy-page placeholders | **(owner)** confirms the plan's backup days. Hosting location and effective date filled in |
-| Tell members about the changes | In-app notice after 0.33.0 is live |
+| Privacy-page placeholders | Done 2026-10-21: effective date (Oct 5, 2026), hosting (EU, Google Cloud Belgium), logs (host's own policies), backups ("up to 60 days"). **(owner)** confirm the plan's exact backup days |
+| Tell members about the changes | Done 2026-10-21: in-app notice to all 37 members (option `cmp_notice_privacy_20261021`) |
+| Terms of Service | Drafted 2026-10-21 as an unpublished page (`/terms/`, page 1088). **(owner)** review, set the effective date, publish, then link it from the footer and the Privacy Policy. No separate EULA: the installable app is the website |
+| Public forms on cached pages (login, sign-up, volunteer, submit) | Found 2026-10-21: the host's CDN caches them up to 7 days while their nonces last 12–24 hours. Suggested as a separate task |
 
 ## 1. Consent (CMP 0.32.0)
 
@@ -154,6 +156,7 @@ The goal: with the mode on, the server only ever holds data it cannot decrypt. E
 1. Add `CMP_PHOTO_KEY` to wp-config.php (section 6).
 2. Confirm how many days of backups the hosting plan keeps, so the privacy page can state it.
 3. Make sure someone reads the admin inbox daily, for the 48-hour takedown window.
-4. Ask a lawyer to review the Privacy Policy and the image-report process, particularly on:
+4. Review and publish the Terms of Service draft (page 1088).
+5. Ask a lawyer to review the Privacy Policy, the Terms and the image-report process, particularly on:
    - age verification for adult content in your state;
    - whether 18 U.S.C. § 2257 record-keeping applies (it targets producers of sexually explicit material; members' private photos to their own keyholder are a different situation, but confirm).
