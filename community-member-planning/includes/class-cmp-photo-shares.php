@@ -113,6 +113,11 @@ class CMP_Photo_Shares {
 		return (bool) $wpdb->query( $wpdb->prepare( 'UPDATE ' . self::t() . ' SET revoked_at = %s WHERE id = %d AND wearer_id = %d AND revoked_at IS NULL', gmdate( 'Y-m-d H:i:s' ), $share_id, $wearer_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
+	public static function delete_for_event( $event_id ) {
+		global $wpdb;
+		$wpdb->delete( self::t(), array( 'event_id' => (int) $event_id ), array( '%d' ) );
+	}
+
 	public static function delete_for_lock( $lock_id ) {
 		global $wpdb;
 		$wpdb->delete( self::t(), array( 'lock_id' => (int) $lock_id ), array( '%d' ) );

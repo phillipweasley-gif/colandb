@@ -18,6 +18,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   entry stays and says the photo was removed; private links to it stop.
  *   Links themselves are cleared a day after they stop working. Photos
  *   stored before encryption are encrypted here if the upgrade missed any.
+ * - Homework proof photos (0.32.0): 90 days after the logged day.
+ * - Image reports (0.32.0): 3 years, like member reports.
  * - Erase requests: an admin notice when a confirmed request has been
  *   waiting 20 days (the statement promises 30).
  *
@@ -58,6 +60,8 @@ class CMP_Retention {
 				'unverified' => 60,
 				'calendar'   => 365,
 				'lock_photos' => 90,
+				'homework_photos' => 90,
+				'image_reports' => 1095,
 			)
 		);
 	}
@@ -104,6 +108,8 @@ class CMP_Retention {
 		$done = array( 'audit_log' => 0, 'reports' => 0, 'unverified' => 0, 'calendar' => 0, 'lock_photos' => 0, 'photo_links' => 0 );
 		$done['lock_photos'] = CMP_Chastity::purge_photos( CMP_Chastity::photo_days() );
 		$done['photo_links'] = CMP_Photo_Shares::purge();
+		$done['homework_photos'] = CMP_Homework::purge_photos( CMP_Homework::photo_days() );
+		$done['image_reports']   = CMP_Image_Reports::purge( isset( $p['image_reports'] ) ? (int) $p['image_reports'] : 1095 );
 		CMP_Photo_Vault::seal_existing( 200 );
 		$done['reports'] = (int) $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . CMP_Install::table( 'message_reports' ) . ' WHERE created_at < %s', gmdate( 'Y-m-d H:i:s', time() - (int) $p['reports'] * DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		require_once ABSPATH . 'wp-admin/includes/user.php';

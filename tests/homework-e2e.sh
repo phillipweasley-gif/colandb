@@ -81,10 +81,17 @@ ok "the led side can't create one for the lead" $([ "$(q "SELECT COUNT(*) FROM $
 log(){ curl -s -b $T/boy.jar -c $T/boy.jar -o /dev/null -w '%{redirect_url}' "$H/wp-admin/admin-post.php" -F "action=cmp_hw_log" -F "_cmp_nonce=$BN" "$@"; }
 r=$(log -F "task=$T1" -F "day=$TODAY" -F "status=done" -F "note=Good morning, Sir.")
 ok "photo task without a photo refused" $(echo "$r" | grep -q 'hw_proof' && echo 1 || echo 0)
-r=$(log -F "task=$T1" -F "day=$TODAY" -F "status=done" -F "note=Good morning" -F "photo=@$T/fake.jpg;type=image/jpeg")
+get boy bc0 "$PAGE&cmp_tab=homework&program=$PID&cmp_day=$TODAY"
+ok "first photo: the consent tick box is shown (0.32.0)" $(has $T/bc0.html 'name="photo_consent"')
+r=$(log -F "task=$T1" -F "day=$TODAY" -F "status=done" -F "note=Good morning" -F "photo=@$T/proof.jpg;type=image/jpeg")
+ok "...and a photo without it is refused, nothing stored" $(echo "$r" | grep -q 'hw_consent' && [ "$(q "SELECT COUNT(*) FROM $E_T WHERE task_id=$T1")" = 0 ] && echo 1 || echo 0)
+r=$(log -F "task=$T1" -F "day=$TODAY" -F "status=done" -F "note=Good morning" -F "photo_consent=1" -F "photo=@$T/fake.jpg;type=image/jpeg")
 ok "non-image refused" $(echo "$r" | grep -q 'hw_photo' && echo 1 || echo 0)
 r=$(log -F "task=$T1" -F "day=$TODAY" -F "status=done" -F "note=Good morning, Sir." -F "photo=@$T/proof.jpg;type=image/jpeg")
 ok "photo + text logged" $(echo "$r" | grep -q 'hw_logged' && echo 1 || echo 0)
+ok "consent recorded once (user meta + audit log)" $([ -n "$(ev "echo get_user_meta($BOY,'cmp_photo_consent_at',true);")" ] && [ "$(q "SELECT COUNT(*) FROM $(TBL audit_log) WHERE action='photo_consent_given' AND object_id=$BOY")" = 1 ] && echo 1 || echo 0)
+get boy bc1 "$PAGE&cmp_tab=homework&program=$PID&cmp_day=$TODAY"
+ok "...and the tick box isn't shown again" $(hasnt $T/bc1.html 'name="photo_consent"')
 EID=$(q "SELECT id FROM $E_T WHERE task_id=$T1 AND day='$TODAY'")
 ok "lead notified (submission)" $([ "$(q "SELECT COUNT(*) FROM $(TBL notifications) WHERE user_id=$SIR AND category='submission'")" -ge 1 ] && echo 1 || echo 0)
 r=$(log -F "task=$T2" -F "day=$TODAY" -F "status=done")
@@ -108,6 +115,10 @@ code_of(){ curl -s -b $T/$1.jar -o $T/photo.$1 -w '%{http_code}' "$PURL"; }
 ok "member sees own photo" $([ "$(code_of boy)" = 200 ] && echo 1 || echo 0)
 ok "lead sees it" $([ "$(code_of sir)" = 200 ] && echo 1 || echo 0)
 ok "re-encoded JPEG with the GPS marker gone" $(php -r '$d=file_get_contents($argv[1]); exit("\xFF\xD8\xFF"===substr($d,0,3) && false===strpos($d,"SECRET-GPS-MARKER")?0:1);' $T/photo.boy && echo 1 || echo 0)
+ok "stored encrypted (CMPv1, no JPEG bytes) and bound to the program and member" $(ev "global \$wpdb; \$b=\$wpdb->get_var(\"SELECT photo FROM $E_T WHERE id=$EID\"); echo 0===strpos(\$b,'CMPv1:') && false===strpos(\$b,\"\xFF\xD8\xFF\") && null===CMP_Photo_Vault::open(\$b,$PID,$SIR,'hwproof') && null===CMP_Photo_Vault::open(\$b,$PID,$BOY) && \"\xFF\xD8\xFF\"===substr(CMP_Photo_Vault::open(\$b,$PID,$BOY,'hwproof'),0,3)?1:0;")
+ok "download link sends it as an attachment" $(curl -s -b $T/boy.jar -D - -o /dev/null "$PURL&dl=1" | grep -qi 'content-disposition: attachment; filename="colandb-homework-' && echo 1 || echo 0)
+get boy bc2 "$PAGE&cmp_tab=homework&program=$PID&cmp_day=$TODAY"
+ok "member sees View / Download / Delete photo for their day" $([ "$(has $T/bc2.html 'value="cmp_hw_unphoto"')$(has $T/bc2.html 'kept, encrypted, until')" = 11 ] && echo 1 || echo 0)
 ok "resized to at most 1600px" $(php -r '$s=getimagesize($argv[1]); exit(max($s[0],$s[1])<=1600?0:1);' $T/photo.boy && echo 1 || echo 0)
 login nosy nosy nosypass12345
 ok "another member: 404" $([ "$(code_of nosy)" = 404 ] && echo 1 || echo 0)
@@ -145,9 +156,20 @@ ok "member still sees own photo" $([ "$(code_of boy)" = 200 ] && echo 1 || echo 
 r=$(log -F "task=$T2" -F "day=$TODAY" -F "status=done" -F "note=x")
 ok "no logging once archived" $(echo "$r" | grep -q 'hw_gone' && echo 1 || echo 0)
 
+echo "== Deleting and purging proof photos (0.32.0)"
+r=$(post sir -d "action=cmp_hw_unphoto&_cmp_nonce=$N&entry=$EID")
+ok "the lead can't delete the member's photo" $(echo "$r" | grep -q 'hw_gone' && [ "$(code_of boy)" = 200 ] && echo 1 || echo 0)
+r=$(post boy -d "action=cmp_hw_unphoto&_cmp_nonce=$BN&entry=$EID")
+ok "the member deletes it: gone (404), entry kept, marked deleted" $(echo "$r" | grep -q 'hw_photo_deleted' && [ "$(code_of boy)" = 404 ] && [ "$(q "SELECT CONCAT(IFNULL(photo,'NULL'),'|',photo_sha,'|',status) FROM $E_T WHERE id=$EID")" = "NULL|deleted|done" ] && echo 1 || echo 0)
+OLDE=$(ev "global \$wpdb; \$j=file_get_contents('$T/photo.boy'); \$wpdb->insert('$E_T',array('task_id'=>$T2,'program_id'=>$PID,'member_id'=>$BOY,'day'=>wp_date('Y-m-d',time()-95*DAY_IN_SECONDS),'status'=>'done','note'=>'old','photo'=>CMP_Photo_Vault::seal(\$j,$PID,$BOY,'hwproof'),'photo_sha'=>hash('sha256',\$j),'created_at'=>gmdate('Y-m-d H:i:s'),'updated_at'=>gmdate('Y-m-d H:i:s'))); echo \$wpdb->insert_id;")
+NEWE=$(ev "global \$wpdb; \$j=file_get_contents('$T/photo.boy'); \$wpdb->insert('$E_T',array('task_id'=>$T2,'program_id'=>$PID,'member_id'=>$BOY,'day'=>wp_date('Y-m-d',time()-80*DAY_IN_SECONDS),'status'=>'done','note'=>'recent','photo'=>\$j,'photo_sha'=>hash('sha256',\$j),'created_at'=>gmdate('Y-m-d H:i:s'),'updated_at'=>gmdate('Y-m-d H:i:s'))); echo \$wpdb->insert_id;")
+OUT=$(ev 'print_r(CMP_Retention::run());')
+ok "daily clean-up: a 95-day-old photo removed, an 80-day-old one kept and (older, unencrypted) now encrypted" $([ "$(q "SELECT CONCAT(IFNULL(photo,'NULL'),'|',photo_sha) FROM $E_T WHERE id=$OLDE")" = "NULL|purged" ] && [ "$(q "SELECT LEFT(photo,6) FROM $E_T WHERE id=$NEWE")" = "CMPv1:" ] && echo "$OUT" | grep -q '\[homework_photos\] => 1' && echo 1 || echo 0)
+ok "...removed text for the lead and the member" $(ev "\$e=CMP_Homework::entry($OLDE); \$d=CMP_Homework::entry($EID); echo 'Photo removed after 90 days.'===CMP_Homework::removed_text(\$e) && 'Photo deleted.'===CMP_Homework::removed_text(\$d)?1:0;")
+
 echo "== Privacy"
-ok "export lists the program and logs (not photo bytes)" $(ev "\$j=wp_json_encode(CMP_Account::export('boy@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'Fall routine') && false!==strpos(\$j,'Read chapter 3') && false!==strpos(\$j,'(photo kept)')?1:0;")
-ok "erase removes programs, tasks and logs" $(ev "CMP_Account::erase('boy@example.com'); global \$wpdb; echo 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $P_T WHERE member_id=$BOY\") && 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $E_T WHERE member_id=$BOY\")?1:0;")
+ok "export lists the program and logs (not photo bytes)" $(ev "\$j=wp_json_encode(CMP_Account::export('boy@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'Fall routine') && false!==strpos(\$j,'Read chapter 3') && false!==strpos(\$j,'(photo kept, encrypted') && false!==strpos(\$j,'Photo deleted.') && false!==strpos(\$j,'Consent to keep intimate photos')?1:0;")
+ok "erase removes programs, tasks and logs" $(ev "CMP_Account::erase('boy@example.com'); global \$wpdb; echo 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $P_T WHERE member_id=$BOY\") && 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $E_T WHERE member_id=$BOY\") && ''===get_user_meta($BOY,'cmp_photo_consent_at',true)?1:0;")
 
 pkill -f "php -S 127.0.0.1:8899" 2>/dev/null
 ev "global \$wpdb; foreach(array('$P_T','$T_T','$E_T','$D_T') as \$t) \$wpdb->query(\"DELETE FROM \$t\");" >/dev/null

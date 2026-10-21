@@ -800,3 +800,8 @@
 .cmp-member-area .cmp-cl-share.is-new { outline: 2px solid var(--cmp-primary); outline-offset: 4px; border-radius: 6px; }
 .cmp-member-area .cmp-cl-share input[type="text"] { min-width: 0; width: 100%; font-size: 12px; }
 .cmp-member-area .cmp-cl-share p { margin: 4px 0; }
+
+/* 0.32.0: consent tick box, photo actions. */
+.cmp-member-area .cmp-photo-consent { font-size: 14px; line-height: 1.45; }
+.cmp-member-area .cmp-photo-consent label { display: inline; }
+.cmp-member-area .cmp-cl-photo-acts { margin: 0; font-size: 14px; }

@@ -40,7 +40,7 @@ class CMP_Install {
 	}
 
 	public static function table_names() {
-		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ), self::table( 'follows' ), self::table( 'nods' ), self::table( 'dynamic_addons' ), self::table( 'calendar' ), self::table( 'group_links' ), self::table( 'photo_shares' ) );
+		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ), self::table( 'follows' ), self::table( 'nods' ), self::table( 'dynamic_addons' ), self::table( 'calendar' ), self::table( 'group_links' ), self::table( 'photo_shares' ), self::table( 'image_reports' ) );
 	}
 
 	private static function create_tables() {
@@ -61,7 +61,7 @@ class CMP_Install {
 		if ( $from && $from < 17 ) {
 			$wpdb->query( 'UPDATE ' . self::table( 'locks' ) . ' SET kh_show = 0' ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
 		}
-		// 0.31.0: encrypt chastity photos stored before encryption at rest.
+		// 0.31.0/0.32.0: encrypt chastity and homework photos stored before encryption at rest.
 		for ( $i = 0; $i < 200 && CMP_Photo_Vault::seal_existing( 50 ); $i++ ) {
 			continue;
 		}
@@ -442,6 +442,28 @@ class CMP_Install {
 			KEY idx_event (event_id)
 		) $charset;";
 
-		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports, $follows, $nods, $addons, $calendar, $groups, $shares );
+		// Reports of intimate images shared without consent (0.32.0,
+		// CMP_Image_Reports). Kept 3 years.
+		$image_reports = 'CREATE TABLE ' . self::table( 'image_reports' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			created_at datetime NOT NULL,
+			email varchar(190) NOT NULL DEFAULT '',
+			name varchar(100) NOT NULL DEFAULT '',
+			signature varchar(100) NOT NULL DEFAULT '',
+			relation varchar(12) NOT NULL DEFAULT '',
+			location text NULL,
+			details text NULL,
+			ip_hash char(64) NOT NULL DEFAULT '',
+			status varchar(12) NOT NULL DEFAULT 'new',
+			handled_at datetime NULL,
+			handled_by bigint(20) unsigned NOT NULL DEFAULT 0,
+			note text NULL,
+			PRIMARY KEY  (id),
+			KEY idx_status (status,id),
+			KEY idx_email (email),
+			KEY idx_ip (ip_hash,created_at)
+		) $charset;";
+
+		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports, $follows, $nods, $addons, $calendar, $groups, $shares, $image_reports );
 	}
 }

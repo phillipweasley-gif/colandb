@@ -464,7 +464,7 @@ class CMP_Account {
 					$rows[] = array( 'name' => $name, 'value' => (string) $value );
 				}
 			}
-			$rows = array_merge( $rows, CMP_Birth_Date::export_rows( $user->ID ), CMP_Dynamics::export_rows( $user->ID ), CMP_Homework::export_rows( $user->ID ), CMP_Chastity::export_rows( $user->ID ), CMP_Feed::export_rows( $user->ID ), CMP_Messages::export_rows( $user->ID ), CMP_Follows::export_rows( $user->ID ), CMP_Groups::export_rows( $user->ID ), CMP_Directory::export_rows( $user->ID ), CMP_Nods::export_rows( $user->ID ), CMP_Calendar::export_rows( $user->ID ), CMP_Reminders::export_rows( $user->ID ) );
+			$rows = array_merge( $rows, CMP_Birth_Date::export_rows( $user->ID ), CMP_Dynamics::export_rows( $user->ID ), CMP_Homework::export_rows( $user->ID ), CMP_Chastity::export_rows( $user->ID ), CMP_Feed::export_rows( $user->ID ), CMP_Messages::export_rows( $user->ID ), CMP_Follows::export_rows( $user->ID ), CMP_Groups::export_rows( $user->ID ), CMP_Directory::export_rows( $user->ID ), CMP_Nods::export_rows( $user->ID ), CMP_Calendar::export_rows( $user->ID ), CMP_Reminders::export_rows( $user->ID ), CMP_Photo_Consent::export_rows( $user->ID ) );
 			if ( $rows ) {
 				$data[] = array( 'group_id' => 'cmp-access', 'group_label' => __( 'Member area access', 'cmp' ), 'item_id' => 'cmp-access-' . $user->ID, 'data' => $rows );
 			}
@@ -485,6 +485,11 @@ class CMP_Account {
 					),
 				);
 			}
+		}
+		// 0.32.0: image reports this address made (members or not).
+		$reports = 1 === (int) $page ? CMP_Image_Reports::export_rows( $email ) : array();
+		if ( $reports ) {
+			$data[] = array( 'group_id' => 'cmp-image-reports', 'group_label' => __( 'Image reports', 'cmp' ), 'item_id' => 'cmp-image-reports-' . md5( $email ), 'data' => $reports );
 		}
 		return array( 'data' => $data, 'done' => true );
 	}
@@ -509,6 +514,7 @@ class CMP_Account {
 			$removed = CMP_Chastity::erase( $user->ID ) > 0 || $removed;
 			$removed = CMP_Homework::erase( $user->ID ) > 0 || $removed;
 			$removed = CMP_Dynamics::erase( $user->ID ) > 0 || $removed;
+			$removed = CMP_Photo_Consent::erase( $user->ID ) || $removed;
 			foreach ( array( CMP_Email_Verification::META_VERIFIED_EMAIL, CMP_Email_Verification::META_VERIFIED_AT, CMP_Email_Verification::META_TOKEN_HASH, CMP_Email_Verification::META_TOKEN_EXPIRES, CMP_Email_Verification::META_TOKEN_EMAIL, CMP_Access::META_ATTESTED_AT, CMP_Access::META_ATTESTED_VERSION, CMP_Notifications::META_DISABLED, CMP_Notifications::META_TIMEZONE, self::META_CHANGE_HASH, self::META_CHANGE_EXPIRES, self::META_CHANGE_EMAIL ) as $key ) {
 				$removed = delete_user_meta( $user->ID, $key ) || $removed;
 			}

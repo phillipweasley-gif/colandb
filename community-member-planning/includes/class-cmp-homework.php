@@ -26,13 +26,15 @@ class CMP_Homework {
 	const TAB         = 'homework';
 	const NONCE       = 'cmp_homework';
 	const PHOTO_QUERY = 'cmp_proof';
+	const PURGED      = 'purged';  // 0.32.0: removed by the 90-day clean-up.
+	const DELETED     = 'deleted'; // 0.32.0: deleted by the member or the site team.
 	const MAX_BYTES   = 5242880;
 	const PHOTO_MAX   = 1600;
 	const MAX_TASKS   = 30;
 	const STATUSES    = array( 'done', 'missed', 'moved', 'na' );
 
 	public static function init() {
-		foreach ( array( 'program', 'task', 'retire', 'log', 'review' ) as $a ) {
+		foreach ( array( 'program', 'task', 'retire', 'log', 'review', 'unphoto' ) as $a ) {
 			add_action( 'admin_post_cmp_hw_' . $a, array( __CLASS__, 'handle_' . $a ) );
 			add_action( 'admin_post_nopriv_cmp_hw_' . $a, array( 'CMP_Member_Area', 'redirect_to_login' ) );
 		}
@@ -83,6 +85,8 @@ class CMP_Homework {
 			'hw_proof'    => array( 'error', __( 'This task needs proof. Add what it asks for and log it again.', 'cmp' ) ),
 			'hw_photo'    => array( 'error', __( 'That photo couldn\'t be used. Use a JPEG, PNG or WebP photo under 5 MB.', 'cmp' ) ),
 			'hw_gone'     => array( 'error', __( 'That program isn\'t available.', 'cmp' ) ),
+			'hw_consent'  => array( 'error', __( 'Nothing was saved. To send a photo, tick the box to agree to how it\'s kept.', 'cmp' ) ),
+			'hw_photo_deleted' => array( 'success', __( 'Photo deleted.', 'cmp' ) ),
 		);
 	}
 
@@ -122,7 +126,7 @@ class CMP_Homework {
 	/** Entries of a program between two dates: [task_id][Y-m-d] => row. */
 	public static function entries( $program_id, $from, $to ) {
 		global $wpdb;
-		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT id, task_id, day, status, note, photo_sha, review, review_note, created_at, updated_at FROM ' . self::t( 'task_entries' ) . ' WHERE program_id = %d AND day BETWEEN %s AND %s', $program_id, $from, $to ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT id, task_id, program_id, member_id, day, status, note, photo_sha, review, review_note, created_at, updated_at FROM ' . self::t( 'task_entries' ) . ' WHERE program_id = %d AND day BETWEEN %s AND %s', $program_id, $from, $to ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$out  = array();
 		foreach ( $rows as $r ) {
 			$out[ (int) $r->task_id ][ $r->day ] = $r;
@@ -240,6 +244,49 @@ class CMP_Homework {
 		return "\xFF\xD8\xFF" === substr( $data, 0, 3 ) ? $data : new WP_Error( 'hw_photo', 'save' );
 	}
 
+	/** 0.32.0: an entry whose proof photo is still kept. */
+	public static function has_photo( $e ) {
+		return '' !== (string) $e->photo_sha && self::PURGED !== $e->photo_sha && self::DELETED !== $e->photo_sha;
+	}
+
+	public static function removed_text( $e ) {
+		return self::DELETED === $e->photo_sha ? __( 'Photo deleted.', 'cmp' ) : sprintf( /* translators: %d: days */ __( 'Photo removed after %d days.', 'cmp' ), self::photo_days() );
+	}
+
+	public static function photo_days() {
+		$p = CMP_Retention::periods();
+		return isset( $p['homework_photos'] ) ? max( 1, (int) $p['homework_photos'] ) : 90;
+	}
+
+	/**
+	 * 0.32.0, daily: delete proof photos for days more than $days ago. The
+	 * log entry and its review stay.
+	 *
+	 * @return int Photos removed.
+	 */
+	public static function purge_photos( $days ) {
+		global $wpdb;
+		return (int) $wpdb->query( $wpdb->prepare( 'UPDATE ' . self::t( 'task_entries' ) . ' SET photo = NULL, photo_sha = %s WHERE photo IS NOT NULL AND day < %s', self::PURGED, wp_date( 'Y-m-d', time() - max( 1, (int) $days ) * DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	/** 0.32.0: delete one proof photo now (the member, or the site team from a report). */
+	public static function delete_photo( $entry, $by, $actor_id ) {
+		global $wpdb;
+		$wpdb->update( self::t( 'task_entries' ), array( 'photo' => null, 'photo_sha' => self::DELETED ), array( 'id' => (int) $entry->id ) );
+		CMP_Audit::log( 'homework_photo_deleted', 'program', (int) $entry->program_id, null, array( 'entry' => (int) $entry->id, 'by' => $by ), '', $actor_id );
+	}
+
+	/** The member deletes their own proof photo (any program, running or ended). */
+	public static function handle_unphoto() {
+		$user_id = self::guard();
+		$entry   = self::entry( isset( $_POST['entry'] ) ? absint( $_POST['entry'] ) : 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- guard() checked it.
+		if ( ! $entry || (int) $entry->member_id !== (int) $user_id || ! self::has_photo( $entry ) ) {
+			self::go( array(), 'hw_gone' );
+		}
+		self::delete_photo( $entry, 'member', $user_id );
+		self::go( array( 'program' => (int) $entry->program_id, 'cmp_week' => self::week_start( $entry->day ), 'cmp_day' => $entry->day ), 'hw_photo_deleted' );
+	}
+
 	public static function photo_url( $entry ) {
 		return add_query_arg( array( self::PHOTO_QUERY => (int) $entry->id, 'v' => substr( (string) $entry->photo_sha, 0, 12 ) ), home_url( '/' ) );
 	}
@@ -261,7 +308,8 @@ class CMP_Homework {
 		$entry   = self::entry( absint( $_GET[ self::PHOTO_QUERY ] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$program = $entry ? self::program( $entry->program_id ) : null;
 		$viewer  = get_current_user_id();
-		if ( ! $entry || ! $entry->photo || ! $program || ! $viewer || ! self::can_view( $program, $viewer ) ) {
+		$photo   = $entry && $program && $viewer && self::can_view( $program, $viewer ) ? CMP_Photo_Vault::open( $entry->photo, $entry->program_id, $entry->member_id, 'hwproof' ) : null;
+		if ( null === $photo ) {
 			nocache_headers();
 			status_header( 404 );
 			header( 'Content-Type: text/plain; charset=utf-8' );
@@ -272,10 +320,10 @@ class CMP_Homework {
 		header( 'ETag: "' . $entry->photo_sha . '"' );
 		status_header( 200 );
 		header( 'Content-Type: image/jpeg' );
-		header( 'Content-Length: ' . strlen( $entry->photo ) );
-		header( 'Content-Disposition: inline; filename="proof.jpg"' );
+		header( 'Content-Length: ' . strlen( $photo ) );
+		header( 'Content-Disposition: ' . ( isset( $_GET['dl'] ) ? 'attachment; filename="colandb-homework-' . $entry->day . '-' . (int) $entry->id . '.jpg"' : 'inline; filename="proof.jpg"' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		header( "Content-Security-Policy: default-src 'none'" );
-		echo $entry->photo; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JPEG bytes.
+		echo $photo; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JPEG bytes.
 		exit;
 	}
 
@@ -440,6 +488,9 @@ class CMP_Homework {
 			if ( UPLOAD_ERR_OK !== (int) $file['error'] || ! is_uploaded_file( $file['tmp_name'] ) ) {
 				self::go( $back, 'hw_photo' );
 			}
+			if ( ! CMP_Photo_Consent::check( $user_id ) ) {
+				self::go( $back, 'hw_consent' ); // 0.32.0
+			}
 			$photo = self::process_photo( $file['tmp_name'] );
 			if ( is_wp_error( $photo ) ) {
 				self::go( $back, 'hw_photo' );
@@ -449,7 +500,7 @@ class CMP_Homework {
 		if ( 'done' === $status ) {
 			$needs_photo = in_array( $task->proof, array( 'photo', 'photo_text' ), true );
 			$needs_text  = in_array( $task->proof, array( 'text', 'photo_text', 'report' ), true );
-			$has_photo   = $photo || ( $existing && $existing->photo_sha );
+			$has_photo   = $photo || ( $existing && self::has_photo( $existing ) );
 			if ( ( $needs_photo && ! $has_photo ) || ( $needs_text && '' === $note ) ) {
 				self::go( $back, 'hw_proof' );
 			}
@@ -457,7 +508,7 @@ class CMP_Homework {
 		$now = gmdate( 'Y-m-d H:i:s' );
 		$row = array( 'status' => $status, 'note' => $note, 'review' => '', 'review_note' => '', 'updated_at' => $now );
 		if ( $photo ) {
-			$row['photo']     = $photo;
+			$row['photo']     = CMP_Photo_Vault::seal( $photo, $program->id, $user_id, 'hwproof' ); // 0.32.0
 			$row['photo_sha'] = hash( 'sha256', $photo );
 		}
 		if ( $existing ) {
@@ -726,7 +777,8 @@ class CMP_Homework {
 				<p class="cmp-hw-review-note"><?php echo esc_html( $entry->review_note ); ?></p>
 			<?php endif; ?>
 			<?php if ( $needs_photo ) : ?>
-				<p class="cmp-field"><label for="<?php echo esc_attr( $id ); ?>_photo"><?php echo esc_html( $entry && $entry->photo_sha ? __( 'Replace photo (one is already attached)', 'cmp' ) : __( 'Photo (needed to log it done)', 'cmp' ) ); ?></label><input type="file" id="<?php echo esc_attr( $id ); ?>_photo" name="photo" accept="image/jpeg,image/png,image/webp" /></p>
+				<p class="cmp-field"><label for="<?php echo esc_attr( $id ); ?>_photo"><?php echo esc_html( $entry && self::has_photo( $entry ) ? __( 'Replace photo (one is already attached)', 'cmp' ) : __( 'Photo (needed to log it done)', 'cmp' ) ); ?></label><input type="file" id="<?php echo esc_attr( $id ); ?>_photo" name="photo" accept="image/jpeg,image/png,image/webp" /></p>
+				<?php echo CMP_Photo_Consent::field_html( get_current_user_id(), $id . '_consent' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 			<?php endif; ?>
 			<?php if ( 'none' !== $task->proof ) : ?>
 				<p class="cmp-field"><label for="<?php echo esc_attr( $id ); ?>_note"><?php echo esc_html( 'report' === $task->proof ? __( 'Your report', 'cmp' ) : ( $needs_text ? __( 'Text (needed to log it done)', 'cmp' ) : __( 'Note (optional)', 'cmp' ) ) ); ?></label><textarea id="<?php echo esc_attr( $id ); ?>_note" name="note" rows="<?php echo 'report' === $task->proof ? 8 : 3; ?>" maxlength="<?php echo 'report' === $task->proof ? 5000 : 1000; ?>"><?php echo esc_textarea( $entry ? $entry->note : '' ); ?></textarea></p>
@@ -737,6 +789,17 @@ class CMP_Homework {
 				<button type="submit" name="status" value="na" class="cmp-btn cmp-btn-outline" formnovalidate><?php esc_html_e( 'N/A', 'cmp' ); ?></button>
 			</div>
 		</form>
+		<?php if ( $entry && self::has_photo( $entry ) && (int) $entry->member_id === get_current_user_id() ) : ?>
+			<?php /* 0.32.0: the member's own proof photo: view, download, delete. */ ?>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="cmp-form cmp-hw-photo-acts">
+				<input type="hidden" name="action" value="cmp_hw_unphoto" /><input type="hidden" name="entry" value="<?php echo (int) $entry->id; ?>" /><?php echo self::nonce_field(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<p class="cmp-muted"><?php echo esc_html( sprintf( /* translators: %s: date */ __( 'Your photo for this day is kept, encrypted, until %s.', 'cmp' ), wp_date( 'M j, Y', strtotime( $entry->day . ' 12:00' ) + self::photo_days() * DAY_IN_SECONDS ) ) ); ?>
+					<a href="<?php echo esc_url( self::photo_url( $entry ) ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'View', 'cmp' ); ?></a> · <a href="<?php echo esc_url( add_query_arg( 'dl', 1, self::photo_url( $entry ) ) ); ?>" download><?php esc_html_e( 'Download', 'cmp' ); ?></a></p>
+				<button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline cmp-btn-danger" data-cmp-confirm="<?php esc_attr_e( 'Delete this photo now? The person who set your homework won\'t see it any more. This can\'t be undone.', 'cmp' ); ?>"><?php esc_html_e( 'Delete photo', 'cmp' ); ?></button>
+			</form>
+		<?php elseif ( $entry && '' !== (string) $entry->photo_sha && ! self::has_photo( $entry ) ) : ?>
+			<p class="cmp-muted"><?php echo esc_html( self::removed_text( $entry ) ); ?></p>
+		<?php endif; ?>
 		<?php
 		return ob_get_clean();
 	}
@@ -749,8 +812,10 @@ class CMP_Homework {
 				continue;
 			}
 			$html .= '<div class="cmp-hw-proof"><p><b>' . esc_html( wp_date( 'D M j', strtotime( $d . ' 12:00' ) ) ) . '</b>' . ( $e->review ? ' · ' . esc_html( 'accepted' === $e->review ? __( 'accepted', 'cmp' ) : __( 'not good enough', 'cmp' ) ) : '' ) . '</p>';
-			if ( $e->photo_sha ) {
+			if ( self::has_photo( $e ) ) {
 				$html .= '<a href="' . esc_url( self::photo_url( $e ) ) . '" target="_blank" rel="noopener"><img src="' . esc_url( self::photo_url( $e ) ) . '" alt="' . esc_attr__( 'Proof photo', 'cmp' ) . '" loading="lazy" /></a>';
+			} elseif ( '' !== (string) $e->photo_sha ) {
+				$html .= '<p class="cmp-muted">' . esc_html( self::removed_text( $e ) ) . '</p>';
 			}
 			if ( $e->note ) {
 				$html .= '<p class="cmp-hw-note">' . nl2br( esc_html( $e->note ) ) . '</p>';
@@ -876,7 +941,7 @@ class CMP_Homework {
 		}
 		$entries = $wpdb->get_results( $wpdb->prepare( 'SELECT e.day, e.status, e.note, e.photo_sha, t.title FROM ' . self::t( 'task_entries' ) . ' e JOIN ' . self::t( 'tasks' ) . ' t ON t.id = e.task_id WHERE e.member_id = %d ORDER BY e.day', $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		foreach ( $entries as $e ) {
-			$rows[] = array( 'name' => __( 'Homework log', 'cmp' ), 'value' => sprintf( '%s · %s · %s%s%s', $e->day, $e->title, $e->status, $e->note ? ' · ' . $e->note : '', $e->photo_sha ? ' · ' . __( '(photo kept)', 'cmp' ) : '' ) );
+			$rows[] = array( 'name' => __( 'Homework log', 'cmp' ), 'value' => sprintf( '%s · %s · %s%s%s', $e->day, $e->title, $e->status, $e->note ? ' · ' . $e->note : '', self::has_photo( $e ) ? ' · ' . __( '(photo kept, encrypted; download it from the homework log)', 'cmp' ) : ( '' !== (string) $e->photo_sha ? ' · ' . self::removed_text( $e ) : '' ) ) );
 		}
 		return $rows;
 	}
