@@ -63,7 +63,10 @@ get pup p1b "$PAGE&cmp_tab=chastity"
 ok "someone the wearer leads is not offered" $(hasnt $T/p1b.html "<option value=\"$NOSY\"")
 r=$(act pup $PN start -F "keyholder=0" -F "option=custom" -F "option_name=" -F "policy=none")
 ok "custom option needs a name" $(echo "$r" | grep -q 'cl_invalid' && echo 1 || echo 0)
-r=$(act pup $PN start -F "keyholder=$KH" -F "keyholder_name=Ignored Name" -F "option=b" -F "length=10080" -F "photo=@$T/v.jpg;type=image/jpeg")
+ok "start form shows the photo consent tick box (0.32.0)" $(has $T/p1b.html 'name="photo_consent"')
+r=$(act pup $PN start -F "keyholder=$KH" -F "option=b" -F "length=10080" -F "photo=@$T/v.jpg;type=image/jpeg")
+ok "...a photo without consent is refused and nothing starts" $(echo "$r" | grep -q 'cl_consent' && [ "$(q "SELECT COUNT(*) FROM $L_T WHERE wearer_id=$PUP")" = 0 ] && echo 1 || echo 0)
+r=$(act pup $PN start -F "keyholder=$KH" -F "keyholder_name=Ignored Name" -F "option=b" -F "length=10080" -F "photo_consent=1" -F "photo=@$T/v.jpg;type=image/jpeg")
 LID=$(q "SELECT MAX(id) FROM $L_T")
 ok "locked with a keyholder: option B, 1 week" $(echo "$r" | grep -q 'cl_started' && [ "$(lk $LID keyholder_id option_key release_policy status)" = "$KH|b|permission|locked" ] && echo 1 || echo 0)
 ok "keyholder notified (lock)" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$KH AND category='lock'")" -ge 1 ] && echo 1 || echo 0)
@@ -198,6 +201,16 @@ mkdir -p wp-content/mu-plugins && echo "<?php add_action('send_headers', functio
 ec(){ curl -s -D - -o /dev/null "$@" | grep -ci '^ec-cdn-cache-control'; }
 ok "private photo responses drop the host's public-cache hint (share page, view, wearer photo)" $([ "$(ec "$H/?page_id=$PAGE_ID")$(ec "$SURL4")$(ec -X POST -d cmp_view=1 "$SURL4")$(ec -b $T/pup.jar "$VURL")" = 1000 ] && echo 1 || echo 0)
 rm -f wp-content/mu-plugins/zz-cdn-hint.php
+ok "Download sends the photo as an attachment" $(curl -s -b $T/pup.jar -D - -o /dev/null "$VURL&dl=1" | grep -qi 'content-disposition: attachment; filename="colandb-lock-' && echo 1 || echo 0)
+ok "Your photos has Download and Delete photo" $([ "$(has $T/ph2.html '&#038;dl=1\|&dl=1')$(has $T/ph2.html 'value="unphoto"')" = 11 ] && echo 1 || echo 0)
+r=$(act pup $PN share -F "event=$VID" -F "expires=86400"); DSH=$(q "SELECT MAX(id) FROM $S_T")
+DEL=$(ev "global \$wpdb; \$j=file_get_contents('$T/pic.pup'); \$wpdb->insert('$E_T',array('lock_id'=>$LID,'actor_id'=>$PUP,'type'=>'verification','photo'=>CMP_Photo_Vault::seal(\$j,$LID,$PUP),'photo_sha'=>hash('sha256',\$j),'code'=>'DEL','created_at'=>gmdate('Y-m-d H:i:s'))); echo \$wpdb->insert_id;")
+r=$(act pup $PN share -F "event=$DEL" -F "expires=86400"); DSH2=$(q "SELECT MAX(id) FROM $S_T")
+r=$(act kh $KN unphoto -F "event=$DEL")
+ok "the keyholder can't delete the wearer's photo" $(echo "$r" | grep -q 'cl_gone' && [ "$(curl -s -b $T/pup.jar -o /dev/null -w '%{http_code}' "$H/?cmp_lockpic=$DEL")" = 200 ] && echo 1 || echo 0)
+r=$(act pup $PN unphoto -F "event=$DEL")
+ok "the wearer deletes a photo: 404, its links gone, history says 'photo deleted', other links kept" $(echo "$r" | grep -q 'cl_photo_deleted' && [ "$(curl -s -b $T/pup.jar -o /dev/null -w '%{http_code}' "$H/?cmp_lockpic=$DEL")" = 404 ] && [ "$(q "SELECT COUNT(*) FROM $S_T WHERE event_id=$DEL")" = 0 ] && [ "$(q "SELECT COUNT(*) FROM $S_T WHERE id=$DSH")" = 1 ] && ev "\$e=CMP_Chastity::events($LID,100); foreach(\$e as \$x) if(\$x->id==$DEL) echo (new ReflectionMethod('CMP_Chastity','event_text'))->invoke(null,\$x);" | grep -q 'photo deleted' && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->delete('$E_T',array('id'=>$DEL));" >/dev/null # the extra photo would make today count as verified below
 ok "the daily code isn't an access code" $([ "$(curl -s -o /dev/null -w '%{http_code}' "$H/?cmp_share=$CODE")$(curl -s -o /dev/null -w '%{http_code}' "$H/?cmp_lockpic=$VID&code=$CODE")" = 404404 ] && echo 1 || echo 0)
 
 echo "== Verified elsewhere (CMP 0.28.0)"

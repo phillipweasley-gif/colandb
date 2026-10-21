@@ -4,6 +4,48 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.32.0
+
+**Consent before intimate photos; homework photos encrypted and deleted after 90 days; members download and delete their own photos; a public way to report an intimate image** (owner, 2026-10-21: "start the end-to-end encryption and build a plan/address the other concerns until completed". Plan: `docs/privacy-security-plan.md`. End-to-end encryption is the next release.)
+
+- **Consent** (`CMP_Photo_Consent`, new).
+  - Before a member's first chastity or homework photo, the form shows a tick box: what's kept, who sees it, that it's encrypted and deleted after 90 days, and that they can delete it sooner. It links to the privacy statement.
+  - The server refuses a photo without it ("Nothing was saved…"), then records the time (user meta `cmp_photo_consent_at`) and an audit-log row (`photo_consent_given`). It isn't asked again.
+  - Why: intimate photos are special-category data under GDPR and "sensitive data" under several US state laws, which ask for opt-in consent.
+  - Included in the data export; removed on erase.
+- **Homework proof photos**, now treated like chastity photos:
+  - encrypted at rest (`CMP_Photo_Vault`, new context `hwproof`, bound to the program and member). Older ones are encrypted on upgrade (`CMP_DB_VERSION` 19) and by the daily clean-up.
+  - deleted 90 days after the logged day (`cmp_retention_periods['homework_photos']`). The log entry and its review stay, and say "Photo removed after 90 days."
+- **Members control their own photos.**
+  - Chastity "Your photos": **Download** (sent as a file) and **Delete photo** (confirm). Deleting stops its share links; the history says "photo deleted" and the keyholder sees "Photo deleted."
+  - Homework: under the day's log form the member sees "kept, encrypted, until <date>" with **View**, **Download** and **Delete photo**. The lead can't delete it.
+  - The export points to these downloads, because WordPress's exporter only carries text.
+- **Report an intimate image** (`CMP_Image_Reports`, new table `cmp_image_reports`).
+  - What it's for: the TAKE IT DOWN Act asks sites that host what users post to offer a clear reporting process and act on valid reports within 48 hours.
+  - `[cmp_image_report]` is a public form; no account needed. It asks:
+    - who the image shows (me, someone I'm reporting for, or possibly someone under 18);
+    - where it is, and optional details;
+    - email and optional name;
+    - a good-faith statement, and a typed full name as the signature.
+  - Spam protection: a honeypot field, a signed timestamp (at least 3 seconds on the page) and 5 reports a day per address or email.
+  - On a report:
+    - the site's admin email gets an urgent message with the 48-hour deadline;
+    - the reporter gets a confirmation;
+    - a possible-minor report gets its own subject line and "don't open, download or forward it; report it to the NCMEC CyberTipline" guidance.
+  - **Users → Image reports:**
+    - lists reports with time left (red under 12 hours, or overdue), and an admin notice while any are waiting;
+    - **Removed** / **Not actioned** with a note, optionally emailed to the reporter;
+    - **Remove a private photo**: paste a chastity, homework, share, feed or profile photo link and the stored photo is deleted without being shown. It's audit-logged and noted on the report.
+  - Retention: reports are kept 3 years (`image_reports`), not erased on request (safety and legal record). The data export by email lists them, for reporters without accounts too.
+- **Verification** (local WordPress test kit, PHP 8.3, SQLite):
+  - `tests/image-report-e2e.sh` 22/22 (new): form fields; too fast, honeypot, tampered timestamp, no signature or no statement all refused with nothing stored; a valid report is stored and both emails sent; possible-minor wording; the daily limit; the admin list, time left, notice; a non-admin can't close; closing emails the reporter with the note; removing by share, chastity, homework and feed links (and nothing on a second try); audit and report notes; export by email; the 3-year clean-up.
+  - `tests/chastity-e2e.sh`: new checks for the consent box, a photo refused without it, Download as an attachment, Download and Delete in Your photos, the keyholder unable to delete, and the wearer's delete (404, its links gone, others kept, "photo deleted" in history).
+  - `tests/homework-e2e.sh`: new checks for the consent box shown once and recorded once; encryption bound to program and member; Download; View/Download/Delete for the member; the lead can't delete; the member's delete; the clean-up removing a 95-day-old photo and encrypting an older plain one; the removed/deleted wording; export and erase.
+  - `tests/chastity-e2e.sh` 176/176, `tests/homework-e2e.sh` 55/55, `tests/retention-e2e.sh` 17/17, `tests/account-e2e.sh` 69/69, `tests/feed-e2e.sh` 41/41, `tests/profile-e2e.sh` 84/84, `tests/member-admin-e2e.sh` 43/43. `php -l` on every changed file; no plugin warnings in `debug.log`.
+- **After this is live:** add a page with `[cmp_image_report]` and link it from the Privacy Policy, the Help & FAQ and the footer.
+
+---
+
 ## 0.31.1
 
 **Private photos never carry the host's "cache publicly" hint.** Checking 0.31.0 on colandb.com showed that the host's CDN (Elementor Hosting) adds its own header, `ec-cdn-cache-control: public, s-maxage=604800`, to every page, including private photo responses. The CDN does cache 200 pages with query strings, as a test on the public privacy page showed.
