@@ -8,6 +8,7 @@ class CEC_Submission_Form {
 	const NONCE_ACTION = 'cec_submit_event_action';
 
 	public static function render_shortcode( $atts ) {
+		CEC_No_Cache::send();
 		$require_login = CEC_Admin_Settings::get( 'require_login' );
 		$guest_allowed  = CEC_Admin_Settings::get( 'allow_guest_submission' );
 		$logged_in      = is_user_logged_in();
@@ -212,6 +213,7 @@ class CEC_Submission_Form {
 			</div>
 			<?php echo CEC_Recurrence::render_monthly_weekday_fields(); // phpcs:ignore ?>
 
+			<p class="cec-hp-field" aria-hidden="true"><label>Leave this field empty</label><input type="text" name="cec_website" tabindex="-1" autocomplete="off"></p>
 			<button type="submit" class="cec-btn"><?php esc_html_e( 'Submit Event for Review', 'cec' ); ?></button>
 			<p class="description"><?php esc_html_e( 'An admin will review your submission before it appears on the public calendar.', 'cec' ); ?></p>
 		</form>
@@ -235,8 +237,14 @@ class CEC_Submission_Form {
 	private static function process_submission( $is_guest ) {
 		$redirect = isset( $_POST['cec_redirect'] ) ? esc_url_raw( $_POST['cec_redirect'] ) : home_url();
 
-		if ( ! isset( $_POST['cec_submit_nonce'] ) || ! wp_verify_nonce( $_POST['cec_submit_nonce'], self::NONCE_ACTION ) ) {
+		// Signed out, an expired nonce is let through (CEC_No_Cache::form_nonce_ok()); the honeypot and the approval queue remain.
+		if ( ! CEC_No_Cache::form_nonce_ok( 'cec_submit_nonce', self::NONCE_ACTION ) ) {
 			wp_safe_redirect( add_query_arg( 'cec_submitted', '0', $redirect ) );
+			exit;
+		}
+		if ( ! empty( $_POST['cec_website'] ) ) {
+			// Honeypot (1.46.1): pretend success so bots learn nothing.
+			wp_safe_redirect( add_query_arg( 'cec_submitted', $is_guest ? 'guest' : '1', $redirect ) );
 			exit;
 		}
 

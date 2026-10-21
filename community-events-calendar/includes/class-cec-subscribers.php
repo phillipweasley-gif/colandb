@@ -95,6 +95,7 @@ class CEC_Subscribers {
 	}
 
 	private static function render_form() {
+		CEC_No_Cache::send();
 		$orgs           = get_terms( array( 'taxonomy' => 'cec_partner_org', 'hide_empty' => false ) );
 		$preselect_slug = isset( $_GET['cec_org'] ) ? sanitize_title( wp_unslash( $_GET['cec_org'] ) ) : '';
 
@@ -136,7 +137,7 @@ class CEC_Subscribers {
 	public static function handle_subscribe() {
 		$redirect = isset( $_POST['cec_redirect'] ) ? esc_url_raw( wp_unslash( $_POST['cec_redirect'] ) ) : home_url();
 
-		if ( ! isset( $_POST['cec_subscribe_nonce'] ) || ! wp_verify_nonce( $_POST['cec_subscribe_nonce'], 'cec_subscribe_action' ) || ! empty( $_POST['cec_website'] ) ) {
+		if ( ! CEC_No_Cache::form_nonce_ok( 'cec_subscribe_nonce', 'cec_subscribe_action' ) || ! empty( $_POST['cec_website'] ) ) {
 			wp_safe_redirect( add_query_arg( 'cec_subscribed', '0', $redirect ) );
 			exit;
 		}

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Community Events Calendar
  * Description: Member and admin-managed community events calendar with submissions, approval workflow, partner organizations & titleholders, recurring events, postponed/cancelled status, RSS/email subscriptions, volunteer inquiries, RSVP, and Elementor widgets. Shortcodes: [cec_calendar] month view, [cec_submit_org] organization/titleholder listing form, [cec_partner_orgs kind="organization|titleholder" limit="6" shuffle="yes" more="/organizations/"] listed groups grid, [cec_events view="grid|list"] filterable grid/list, [cec_upcoming count="8"] scrolling upcoming events, [cec_submit_event] front-end submission form, [cec_admin_dashboard] front-end approval dashboard for delegated Calendar Managers, [cec_my_events] lets a submitter manage their own events, [cec_login]/[cec_register] styled account forms, [cec_manage_submission] guest email-link editing, [cec_subscribe] email subscriptions to all events or specific organizations, [cec_volunteer_form] volunteer inquiry form. Full docs on the Events > Settings page.
- * Version: 1.46.0
+ * Version: 1.46.1
  * Author: RA Marketing
  * Text Domain: cec
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CEC_VERSION', '1.46.0' );
+define( 'CEC_VERSION', '1.46.1' );
 define( 'CEC_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CEC_URL', plugin_dir_url( __FILE__ ) );
 define( 'CEC_TABLE_RSVP', 'cec_rsvps' );
@@ -29,6 +29,7 @@ require_once CEC_DIR . 'includes/class-cec-public-api.php';
 require_once CEC_DIR . 'includes/class-cec-meta-boxes.php';
 require_once CEC_DIR . 'includes/class-cec-admin-list.php';
 require_once CEC_DIR . 'includes/class-cec-admin-settings.php';
+require_once CEC_DIR . 'includes/class-cec-no-cache.php';
 require_once CEC_DIR . 'includes/class-cec-auth.php';
 require_once CEC_DIR . 'includes/class-cec-tokens.php';
 require_once CEC_DIR . 'includes/class-cec-submission-form.php';
@@ -113,6 +114,7 @@ final class CEC_Plugin {
 		add_action( 'admin_post_nopriv_cec_register', array( 'CEC_Auth', 'handle_register' ) );
 
 		add_shortcode( 'cec_manage_submission', array( 'CEC_Guest_Edit', 'render_shortcode' ) );
+		add_filter( 'request', array( 'CEC_Guest_Edit', 'keep_edit_link_on_page' ) );
 		add_action( 'admin_post_cec_request_edit_link', array( 'CEC_Guest_Edit', 'handle_request_link' ) );
 		add_action( 'admin_post_nopriv_cec_request_edit_link', array( 'CEC_Guest_Edit', 'handle_request_link' ) );
 		add_action( 'admin_post_cec_guest_save_event', array( 'CEC_Guest_Edit', 'handle_save_event' ) );
@@ -173,6 +175,7 @@ final class CEC_Plugin {
 		CEC_Meetings::init();
 		CEC_Org_Submissions::init();
 		CEC_Org_Editor::init();
+		CEC_No_Cache::init();
 		add_action( 'updated_post_meta', array( 'CEC_RSVP', 'on_start_meta_updated' ), 10, 4 );
 
 		add_filter( 'query_vars', array( 'CEC_Ical', 'add_query_vars' ) );

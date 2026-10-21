@@ -88,6 +88,7 @@ class CEC_Org_Submissions {
 	}
 
 	public static function render_form() {
+		CEC_No_Cache::send();
 		wp_enqueue_style( 'cec-frontend' );
 		wp_enqueue_style( 'cec-orgs' );
 		$state  = isset( $_GET['cec_org'] ) ? sanitize_key( wp_unslash( $_GET['cec_org'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended

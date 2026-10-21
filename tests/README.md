@@ -32,6 +32,7 @@ bash tests/series-e2e.sh             # a series saved in wp-admin keeps its date
 bash tests/ends-e2e.sh               # event ends: past midnight is the next day, earlier dates refused, the 1.45.3 repair: 18 checks
 bash tests/fundraisers-e2e.sh        # public fundraising tracker: wp-admin entry, totals-only cards, private donations: 21 checks
 bash tests/meetings-e2e.sh           # meeting notes: Secretary portal, drafts/approval, motions, files, public page: 27 checks
+bash tests/form-cache-e2e.sh         # form pages never cached (host CDN header copied by a test mu-plugin), expired nonces accepted when signed out, guest edit links: 36 checks
 ```
 
 | File | What it does |
@@ -61,6 +62,7 @@ bash tests/meetings-e2e.sh           # meeting notes: Secretary portal, drafts/a
 | `mcp-e2e.sh` | COL&B Claude Connector: the MCP server over real HTTP with application passwords (who may connect, the Claude Agent role's reach in core REST, protocol errors, each tool's results and refusals, per-tool capabilities, the call log). Allows application passwords over HTTP with a temporary must-use plugin, removed at the end. |
 | `updater-e2e.sh` + `mock-github.php` | COL&B Plugin Updater: 27 checks against a local stand-in for GitHub (tokens, staging vs live channel, install, background auto-update, rejected zips, token never sent to the storage server). Run with `WPTEST` set, after `setup.sh`. The mock's release list expects member plugin releases 0.1.0/0.2.0; update `mock-github.php` if that test data needs to move. |
 | `recurrence-e2e.sh` + `recurrence-e2e.php` | Recurring events (CEC 1.45.1) through the wp-admin save hooks with the form post.php sends: a pending monthly series published from the edit screen keeps each date's day, only the series emails subscribers, and changing "Repeat until" regenerates the dates once. Runs in `wp eval-file` (no web server); creates and deletes its own "ZZ Recurrence Series" events. |
+| `form-cache-e2e.sh` | Pages with forms (CEC 1.46.1): with a must-use plugin adding the host's `ec-cdn-cache-control` header, every form page (sign-in, sign-up, event and organization submission, guest edit, subscribe, volunteer, meeting portal, an Elementor-only page) sends `no-store` and drops the hint while other pages keep it; signed out, a 2-day-old nonce still signs in, signs up, volunteers, subscribes, requests an edit link, submits and withdraws an event, while honeypots, missing nonces and signed-in nonces are still refused; guest edit links open (plain and pretty permalinks). Creates and deletes its own pages, events and user; restores settings. |
 | `snap.php` | `wp eval-file tests/snap.php <dir>` saves the public month calendar's HTML for 12 cases. Run it before and after any change to `CEC_Month_Grid` and `diff -r` the two folders: they must be identical. |
 | `shots.js` | `node tests/shots.js <outdir> <member-page-id>` (Playwright): screenshots of each member-area state and a horizontal-overflow check at 320/375/768/1440 px. Expects users `unv`, `att`, `mem` (password `pass1234`) in the matching states. |
 

@@ -17,7 +17,34 @@ class CEC_Guest_Edit {
 	const REQUEST_NONCE = 'cec_request_edit_link';
 	const ACTION_NONCE  = 'cec_guest_event_action';
 
+	/**
+	 * Edit links are "<manage page>?cec_event=<id>&cec_token=<token>", but
+	 * cec_event is also the event post type's query var, so WordPress looked
+	 * for an event with that slug and answered 404 (found 2026-10-21 on
+	 * colandb.com; 1.46.1). When a page is asked for with a token, the page
+	 * is what's wanted: drop the event lookup. The shortcode reads $_GET.
+	 *
+	 * @param array $vars Parsed query vars ('request' filter).
+	 */
+	public static function keep_edit_link_on_page( $vars ) {
+		if ( empty( $_GET['cec_token'] ) || ! isset( $vars['cec_event'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return $vars;
+		}
+		if ( empty( $vars['pagename'] ) && empty( $vars['page_id'] ) ) {
+			return $vars;
+		}
+		if ( isset( $vars['name'] ) && (string) $vars['name'] === (string) $vars['cec_event'] ) {
+			unset( $vars['name'] );
+		}
+		if ( isset( $vars['post_type'] ) && 'cec_event' === $vars['post_type'] ) {
+			unset( $vars['post_type'] );
+		}
+		unset( $vars['cec_event'] );
+		return $vars;
+	}
+
 	public static function render_shortcode( $atts ) {
+		CEC_No_Cache::send();
 		$event_id = isset( $_GET['cec_event'] ) ? absint( $_GET['cec_event'] ) : 0;
 		$token    = isset( $_GET['cec_token'] ) ? sanitize_text_field( wp_unslash( $_GET['cec_token'] ) ) : '';
 
@@ -73,7 +100,7 @@ class CEC_Guest_Edit {
 	public static function handle_request_link() {
 		$redirect = isset( $_POST['cec_redirect'] ) ? esc_url_raw( wp_unslash( $_POST['cec_redirect'] ) ) : home_url();
 
-		if ( ! isset( $_POST['cec_request_nonce'] ) || ! wp_verify_nonce( $_POST['cec_request_nonce'], self::REQUEST_NONCE ) ) {
+		if ( ! CEC_No_Cache::form_nonce_ok( 'cec_request_nonce', self::REQUEST_NONCE ) ) {
 			wp_safe_redirect( add_query_arg( 'cec_msg', 'requested', $redirect ) );
 			exit;
 		}
@@ -357,7 +384,7 @@ class CEC_Guest_Edit {
 	}
 
 	private static function verify_request( $event_id, $token ) {
-		if ( ! isset( $_POST['cec_guest_nonce'] ) || ! wp_verify_nonce( $_POST['cec_guest_nonce'], self::ACTION_NONCE ) ) {
+		if ( ! CEC_No_Cache::form_nonce_ok( 'cec_guest_nonce', self::ACTION_NONCE ) ) {
 			return false;
 		}
 		return CEC_Tokens::verify( $event_id, $token );
