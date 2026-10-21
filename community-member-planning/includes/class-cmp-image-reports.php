@@ -36,6 +36,7 @@ class CMP_Image_Reports {
 
 	public static function init() {
 		add_shortcode( self::SHORTCODE, array( __CLASS__, 'form_html' ) );
+		add_action( 'template_redirect', array( __CLASS__, 'no_cache' ) );
 		add_action( 'admin_post_' . self::ACTION, array( __CLASS__, 'handle' ) );
 		add_action( 'admin_post_nopriv_' . self::ACTION, array( __CLASS__, 'handle' ) );
 		add_action( 'admin_post_cmp_image_report_admin', array( __CLASS__, 'handle_admin' ) );
@@ -45,6 +46,24 @@ class CMP_Image_Reports {
 
 	public static function t() {
 		return CMP_Install::table( 'image_reports' );
+	}
+
+	/**
+	 * 0.32.1: the page with the form is never cached. The host's CDN keeps
+	 * pages for up to 7 days, and a cached copy would carry an old timestamp,
+	 * a stale thank-you message and someone else's "sent" state.
+	 */
+	public static function no_cache() {
+		$post = is_singular() ? get_queried_object() : null;
+		if ( ! $post || ! isset( $post->post_content ) || ! has_shortcode( $post->post_content, self::SHORTCODE ) ) {
+			return;
+		}
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true );
+		}
+		nocache_headers();
+		header_remove( 'ec-cdn-cache-control' );
+		header( 'Cache-Control: no-store, private, max-age=0' );
 	}
 
 	public static function relations() {
@@ -119,7 +138,7 @@ class CMP_Image_Reports {
 		};
 		$stamp = $p( 't', 64 );
 		$t     = (int) strtok( $stamp, '.' );
-		if ( '' !== $p( 'website', 200 ) || ! hash_equals( self::stamp( $t ), $stamp ) || time() - $t < self::MIN_SECS || time() - $t > DAY_IN_SECONDS ) {
+		if ( '' !== $p( 'website', 200 ) || ! hash_equals( self::stamp( $t ), $stamp ) || time() - $t < self::MIN_SECS || time() - $t > 8 * DAY_IN_SECONDS ) {
 			$go( 'invalid' ); // Bots: no details on purpose.
 		}
 		$row = array(

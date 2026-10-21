@@ -4,6 +4,18 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.32.1
+
+**The image report page is never cached.** I found this on colandb.com straight after 0.32.0 went live: the host's CDN (Elementor Hosting) cached `/report-an-image/` for up to 7 days (`s-maxage=604800`, `ec-cdn-status: hit`).
+- The form carries a signed timestamp, and 0.32.0 refused one older than a day. So a day after caching, every real report would have been refused.
+- A cached page could also show one visitor's "sent" message to the next.
+- Fix:
+  - Any page with `[cmp_image_report]` now sends `Cache-Control: no-store`, sets `DONOTCACHEPAGE`, and removes the CDN's `ec-cdn-cache-control` hint.
+  - As a fallback, a form timestamp is accepted for up to 8 days. Spam protection still has the honeypot, the 3-second minimum and the daily limits.
+- **Verification:** `tests/image-report-e2e.sh` 24/24. New checks: the report page has no-store and no CDN hint while another page keeps the hint (a test mu-plugin adds the host's header); a form opened 3 days ago still sends. `php -l`.
+
+---
+
 ## 0.32.0
 
 **Consent before intimate photos; homework photos encrypted and deleted after 90 days; members download and delete their own photos; a public way to report an intimate image** (owner, 2026-10-21: "start the end-to-end encryption and build a plan/address the other concerns until completed". Plan: `docs/privacy-security-plan.md`. End-to-end encryption is the next release.)
