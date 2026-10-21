@@ -28,6 +28,7 @@ community-member-planning/
 │   ├── class-cmp-photo-shares.php  0.31.0: wearer's private links to one photo (`?cmp_share=<id>.<token>`, expiry, once, revoke, view count)
 │   ├── class-cmp-photo-consent.php 0.32.0: one-time explicit consent before the first chastity/homework photo (`cmp_photo_consent_at`)
 │   ├── class-cmp-image-reports.php 0.32.0: public [cmp_image_report] form (TAKE IT DOWN Act), Users → Image reports, remove a private photo by link
+│   ├── class-cmp-e2e.php           0.33.0: optional end-to-end photos: keys (user meta), envelope checks, panel, share-page decrypt (with assets/js/e2e-photos.js)
 │   ├── class-cmp-member-admin.php  Users → Member Dynamics & Locks: site-team corrections to locks and dynamics (0.26.0)
 │   ├── class-cmp-feed.php          member feed: text/photo posts, event tags, likes, reports, admin hide, Feed tab
 │   ├── class-cmp-messages.php      member messages: requests, blocks, reports (Users → Member reports), Messages tab
@@ -70,6 +71,8 @@ community-member-planning/
 | user meta `cmp_age_blocked_at` | Set when a signed-in account gives a date under 18: the member area stays closed until the site team unlocks it. Kept by the eraser on purpose. |
 | user meta `cmp_notify_disabled_categories`, `cmp_timezone` | Notification opt-outs; member timezone for quiet hours (UI arrives with profiles). |
 | `{prefix}cmp_lock_events.photo` | 0.31.0: sealed by `CMP_Photo_Vault::seal()` as `CMPv1:` + key id (8) + nonce (24) + XChaCha20-Poly1305 ciphertext, with the lock id and wearer id as authenticated data. Key: BLAKE2b of `CMP_PHOTO_KEY` (if defined in wp-config.php, 32+ chars) or `AUTH_KEY`+`SECURE_AUTH_KEY`, then per lock and wearer. Never in the database. Changing those secrets makes stored photos unreadable (shown as not found; they're purged on schedule). `photo_sha` is the SHA-256 of the JPEG, or `purged` once the 90-day clean-up removed it. Only ever served by `CMP_Chastity::maybe_serve_photo()` (wearer and current keyholder) and `CMP_Photo_Shares::maybe_serve()`. |
+| `{prefix}cmp_lock_events.photo_e2e` | 0.33.0: 1 when `photo` holds (sealed) a `CMPE2E1` envelope only the recipients' browsers can open. Served as `application/octet-stream`. |
+| user meta `cmp_e2e_pub`, `cmp_e2e_box`, `cmp_e2e_on`, `cmp_e2e_at` | 0.33.0: P-256 public key (base64), private key boxed under the photo passphrase (JSON v/salt/iter/iv/ct), new photos end to end, set-up time. |
 | `{prefix}cmp_task_entries.photo` | 0.32.0: sealed like lock photos, context `hwproof` (program id, member id). `photo_sha` is `purged` after 90 days (from the logged day) or `deleted` when the member or site team deletes it. |
 | `{prefix}cmp_image_reports` | 0.32.0: id, created_at, email, name, signature, relation (self/behalf/minor), location, details, ip_hash (HMAC), status (new/removed/declined), handled_at, handled_by, note. Kept 3 years. |
 | `{prefix}cmp_photo_shares` | 0.31.0: id, wearer_id, lock_id, event_id, salt, created_at, expires_at, max_views (0 = until expiry, 1 = once), views, last_view_at, revoked_at. No token stored: the link token is `CMP_Photo_Vault::mac( 'share|<id>|<salt>' )`. Cleared a day after a link stops working, or when its photo is purged. |

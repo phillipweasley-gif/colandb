@@ -294,6 +294,7 @@ class CMP_Install {
 			note varchar(500) NOT NULL DEFAULT '',
 			photo mediumblob NULL,
 			photo_sha char(64) NOT NULL DEFAULT '',
+			photo_e2e tinyint(1) NOT NULL DEFAULT 0,
 			code varchar(8) NOT NULL DEFAULT '',
 			review varchar(12) NOT NULL DEFAULT '',
 			created_at datetime NOT NULL,

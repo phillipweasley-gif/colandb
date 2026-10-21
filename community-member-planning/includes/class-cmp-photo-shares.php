@@ -166,14 +166,26 @@ class CMP_Photo_Shares {
 		$once    = (int) $share->max_views ? __( 'It works once: after you view the photo, the link stops working.', 'cmp' ) : '';
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- viewing needs no account; the token is the permission.
+		// 0.33.0: an end-to-end photo. The key is in the link's #fragment, which
+		// browsers never send; one inline script (CSP nonce) decrypts it here.
+		$e2e    = (int) ( $event->photo_e2e ?? 0 );
+		$nonce  = $e2e ? bin2hex( random_bytes( 16 ) ) : '';
+		$script = '';
+		if ( $e2e ) {
+			header( "Content-Security-Policy: default-src 'none'; img-src blob: data:; style-src 'unsafe-inline'; script-src 'nonce-" . $nonce . "'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'" );
+		}
 		if ( 'POST' !== ( isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : '' ) || empty( $_POST['cmp_view'] ) ) {
-			$form = '<form method="post" action="' . esc_url( self::url( $share ) ) . '"><input type="hidden" name="cmp_view" value="1" /><button type="submit">' . esc_html__( 'View photo', 'cmp' ) . '</button></form>';
+			$form = '<form method="post" id="cmp-view" action="' . esc_url( self::url( $share ) ) . '"><input type="hidden" name="cmp_view" value="1" /><button type="submit">' . esc_html__( 'View photo', 'cmp' ) . '</button></form>';
+			if ( $e2e ) {
+				// Keep the #k= key through the POST; without it, don't use up the link.
+				$form .= '<p class="m" id="cmp-nokey" hidden>' . esc_html__( 'This link is missing its end. Ask the person who shared it to copy the whole link again.', 'cmp' ) . '</p><script nonce="' . esc_attr( $nonce ) . '">(function(){var f=document.getElementById("cmp-view");if(!/[#&]k=/.test(location.hash)){f.hidden=true;document.getElementById("cmp-nokey").hidden=false;return;}f.action=location.href;})();</script>';
+			}
 			self::page( 200, __( 'A private photo was shared with you', 'cmp' ), '<p>' . esc_html__( 'Someone on COL&B shared a private photo with you. It may be intimate (adults only). Open it only if you\'re 18 or over and you were expecting it.', 'cmp' ) . '</p><p class="m">' . esc_html( trim( $expires . ' ' . $once ) ) . '</p>' . $form );
 		}
 
 		// Count the view; a one-time link can only win this once.
 		$counted = (int) $wpdb->query( $wpdb->prepare( 'UPDATE ' . self::t() . ' SET views = views + 1, last_view_at = %s WHERE id = %d AND revoked_at IS NULL AND ( max_views = 0 OR views < max_views )', gmdate( 'Y-m-d H:i:s' ), $share->id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$photo   = $counted ? CMP_Photo_Vault::open( $event->photo, $lock->id, $lock->wearer_id ) : null;
+		$photo   = $counted ? CMP_Photo_Vault::open( $event->photo, $lock->id, $lock->wearer_id ) : null; // An end-to-end envelope stays encrypted.
 		if ( null === $photo ) {
 			self::page( 404, __( 'This link isn\'t available', 'cmp' ), '<p>' . esc_html__( 'It has expired, has already been used, or the person who shared it turned it off.', 'cmp' ) . '</p>' );
 		}
@@ -181,6 +193,13 @@ class CMP_Photo_Shares {
 			CMP_Notifications::add( (int) $share->wearer_id, 'lock', __( 'A photo link you shared was just opened.', 'cmp' ), CMP_Chastity::url() );
 		}
 		$img = '<img src="data:image/jpeg;base64,' . base64_encode( $photo ) . '" alt="' . esc_attr__( 'Shared photo', 'cmp' ) . '" />'; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+		if ( $e2e ) {
+			$fail = __( 'This photo couldn\'t be opened. The link may be incomplete: ask for the whole link again.', 'cmp' );
+			$img  = '<div id="cmp-env" data-env="' . esc_attr( base64_encode( $photo ) ) . '"></div><p class="m" id="cmp-msg">' . esc_html__( 'Decrypting on your device…', 'cmp' ) . '</p><img id="cmp-img" alt="' . esc_attr__( 'Shared photo', 'cmp' ) . '" hidden />' // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+				. '<script nonce="' . esc_attr( $nonce ) . '">(function(){var m=document.getElementById("cmp-msg");function u(s){s=String(s).replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";var b=atob(s),o=new Uint8Array(b.length);for(var i=0;i<b.length;i++)o[i]=b.charCodeAt(i);return o;}'
+				. 'try{var k=new URLSearchParams(location.hash.slice(1)).get("k");history.replaceState(null,"",location.pathname+location.search);var b=u(document.getElementById("cmp-env").getAttribute("data-env"));var n=new DataView(b.buffer).getUint32(7);var h=JSON.parse(new TextDecoder().decode(b.subarray(11,11+n)));'
+				. 'crypto.subtle.importKey("raw",u(k),"AES-GCM",false,["decrypt"]).then(function(key){return crypto.subtle.decrypt({name:"AES-GCM",iv:u(h.iv),additionalData:new TextEncoder().encode("cmp-e2e-v1")},key,b.subarray(11+n));}).then(function(p){var i=document.getElementById("cmp-img");i.src=URL.createObjectURL(new Blob([p],{type:"image/jpeg"}));i.hidden=false;m.textContent="";}).catch(function(){m.textContent=' . wp_json_encode( $fail ) . ';});}catch(e){m.textContent=' . wp_json_encode( $fail ) . ';}})();</script>';
+		}
 		self::page( 200, __( 'Shared photo', 'cmp' ), $img . '<p class="m">' . esc_html__( 'Shared privately from COL&B. Please don\'t save, screenshot or forward it.', 'cmp' ) . ' ' . esc_html( (int) $share->max_views ? __( 'This link has now stopped working.', 'cmp' ) : $expires ) . '</p>' );
 	}
 
