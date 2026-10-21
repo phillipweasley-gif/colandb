@@ -398,6 +398,9 @@ class CMP_Chastity {
 		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
 			define( 'DONOTCACHEPAGE', true );
 		}
+		// 0.31.1: the host's CDN adds a "cache publicly" hint for itself
+		// (ec-cdn-cache-control) to every page; a private photo must never have it.
+		header_remove( 'ec-cdn-cache-control' );
 		$event  = self::event( absint( $_GET[ self::PHOTO_QUERY ] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$lock   = $event ? self::lock( $event->lock_id ) : null;
 		$viewer = get_current_user_id();

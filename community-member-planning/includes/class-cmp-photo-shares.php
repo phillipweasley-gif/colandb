@@ -136,6 +136,9 @@ class CMP_Photo_Shares {
 		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
 			define( 'DONOTCACHEPAGE', true );
 		}
+		// 0.31.1: the host's CDN adds a "cache publicly" hint for itself
+		// (ec-cdn-cache-control) to every page; a private photo must never have it.
+		header_remove( 'ec-cdn-cache-control' );
 		nocache_headers();
 		header( 'Cache-Control: no-store, private, max-age=0' );
 		header( 'X-Robots-Tag: noindex, nofollow, noarchive, noimageindex' );

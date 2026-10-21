@@ -204,6 +204,9 @@ class CMP_Feed {
 		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
 			define( 'DONOTCACHEPAGE', true );
 		}
+		// 0.31.1: the host's CDN adds a "cache publicly" hint for itself
+		// (ec-cdn-cache-control) to every page; a private photo must never have it.
+		header_remove( 'ec-cdn-cache-control' );
 		$photo = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::t( 'post_photos' ) . ' WHERE id = %d', absint( $_GET[ self::PHOTO_QUERY ] ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.Security.NonceVerification.Recommended
 		$post  = $photo ? self::post( $photo->post_id ) : null;
 		if ( ! $photo || ! self::can_see( $post, get_current_user_id() ) ) {

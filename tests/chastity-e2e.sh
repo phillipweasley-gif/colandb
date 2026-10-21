@@ -193,6 +193,11 @@ ok "used, turned-off and expired links leave the wearer's list" $([ "$(hasnt $T/
 r=$(act pup $PN share -F "event=$VID" -F "expires=86400")
 SH4=$(q "SELECT MAX(id) FROM $S_T"); SURL4=$(ev "global \$wpdb; echo CMP_Photo_Shares::url(\$wpdb->get_row(\"SELECT * FROM $S_T WHERE id=$SH4\"));")
 ok "export lists share links (no link itself)" $(ev "\$j=wp_json_encode(CMP_Account::export('pup@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'Photo share link') && false===strpos(\$j,'cmp_share=') && false!==strpos(\$j,'(photo kept, encrypted, until')?1:0;")
+# Like the live host's CDN, which adds a "cache publicly" hint to every page (CMP 0.31.1).
+mkdir -p wp-content/mu-plugins && echo "<?php add_action('send_headers', function () { header('ec-cdn-cache-control: public, max-age=300, s-maxage=604800'); });" > wp-content/mu-plugins/zz-cdn-hint.php
+ec(){ curl -s -D - -o /dev/null "$@" | grep -ci '^ec-cdn-cache-control'; }
+ok "private photo responses drop the host's public-cache hint (share page, view, wearer photo)" $([ "$(ec "$H/?page_id=$PAGE_ID")$(ec "$SURL4")$(ec -X POST -d cmp_view=1 "$SURL4")$(ec -b $T/pup.jar "$VURL")" = 1000 ] && echo 1 || echo 0)
+rm -f wp-content/mu-plugins/zz-cdn-hint.php
 ok "the daily code isn't an access code" $([ "$(curl -s -o /dev/null -w '%{http_code}' "$H/?cmp_share=$CODE")$(curl -s -o /dev/null -w '%{http_code}' "$H/?cmp_lockpic=$VID&code=$CODE")" = 404404 ] && echo 1 || echo 0)
 
 echo "== Verified elsewhere (CMP 0.28.0)"
