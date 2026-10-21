@@ -303,6 +303,9 @@ class CMP_Profile_Images {
 		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
 			define( 'DONOTCACHEPAGE', true );
 		}
+		// 0.31.1: the host's CDN adds a "cache publicly" hint for itself
+		// (ec-cdn-cache-control) to every page; a private photo must never have it.
+		header_remove( 'ec-cdn-cache-control' );
 		$img = null;
 		if ( preg_match( '/^(\d+)-(avatar|cover)$/', $ref, $m ) ) {
 			$owner = (int) $m[1];

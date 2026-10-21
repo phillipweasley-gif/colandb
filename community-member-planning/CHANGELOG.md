@@ -4,6 +4,19 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.31.1
+
+**Private photos never carry the host's "cache publicly" hint.** Checking 0.31.0 on colandb.com showed that the host's CDN (Elementor Hosting) adds its own header, `ec-cdn-cache-control: public, s-maxage=604800`, to every page, including private photo responses. The CDN does cache 200 pages with query strings, as a test on the public privacy page showed.
+
+- Our responses already send `Cache-Control: no-store`. Signed-in requests (which every photo except a share link needs) aren't cached, and the photo behind a share link is only sent on a POST, which the CDN never caches. So no photo was exposed.
+- To be safe anyway, every private image response now removes that header before sending: chastity photos, share-link pages, homework proof, feed photos and profile photos.
+- **Verification** (local WordPress test kit, PHP 8.3):
+  - `tests/chastity-e2e.sh` 170/170. The new check adds the same header the host does (a test mu-plugin) and confirms that a normal page keeps it, while the share page, the photo view and the wearer's photo do not.
+  - `tests/homework-e2e.sh` 44/44, `tests/feed-e2e.sh` 41/41, `tests/profile-e2e.sh` 84/84.
+  - `php -l` on the changed files.
+
+---
+
 ## 0.31.0
 
 **Chastity photos: encrypted, deleted after 90 days, and private share links** (owner, 2026-10-21: "Can we update it to purge every quarter and make sure that no one other than the keyholder or the caged person can see them via encryption tied to their username? Also, can the one time code be shared by the caged person if they want to show someone their photo without that person officially being a keyholder or account member?"; chose both server-side and optional end-to-end encryption. This release is the server-side part; end-to-end comes next).
