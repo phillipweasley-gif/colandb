@@ -40,7 +40,7 @@ class CMP_Install {
 	}
 
 	public static function table_names() {
-		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ), self::table( 'follows' ), self::table( 'nods' ), self::table( 'dynamic_addons' ), self::table( 'calendar' ), self::table( 'group_links' ), self::table( 'photo_shares' ), self::table( 'image_reports' ) );
+		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ), self::table( 'follows' ), self::table( 'nods' ), self::table( 'dynamic_addons' ), self::table( 'calendar' ), self::table( 'group_links' ), self::table( 'photo_shares' ), self::table( 'image_reports' ), self::table( 'feedback' ) );
 	}
 
 	private static function create_tables() {
@@ -465,6 +465,28 @@ class CMP_Install {
 			KEY idx_ip (ip_hash,created_at)
 		) $charset;";
 
-		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports, $follows, $nods, $addons, $calendar, $groups, $shares, $image_reports );
+		// "Need help?" messages (0.34.0, CMP_Feedback). Kept 2 years.
+		$feedback = 'CREATE TABLE ' . self::table( 'feedback' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			created_at datetime NOT NULL,
+			user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			email varchar(190) NOT NULL DEFAULT '',
+			name varchar(100) NOT NULL DEFAULT '',
+			kind varchar(12) NOT NULL DEFAULT '',
+			page varchar(300) NOT NULL DEFAULT '',
+			message text NULL,
+			user_agent varchar(300) NOT NULL DEFAULT '',
+			ip_hash char(64) NOT NULL DEFAULT '',
+			status varchar(12) NOT NULL DEFAULT 'new',
+			handled_at datetime NULL,
+			handled_by bigint(20) unsigned NOT NULL DEFAULT 0,
+			note text NULL,
+			PRIMARY KEY  (id),
+			KEY idx_status (status,id),
+			KEY idx_email (email),
+			KEY idx_ip (ip_hash,created_at)
+		) $charset;";
+
+		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports, $follows, $nods, $addons, $calendar, $groups, $shares, $image_reports, $feedback );
 	}
 }

@@ -55,3 +55,13 @@
 	.cmp-account-bar .cmp-bar-hello { max-width: 10ch; }
 	.cmp-account-bar .cmp-bar-link { padding: 6px 12px !important; font-size: 12px !important; }
 }
+/* 0.34.0: "Need help?" under the account box. */
+.cmp-account-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.cmp-account-wrap .cmp-bar-help {
+	color: var(--cec-primary, #c6ff00) !important; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	font-size: 13px !important; font-weight: 600 !important; text-decoration: underline !important; text-underline-offset: 3px;
+	background: none !important; padding: 2px 4px !important; line-height: 1.3 !important; text-transform: none !important; letter-spacing: 0 !important;
+}
+.cmp-account-wrap .cmp-bar-help:hover { color: var(--cec-secondary, #ff2d95) !important; }
+.cmp-account-wrap .cmp-bar-help:focus-visible { outline: 3px solid var(--cec-secondary, #ff2d95) !important; outline-offset: 2px !important; }
+@media (max-width: 600px) { .cmp-account-wrap .cmp-bar-help { font-size: 12px !important; } }
