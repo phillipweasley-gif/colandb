@@ -33,8 +33,11 @@ $W user delete fbmember --yes >/dev/null 2>&1
 $W user create fbmember fbmember@example.com --role=subscriber --user_pass=fbpass1234567 --display_name="Feedback Member" >/dev/null
 
 echo "== The link under the account box"
-curl -s -o $T/bar.html "$H/?page_id=$BID&cmp_token=SECRET&x=1"
-ok "signed out: Need help? under Log In, back-link to this page without tokens" $([ "$(has $T/bar.html 'class="cmp-account-wrap"')$(has $T/bar.html 'class="cmp-bar-help"')$(has $T/bar.html "from=%2F%3Fpage_id%3D$BID")$(hasnt $T/bar.html 'SECRET')" = 1111 ] && echo 1 || echo 0)
+$W option update permalink_structure '/%postname%/' >/dev/null 2>&1; $W rewrite flush >/dev/null 2>&1
+BURL=$($W post url $BID 2>/dev/null || ev "echo get_permalink($BID);"); BPATH=$(php -r 'echo parse_url($argv[1], PHP_URL_PATH);' "$BURL")
+curl -s -o $T/bar.html "$BURL?guest=SECRET&x=1"
+ok "signed out: Need help? under Log In, back-link with the page path only, never the query string (0.34.1)" $([ "$(has $T/bar.html 'class="cmp-account-wrap"')$(has $T/bar.html 'class="cmp-bar-help"')$(has $T/bar.html "from=$(php -r 'echo rawurlencode($argv[1]);' "$BPATH")\"")$(hasnt $T/bar.html 'SECRET')$(hasnt $T/bar.html 'x%3D1')" = 11111 ] && echo 1 || echo 0)
+$W option update permalink_structure '' >/dev/null 2>&1; $W rewrite flush >/dev/null 2>&1
 login fbmember fbmember fbpass1234567
 curl -s -b $T/fbmember.jar -o $T/bar2.html "$H/?page_id=$BID"
 ok "signed in: Need help? under Hello, <name>" $([ "$(has $T/bar2.html 'Hello, Feedback Member')$(has $T/bar2.html 'Need help?')" = 11 ] && echo 1 || echo 0)
@@ -92,6 +95,7 @@ ev 'CMP_Retention::run();' >/dev/null
 ok "messages older than 2 years are cleared" $([ "$(q "SELECT COUNT(*) FROM $F_T WHERE id=$FB2")" = 0 ] && echo 1 || echo 0)
 
 pkill -f "php -S 127.0.0.1:8899" 2>/dev/null
+$W option update permalink_structure '' >/dev/null 2>&1; $W rewrite flush >/dev/null 2>&1
 ev "global \$wpdb; \$wpdb->query(\"DELETE FROM $F_T\"); delete_option('cmp_feedback_page_id');" >/dev/null
 $W post delete $FID $BID --force >/dev/null 2>&1; $W user delete fbmember --yes >/dev/null 2>&1
 echo; echo "debug.log (plugin-related):"; grep -i 'cmp\|member-planning' wp-content/debug.log 2>/dev/null | grep -v 'Upgrad\|upgraded' | tail -5

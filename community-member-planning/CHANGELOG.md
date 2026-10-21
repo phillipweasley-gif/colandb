@@ -4,12 +4,20 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.34.1
+
+**"Need help?" passes only the page path, never the query string.** I found this checking 0.34.0 on colandb.com. The host caches whole pages, header included, and ignores some query strings: `/events/?a=…` was served with the "Need help?" link built for an earlier request (`?from=%2Fevents%2F%3Fr%3D…`). So a query string from one visitor could be shown to others, and query strings can carry private things, like an emailed edit or unsubscribe link's token.
+- The 0.34.0 filter only removed a few known names. Now the link carries only the path (`/events/`), and nothing on the home page.
+- **Verification:** `tests/feedback-e2e.sh` 20/20. The link check now runs with pretty permalinks and a page opened with `?guest=SECRET&x=1`: the link carries the encoded path only, no `SECRET` and no `x=1`. `php -l`.
+
+---
+
 ## 0.34.0
 
 **"Need help?" under the account box** (owner, 2026-10-21: "I also want a 'Need Help?' link below the member box in the upper right hand corner for people to submit feedback or report issues").
 
 - **The link.** `[cmp_account_bar]` (the header's "Log In / Create an Account" or "Hello, <name>" box) now has a small underlined **Need help?** link under it, signed in or out.
-  - It opens the page holding the new `[cmp_feedback]` form and passes along the page the visitor was on (`?from=`). Query arguments that could carry a token (`cmp_*`, `token`, `key`, `_wpnonce`) are stripped.
+  - It opens the page holding the new `[cmp_feedback]` form and passes along the page the visitor was on (`?from=`). (0.34.1: the path only.)
   - The link doesn't appear until a published page has the shortcode.
 - **The form** (`CMP_Feedback`, new; table `cmp_feedback`, `CMP_DB_VERSION` 21):
   - What it's about: Something isn't working / I have a question / Feedback or an idea.
