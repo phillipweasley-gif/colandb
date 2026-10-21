@@ -68,8 +68,10 @@ class CMP_Feedback {
 		if ( '' === $url ) {
 			return '';
 		}
-		$here = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
-		$here = preg_replace( '/[?&](cmp_[a-z_]+|_wpnonce|token|key)=[^&]*/', '', (string) $here ); // Never pass tokens along.
+		// 0.34.1: the path only. The header is cached with the page, so a query
+		// string (which can hold one visitor's private token) must never be copied.
+		$here = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_parse_url( esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ), PHP_URL_PATH ) : '';
+		$here = '/' === $here ? '' : $here;
 		$on_form = is_singular() && (int) get_queried_object_id() === (int) get_option( 'cmp_feedback_page_id' );
 		return '' !== $here && ! $on_form ? add_query_arg( 'from', rawurlencode( $here ), $url ) : $url;
 	}
