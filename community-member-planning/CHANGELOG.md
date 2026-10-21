@@ -4,6 +4,34 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.31.0
+
+**Chastity photos: encrypted, deleted after 90 days, and private share links** (owner, 2026-10-21: "Can we update it to purge every quarter and make sure that no one other than the keyholder or the caged person can see them via encryption tied to their username? Also, can the one time code be shared by the caged person if they want to show someone their photo without that person officially being a keyholder or account member?"; chose both server-side and optional end-to-end encryption. This release is the server-side part; end-to-end comes next).
+
+- **Encrypted at rest** (`CMP_Photo_Vault`, new). Every verification and lock photo is sealed with XChaCha20-Poly1305 (libsodium; WordPress's sodium_compat if the extension is missing) before it's stored.
+  - Each wearer's lock has its own key, derived from a secret in `wp-config.php` (`CMP_PHOTO_KEY` if defined, otherwise the `AUTH_KEY` and `SECURE_AUTH_KEY` salts) plus the lock id and the wearer's user id. The lock and wearer are also bound in as authenticated data, so a photo copied to another lock or member doesn't open.
+  - The key is never in the database, so a copy of the database or a database backup on its own can't show any photo.
+  - Who can see a photo is unchanged: the wearer, and their keyholder while the dynamic allows it. Admins have no screen that shows them.
+  - Photos stored before this version are encrypted when the database upgrade runs (`CMP_DB_VERSION` 18), and the daily clean-up catches any left over. Live had none when this was written.
+  - Limit, said plainly in the privacy statement: the site holds the keys so it can show the photo to the wearer and keyholder; it's not end-to-end. If the wp-config secrets are ever changed, older photos can no longer be opened (they're shown as not found and purged on schedule).
+- **Deleted after 90 days.** The daily clean-up (`CMP_Retention`, period `lock_photos`, changeable with `cmp_retention_periods`) removes each photo 90 days after it was taken. The history entry stays and a verification still counts; it now reads "… · photo removed after 90 days", and the keyholder's review list says so. Links to it stop working.
+- **Private share links** (`CMP_Photo_Shares`, new table `cmp_photo_shares`). The daily code is only for writing on paper in the photo; it opens nothing. To show a photo to someone without an account, the wearer makes a link for that one photo.
+  - Only the wearer can make one, not the keyholder or anyone else. Choices: stops working after 1 hour, 1 day or 7 days; "Works once" (on by default). Up to 20 working links.
+  - The wearer can copy the link again later, sees how many times it was viewed, and can **Turn off link** at any time. They get a notification the first time a link is opened.
+  - Opening the link shows a page with an adults-only warning and a **View photo** button; the photo is only sent after that button. Chat apps that fetch a link to make a preview (Telegram, iMessage, Slack …) only ever see the first page, so they neither show the photo nor use up a one-time link.
+  - The photo page sends `Cache-Control: no-store`, `noindex`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY` and a Content-Security-Policy that allows only the inline image. The photo is inside the page, not at a URL of its own.
+  - No token is stored: the link is the share id plus a keyed hash of it (site secret), so the database alone can't produce working links.
+  - Links stop when they expire, are used (once), are turned off, when the photo is purged, or when the lock or account is deleted. Rows are cleared a day after they stop working.
+- **Chastity tab:** a new **Your photos** panel for the wearer (closed by default, so nothing shows the moment the tab opens): each photo with its deletion date, its working links, and **Share privately**. It covers the wearer's past locks too, so they can still turn links off after a lock ends.
+- **Privacy:** export lists share links (when made, expiry, views; not the link itself) and says each kept photo is "kept, encrypted, until <date>". Erase removes the wearer's share links with their locks.
+- **Verification** (local WordPress test kit, Linux, PHP 8.3, SQLite):
+  - `tests/chastity-e2e.sh` 169/169 (was 134), `tests/member-admin-e2e.sh` 43/43, `tests/retention-e2e.sh` 17/17. New: the stored photo is `CMPv1:` with no JPEG bytes; it doesn't open as another wearer or lock, or when tampered with; adding `CMP_PHOTO_KEY` later still opens older photos while new ones use the new key; an older plain photo is served, then encrypted by `seal_existing()` and served identically; the wearer sees Your photos (closed), deletion dates and the share form; another member and the keyholder can't make a link; only the offered expiry lengths; a 1-hour one-time link is stored right with no token in the database; the wearer sees it to copy with views and Turn off; opening it with no account shows the View button and not the photo, with noindex / no-store / no-referrer / CSP / no-framing headers; GETs don't use up a one-time link; a wrong token is a 404; View photo returns the exact JPEG inside the page, counts the view and notifies the wearer; a once link fails the second time; a 1-day link can be viewed twice; another member can't turn it off, the wearer can (404 at once); a 7-day link stops when expired; used/off/expired links leave the list; export lists links without the URL and shows "kept, encrypted, until"; the daily code opens nothing; the clean-up removes a 91-day-old photo and only that one, the wearer gets a 404, its links stop and are cleared, the history keeps the entry marked "photo removed after 90 days"; the period can be changed by filter; erase removes the share links.
+  - Found and fixed while testing: the new panel's image alt text first used the history wording, which would have shown the planned length to a wearer whose timer is hidden. It now says "Verification photo" / "Photo of the lock".
+  - `php -l` on every changed file. No plugin warnings in `debug.log`.
+- **Live site:** checked before release that colandb.com runs PHP 8.5 with libsodium (XChaCha20 available) and that `AUTH_KEY`/`SECURE_AUTH_KEY` are set. Recommended: add a long random `CMP_PHOTO_KEY` (32+ characters) to `wp-config.php`. Adding it later is safe (older photos still open with the salts), and afterwards a salt reset (some security plugins do this to log everyone out) no longer affects photos.
+
+---
+
 ## 0.30.0
 
 **Chastity: hand a running lock to a keyholder, and let the keyholder set its end date** (owner, 2026-10-21: "if someone self locks because their keyholder isn't on the website yet and the lock has already been established there's no way to change the date. We need a keyholder able to change the date and be assigned to a lock that a sub already has established.").

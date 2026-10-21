@@ -14,6 +14,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   purpose: only plain subscriber accounts, created after this clean-up was
  *   first installed (so older accounts are never swept up by surprise), with
  *   no posts or events of any kind and no RSVPs.
+ * - Chastity photos (0.31.0): 90 days after they're taken. The history
+ *   entry stays and says the photo was removed; private links to it stop.
+ *   Links themselves are cleared a day after they stop working. Photos
+ *   stored before encryption are encrypted here if the upgrade missed any.
  * - Erase requests: an admin notice when a confirmed request has been
  *   waiting 20 days (the statement promises 30).
  *
@@ -53,6 +57,7 @@ class CMP_Retention {
 				'reports'    => 1095,
 				'unverified' => 60,
 				'calendar'   => 365,
+				'lock_photos' => 90,
 			)
 		);
 	}
@@ -96,7 +101,10 @@ class CMP_Retention {
 	public static function run() {
 		global $wpdb;
 		$p    = self::periods();
-		$done = array( 'audit_log' => 0, 'reports' => 0, 'unverified' => 0, 'calendar' => 0 );
+		$done = array( 'audit_log' => 0, 'reports' => 0, 'unverified' => 0, 'calendar' => 0, 'lock_photos' => 0, 'photo_links' => 0 );
+		$done['lock_photos'] = CMP_Chastity::purge_photos( CMP_Chastity::photo_days() );
+		$done['photo_links'] = CMP_Photo_Shares::purge();
+		CMP_Photo_Vault::seal_existing( 200 );
 		$done['reports'] = (int) $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . CMP_Install::table( 'message_reports' ) . ' WHERE created_at < %s', gmdate( 'Y-m-d H:i:s', time() - (int) $p['reports'] * DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		require_once ABSPATH . 'wp-admin/includes/user.php';
 		foreach ( self::stale_unverified() as $id ) {

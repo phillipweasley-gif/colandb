@@ -23,7 +23,9 @@ community-member-planning/
 │   ├── class-cmp-access.php        the gate: logged_out → unverified → unattested (no 18+ date of birth, or locked) → member
 │   ├── class-cmp-dynamics.php      dynamics between members: propose/accept/end, lead_can_direct(), connections, Dynamics tab
 │   ├── class-cmp-homework.php      homework programs: tasks, daily entries, proof photos, lead review, Homework tab
-│   ├── class-cmp-chastity.php      chastity locks: keyholder-proposed locks, keyholder controls, verification codes/photos and "verified elsewhere" marks (0.28.0, event type `verified_else`), handing a running self-lock to a keyholder and setting the end date (0.30.0, event types `keyholder_set`, `end_set`), hygiene, emergency unlock, Chastity tab
+│   ├── class-cmp-chastity.php      chastity locks: keyholder-proposed locks, keyholder controls, verification codes/photos and "verified elsewhere" marks (0.28.0, event type `verified_else`), handing a running self-lock to a keyholder and setting the end date (0.30.0, event types `keyholder_set`, `end_set`), hygiene, emergency unlock, Chastity tab; 0.31.0: photos sealed with CMP_Photo_Vault, purged after 90 days (`photo_sha = 'purged'`), wearer's "Your photos" panel
+│   ├── class-cmp-photo-vault.php   0.31.0: encryption at rest for chastity photos (XChaCha20-Poly1305, per lock+wearer key from wp-config secrets, `CMPv1:` prefix)
+│   ├── class-cmp-photo-shares.php  0.31.0: wearer's private links to one photo (`?cmp_share=<id>.<token>`, expiry, once, revoke, view count)
 │   ├── class-cmp-member-admin.php  Users → Member Dynamics & Locks: site-team corrections to locks and dynamics (0.26.0)
 │   ├── class-cmp-feed.php          member feed: text/photo posts, event tags, likes, reports, admin hide, Feed tab
 │   ├── class-cmp-messages.php      member messages: requests, blocks, reports (Users → Member reports), Messages tab
@@ -31,7 +33,7 @@ community-member-planning/
 │   ├── class-cmp-groups.php        member ↔ group links (0.20.0; 0.21.0: cec_partner_org_can_edit for Titleholder/Organizer, admin Linked members): Profile panel, cmp_group_links, "Members on COL&B" on /partner/<slug>/ via cec_partner_org_page_extra, cec_partner_org_member_requested
 │   ├── class-cmp-directory.php     Members tab: search and filters (shown answers only), opt-out, profile item links
 │   ├── class-cmp-nods.php          nods: quiet interest, Messages → Nods, mutual nods count as connected
-│   ├── class-cmp-retention.php     daily clean-up: audit log, reports, never-verified accounts; overdue erase notice
+│   ├── class-cmp-retention.php     daily clean-up: audit log, reports, never-verified accounts, chastity photos after 90 days and dead share links (0.31.0); overdue erase notice
 │   ├── class-cmp-onboarding.php    step-by-step profile setup (6 steps over the normal profile save; home opens it for new members)
 │   ├── class-cmp-birth-date.php    date of birth: sign-up fields via CEC hooks, one-time step, under-18 lock, age, wp-admin correction
 │   ├── class-cmp-email-verification.php
@@ -65,6 +67,8 @@ community-member-planning/
 | user meta `cmp_birth_date` | Date of birth, `Y-m-d` (0.4.0; owner decision 2026-10-04 overriding the project brief's "store the attestation flag and timestamp, not date of birth"). Required at sign-up and asked once of existing members. Never shown to anyone, never searchable, never written to the audit log; members can't edit it (the site team corrects it on the wp-admin user screen). Included in the export, removed by the eraser. `CMP_Birth_Date`. |
 | user meta `cmp_age_blocked_at` | Set when a signed-in account gives a date under 18: the member area stays closed until the site team unlocks it. Kept by the eraser on purpose. |
 | user meta `cmp_notify_disabled_categories`, `cmp_timezone` | Notification opt-outs; member timezone for quiet hours (UI arrives with profiles). |
+| `{prefix}cmp_lock_events.photo` | 0.31.0: sealed by `CMP_Photo_Vault::seal()` as `CMPv1:` + key id (8) + nonce (24) + XChaCha20-Poly1305 ciphertext, with the lock id and wearer id as authenticated data. Key: BLAKE2b of `CMP_PHOTO_KEY` (if defined in wp-config.php, 32+ chars) or `AUTH_KEY`+`SECURE_AUTH_KEY`, then per lock and wearer. Never in the database. Changing those secrets makes stored photos unreadable (shown as not found; they're purged on schedule). `photo_sha` is the SHA-256 of the JPEG, or `purged` once the 90-day clean-up removed it. Only ever served by `CMP_Chastity::maybe_serve_photo()` (wearer and current keyholder) and `CMP_Photo_Shares::maybe_serve()`. |
+| `{prefix}cmp_photo_shares` | 0.31.0: id, wearer_id, lock_id, event_id, salt, created_at, expires_at, max_views (0 = until expiry, 1 = once), views, last_view_at, revoked_at. No token stored: the link token is `CMP_Photo_Vault::mac( 'share|<id>|<salt>' )`. Cleared a day after a link stops working, or when its photo is purged. |
 | option `cmp_settings` | member_page_id, privacy_notice_url, attestation_text, attestation_version, delete_data_on_delete, lock_dashboard (default on) |
 | option `cmp_db_version` | Schema version. Don't delete on a live site. |
 

@@ -36,7 +36,7 @@ pkill -f "php -S 127.0.0.1:8899" 2>/dev/null; sleep 0.5
 PAGE_ID=$(ev 'echo (int) CMP_Settings::get("member_page_id");')
 PAGE="$H/?page_id=$PAGE_ID"
 L_T=$(TBL locks); E_T=$(TBL lock_events); D_T=$(TBL dynamics); N_T=$(TBL notifications)
-ev "global \$wpdb; foreach(array('$L_T','$E_T','$D_T') as \$t) \$wpdb->query(\"DELETE FROM \$t\");" >/dev/null
+ev "global \$wpdb; foreach(array('$L_T','$E_T','$D_T',CMP_Install::table('photo_shares')) as \$t) \$wpdb->query(\"DELETE FROM \$t\");" >/dev/null
 for u in kh pup nosy solo; do $W user delete $u --yes >/dev/null 2>&1; done
 $W user create kh kh@example.com --role=subscriber --user_pass=khpass1234567 --display_name="Sample Keyholder" >/dev/null
 $W user create pup pup@example.com --role=subscriber --user_pass=puppass123456 --display_name="Sample Pup" >/dev/null
@@ -136,6 +136,64 @@ r=$(act kh $KN review -F "lock=$LID" -F "event=$VID" -F "verdict=again")
 ok "ask for another -> wearer told" $([ "$(q "SELECT review FROM $E_T WHERE id=$VID")" = again ] && echo 1 || echo 0)
 get pup p4 "$PAGE&cmp_tab=chastity"
 ok "wearer sees the request" $(has $T/p4.html 'asked for another')
+
+echo "== Encryption at rest and private links (CMP 0.31.0)"
+S_T=$(TBL photo_shares)
+ok "stored photo is encrypted (CMPv1, no JPEG bytes), sha of the JPEG kept" $(ev "global \$wpdb; \$b=\$wpdb->get_var(\"SELECT photo FROM $E_T WHERE id=$VID\"); echo 0===strpos(\$b,'CMPv1:') && false===strpos(\$b,\"\xFF\xD8\xFF\") && 64===strlen(\$wpdb->get_var(\"SELECT photo_sha FROM $E_T WHERE id=$VID\"))?1:0;")
+ok "bound to its lock and wearer: opening it as another wearer or lock fails" $(ev "\$e=CMP_Chastity::event($VID); echo null===CMP_Photo_Vault::open(\$e->photo,$LID,$NOSY) && null===CMP_Photo_Vault::open(\$e->photo,$LID+1,$PUP) && \"\xFF\xD8\xFF\"===substr(CMP_Photo_Vault::open(\$e->photo,$LID,$PUP),0,3)?1:0;")
+ok "adding CMP_PHOTO_KEY later: older photos still open, new ones use the new key" $(ev "\$e=CMP_Chastity::event($VID); define('CMP_PHOTO_KEY',str_repeat('k',40)); \$n=CMP_Photo_Vault::seal('x',$LID,$PUP); echo \"\xFF\xD8\xFF\"===substr((string)CMP_Photo_Vault::open(\$e->photo,$LID,$PUP),0,3) && 'x'===CMP_Photo_Vault::open(\$n,$LID,$PUP) && substr(\$n,6,8)!==substr(\$e->photo,6,8)?1:0;")
+ok "a tampered photo doesn't open" $(ev "\$e=CMP_Chastity::event($VID); \$b=\$e->photo; \$b[60]=chr(ord(\$b[60])^1); echo null===CMP_Photo_Vault::open(\$b,$LID,$PUP)?1:0;")
+# A photo stored before 0.31.0 (plain JPEG) is encrypted by the upgrade/clean-up and still shows.
+LEG=$(ev "global \$wpdb; \$wpdb->insert('$E_T',array('lock_id'=>$LID,'actor_id'=>$PUP,'type'=>'verification','photo'=>file_get_contents('$T/pic.pup'),'photo_sha'=>hash('sha256',file_get_contents('$T/pic.pup')),'code'=>'OLD','review'=>'accepted','created_at'=>gmdate('Y-m-d H:i:s',time()-60))); echo \$wpdb->insert_id;")
+ok "older plain photo: still served before conversion" $([ "$(curl -s -b $T/pup.jar -o /dev/null -w '%{http_code}' "$H/?cmp_lockpic=$LEG")" = 200 ] && echo 1 || echo 0)
+ok "seal_existing encrypts it, and it's still served the same" $([ "$(ev 'echo CMP_Photo_Vault::seal_existing();')" -ge 1 ] && [ "$(q "SELECT LEFT(photo,6) FROM $E_T WHERE id=$LEG")" = "CMPv1:" ] && curl -s -b $T/pup.jar -o $T/leg.jpg "$H/?cmp_lockpic=$LEG" && cmp -s $T/leg.jpg $T/pic.pup && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->delete('$E_T',array('id'=>$LEG));" >/dev/null
+get pup ph0 "$PAGE&cmp_tab=chastity"
+ok "wearer sees 'Your photos' (closed), deletion date and the share form" $([ "$(has $T/ph0.html 'Your photos (')$(has $T/ph0.html '<details><summary class="cmp-panel-title">Your photos')$(has $T/ph0.html 'Deleted ')$(has $T/ph0.html 'value="share"')$(has $T/ph0.html "name=\"event\" value=\"$VID\"")$(has $T/ph0.html 'doesn&#039;t open anything')" = 111111 ] && echo 1 || echo 0)
+get kh khp "$PAGE&cmp_tab=chastity"
+ok "the keyholder isn't offered share links on their own tab" $(hasnt $T/khp.html "name=\"event\" value=\"$VID\"")
+r=$(act nosy $NN share -F "event=$VID" -F "expires=3600" -F "once=1")
+ok "another member can't share the wearer's photo" $(echo "$r" | grep -q 'cl_gone' && [ "$(q "SELECT COUNT(*) FROM $S_T")" = 0 ] && echo 1 || echo 0)
+r=$(act kh $KN share -F "event=$VID" -F "expires=3600" -F "once=1")
+ok "...nor can the keyholder" $(echo "$r" | grep -q 'cl_gone' && [ "$(q "SELECT COUNT(*) FROM $S_T")" = 0 ] && echo 1 || echo 0)
+r=$(act pup $PN share -F "event=$VID" -F "expires=999" -F "once=1")
+ok "only the offered expiry lengths" $(echo "$r" | grep -q 'cl_invalid' && [ "$(q "SELECT COUNT(*) FROM $S_T")" = 0 ] && echo 1 || echo 0)
+r=$(act pup $PN share -F "event=$VID" -F "expires=3600" -F "once=1")
+SH1=$(q "SELECT MAX(id) FROM $S_T")
+ok "wearer makes a one-time link for 1 hour" $(echo "$r" | grep -q 'cl_shared' && [ "$(ev "global \$wpdb; \$s=\$wpdb->get_row(\"SELECT * FROM $S_T WHERE id=$SH1\"); echo \$s->wearer_id,'|',\$s->event_id,'|',\$s->max_views,'|',(strtotime(\$s->expires_at)-strtotime(\$s->created_at))/60;")" = "$PUP|$VID|1|60" ] && echo 1 || echo 0)
+ok "no token stored in the database" $(ev "global \$wpdb; \$s=\$wpdb->get_row(\"SELECT * FROM $S_T WHERE id=$SH1\"); \$u=CMP_Photo_Shares::url(\$s); parse_str(parse_url(\$u,PHP_URL_QUERY),\$a); \$tok=explode('.',\$a['cmp_share'])[1]; echo strlen(\$tok)>=40 && false===strpos(wp_json_encode(\$s),\$tok)?1:0;")
+SURL=$(ev "global \$wpdb; echo CMP_Photo_Shares::url(\$wpdb->get_row(\"SELECT * FROM $S_T WHERE id=$SH1\"));")
+get pup ph1 "$PAGE&cmp_tab=chastity&photos=1&shared=$SH1"
+ok "wearer sees the link to copy, views and Turn off" $([ "$(has $T/ph1.html "${SURL#*cmp_share=}")$(has $T/ph1.html 'cmp-cl-share is-new')$(has $T/ph1.html 'viewed 0 times')$(has $T/ph1.html 'Turn off link')$(has $T/ph1.html '<details open>')" = 11111 ] && echo 1 || echo 0)
+curl -s -D $T/sh0.h -o $T/sh0.html "$SURL"; curl -s -o $T/sh0b.html "$SURL"
+ok "opening the link (no account) shows a View button, not the photo" $([ "$(has $T/sh0.html 'View photo')$(hasnt $T/sh0.html 'data:image')$(has $T/sh0.html '18 or over')$(has $T/sh0.html 'works once')" = 1111 ] && echo 1 || echo 0)
+ok "...noindex, no-store, no-referrer, strict CSP, no framing" $([ "$(grep -ci 'x-robots-tag: noindex' $T/sh0.h)$(grep -ci 'cache-control: no-store' $T/sh0.h)$(grep -ci 'referrer-policy: no-referrer' $T/sh0.h)$(grep -ci "content-security-policy: default-src 'none'" $T/sh0.h)$(grep -ci 'x-frame-options: deny' $T/sh0.h)" = 11111 ] && echo 1 || echo 0)
+ok "link previews (GETs) don't use up a one-time link" $([ "$(q "SELECT views FROM $S_T WHERE id=$SH1")" = 0 ] && grep -q 'View photo' $T/sh0b.html && echo 1 || echo 0)
+ok "a wrong token: not available (404)" $([ "$(curl -s -o /dev/null -w '%{http_code}' "${SURL%?????}AAAAA")" = 404 ] && [ "$(curl -s -o /dev/null -w '%{http_code}' "$H/?cmp_share=$SH1")" = 404 ] && echo 1 || echo 0)
+N1=$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$PUP AND message LIKE '%photo link you shared was just opened%'")
+curl -s -o $T/sh1.html -X POST -d "cmp_view=1" "$SURL"
+ok "View photo shows it inside the page (data URL), the same JPEG" $(php -r '$h=file_get_contents($argv[1]); preg_match("~data:image/jpeg;base64,([A-Za-z0-9+/=]+)~",$h,$m); exit(isset($m[1]) && base64_decode($m[1])===file_get_contents($argv[2])?0:1);' $T/sh1.html $T/pic.pup && echo 1 || echo 0)
+ok "view counted; the wearer is told it was opened" $([ "$(q "SELECT views FROM $S_T WHERE id=$SH1")" = 1 ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$PUP AND message LIKE '%photo link you shared was just opened%'")" = $((N1+1)) ] && echo 1 || echo 0)
+ok "a one-time link works only once" $([ "$(curl -s -o $T/sh2.html -w '%{http_code}' -X POST -d 'cmp_view=1' "$SURL")" = 404 ] && grep -q "isn&#039;t available\|isn't available" $T/sh2.html && ! grep -q 'data:image' $T/sh2.html && echo 1 || echo 0)
+r=$(act pup $PN share -F "event=$VID" -F "expires=86400")
+SH2=$(q "SELECT MAX(id) FROM $S_T"); SURL2=$(ev "global \$wpdb; echo CMP_Photo_Shares::url(\$wpdb->get_row(\"SELECT * FROM $S_T WHERE id=$SH2\"));")
+c1=$(curl -s -o /dev/null -w '%{http_code}' -X POST -d 'cmp_view=1' "$SURL2"); c2=$(curl -s -o /dev/null -w '%{http_code}' -X POST -d 'cmp_view=1' "$SURL2")
+ok "a 1-day link without 'once' can be viewed again" $([ "$c1$c2" = 200200 ] && [ "$(ev "global \$wpdb; \$s=\$wpdb->get_row(\"SELECT * FROM $S_T WHERE id=$SH2\"); echo \$s->max_views,'|',\$s->views,'|',(strtotime(\$s->expires_at)-strtotime(\$s->created_at))/3600;")" = "0|2|24" ] && echo 1 || echo 0)
+r=$(act nosy $NN unshare -F "share=$SH2")
+ok "another member can't turn it off" $([ "$(curl -s -o /dev/null -w '%{http_code}' "$SURL2")" = 200 ] && echo 1 || echo 0)
+r=$(act pup $PN unshare -F "share=$SH2")
+ok "the wearer turns it off: 404 at once" $(echo "$r" | grep -q 'cl_unshared' && [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -d 'cmp_view=1' "$SURL2")" = 404 ] && echo 1 || echo 0)
+r=$(act pup $PN share -F "event=$VID" -F "expires=604800")
+SH3=$(q "SELECT MAX(id) FROM $S_T"); SURL3=$(ev "global \$wpdb; echo CMP_Photo_Shares::url(\$wpdb->get_row(\"SELECT * FROM $S_T WHERE id=$SH3\"));")
+ok "a 7-day link works..." $([ "$(curl -s -o /dev/null -w '%{http_code}' "$SURL3")" = 200 ] && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->update('$S_T',array('expires_at'=>gmdate('Y-m-d H:i:s',time()-60)),array('id'=>$SH3));" >/dev/null
+ok "...and not once it has expired" $([ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -d 'cmp_view=1' "$SURL3")" = 404 ] && echo 1 || echo 0)
+get pup ph2 "$PAGE&cmp_tab=chastity"
+ok "used, turned-off and expired links leave the wearer's list" $([ "$(hasnt $T/ph2.html 'Turn off link')" = 1 ] && echo 1 || echo 0)
+r=$(act pup $PN share -F "event=$VID" -F "expires=86400")
+SH4=$(q "SELECT MAX(id) FROM $S_T"); SURL4=$(ev "global \$wpdb; echo CMP_Photo_Shares::url(\$wpdb->get_row(\"SELECT * FROM $S_T WHERE id=$SH4\"));")
+ok "export lists share links (no link itself)" $(ev "\$j=wp_json_encode(CMP_Account::export('pup@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'Photo share link') && false===strpos(\$j,'cmp_share=') && false!==strpos(\$j,'(photo kept, encrypted, until')?1:0;")
+ok "the daily code isn't an access code" $([ "$(curl -s -o /dev/null -w '%{http_code}' "$H/?cmp_share=$CODE")$(curl -s -o /dev/null -w '%{http_code}' "$H/?cmp_lockpic=$VID&code=$CODE")" = 404404 ] && echo 1 || echo 0)
 
 echo "== Verified elsewhere (CMP 0.28.0)"
 ok "keyholder sees 'Verified elsewhere' with Today (the lock started today)" $([ "$(has $T/k2.html 'name="do" value="verified_else"')$(has $T/k2.html '>Today</option>')$(hasnt $T/k2.html '>Yesterday</option>')" = 111 ] && echo 1 || echo 0)
@@ -390,12 +448,24 @@ r=$(act solo $HN emergency -F "lock=$HID")
 ok "emergency unlock still ends it" $([ "$(lk $HID status end_reason)" = "ended|emergency" ] && echo 1 || echo 0)
 ev "global \$wpdb; \$wpdb->update('$D_T',array('status'=>'ended'),array('id'=>$DYN3));" >/dev/null
 
+echo "== 90-day photo purge (CMP 0.31.0)"
+ok "SH4 still works before the purge" $([ "$(curl -s -o /dev/null -w '%{http_code}' "$SURL4")" = 200 ] && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->update('$E_T',array('created_at'=>gmdate('Y-m-d H:i:s',time()-91*DAY_IN_SECONDS)),array('id'=>$VID));" >/dev/null
+KEEP=$(q "SELECT COUNT(*) FROM $E_T WHERE photo IS NOT NULL AND id<>$VID")
+OUT=$(ev 'print_r(CMP_Retention::run());')
+ok "daily clean-up removes the photo over 90 days old, keeps newer ones" $([ "$(q "SELECT CONCAT(IFNULL(photo,'NULL'),'|',photo_sha,'|',type) FROM $E_T WHERE id=$VID")" = "NULL|purged|verification" ] && [ "$(q "SELECT COUNT(*) FROM $E_T WHERE photo IS NOT NULL")" = "$KEEP" ] && echo "$OUT" | grep -q '\[lock_photos\] => 1' && echo 1 || echo 0)
+ok "...it's gone for the wearer too (404)" $([ "$(curl -s -b $T/pup.jar -o /dev/null -w '%{http_code}' "$VURL")" = 404 ] && echo 1 || echo 0)
+ok "...links to it stop and are cleared" $([ "$(curl -s -o /dev/null -w '%{http_code}' "$SURL4")" = 404 ] && [ "$(q "SELECT COUNT(*) FROM $S_T WHERE event_id=$VID")" = 0 ] && echo 1 || echo 0)
+get kh pg1 "$PAGE&cmp_tab=chastity&lock=$HID"
+ok "...the history entry stays, marked 'photo removed after 90 days'" $([ "$(q "SELECT COUNT(*) FROM $E_T WHERE id=$VID")" = 1 ] && ev "\$e=CMP_Chastity::events($LID,100); foreach(\$e as \$x) if(\$x->id==$VID) echo (new ReflectionMethod('CMP_Chastity','event_text'))->invoke(null,\$x);" | grep -q 'photo removed after 90 days' && echo 1 || echo 0)
+ok "the period can be changed (cmp_retention_periods)" $(ev "add_filter('cmp_retention_periods',function(\$p){\$p['lock_photos']=30; return \$p;}); echo 30===CMP_Chastity::photo_days()?1:0;")
+
 echo "== Privacy"
-ok "export lists the lock and its history" $(ev "\$j=wp_json_encode(CMP_Account::export('pup@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'One release a week') && false!==strpos(\$j,'Verification photo') && false!==strpos(\$j,'(photo kept)')?1:0;")
-ok "erase removes the wearer's locks and history" $(ev "CMP_Account::erase('pup@example.com'); global \$wpdb; echo 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $L_T WHERE wearer_id=$PUP\") && 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $E_T WHERE lock_id=$LID\")?1:0;")
+ok "export lists the lock and its history" $(ev "\$j=wp_json_encode(CMP_Account::export('pup@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'One release a week') && false!==strpos(\$j,'Verification photo') && false!==strpos(\$j,'photo removed after 90 days')?1:0;")
+ok "erase removes the wearer's locks and history" $(ev "CMP_Account::erase('pup@example.com'); global \$wpdb; echo 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $L_T WHERE wearer_id=$PUP\") && 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $E_T WHERE lock_id=$LID\") && 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $S_T WHERE wearer_id=$PUP\")?1:0;")
 
 pkill -f "php -S 127.0.0.1:8899" 2>/dev/null
-ev "global \$wpdb; foreach(array('$L_T','$E_T','$D_T') as \$t) \$wpdb->query(\"DELETE FROM \$t\");" >/dev/null
+ev "global \$wpdb; foreach(array('$L_T','$E_T','$D_T',CMP_Install::table('photo_shares')) as \$t) \$wpdb->query(\"DELETE FROM \$t\");" >/dev/null
 for u in kh pup nosy solo; do $W user delete $u --yes >/dev/null 2>&1; done
 echo; echo "debug.log (plugin-related):"; grep -i 'cmp\|member-planning' wp-content/debug.log 2>/dev/null | grep -v 'Upgrad\|upgraded' | tail -5
 echo "RESULT: $PASS passed, $FAIL failed"

@@ -40,7 +40,7 @@ class CMP_Install {
 	}
 
 	public static function table_names() {
-		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ), self::table( 'follows' ), self::table( 'nods' ), self::table( 'dynamic_addons' ), self::table( 'calendar' ), self::table( 'group_links' ) );
+		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ), self::table( 'follows' ), self::table( 'nods' ), self::table( 'dynamic_addons' ), self::table( 'calendar' ), self::table( 'group_links' ), self::table( 'photo_shares' ) );
 	}
 
 	private static function create_tables() {
@@ -60,6 +60,10 @@ class CMP_Install {
 		// their old badge ("Locked · N days") until the keyholder turns it on.
 		if ( $from && $from < 17 ) {
 			$wpdb->query( 'UPDATE ' . self::table( 'locks' ) . ' SET kh_show = 0' ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
+		}
+		// 0.31.0: encrypt chastity photos stored before encryption at rest.
+		for ( $i = 0; $i < 200 && CMP_Photo_Vault::seal_existing( 50 ); $i++ ) {
+			continue;
 		}
 		update_option( self::DB_VERSION_OPTION, CMP_DB_VERSION, false );
 	}
@@ -418,6 +422,26 @@ class CMP_Install {
 			KEY idx_term (term_id)
 		) $charset;";
 
-		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports, $follows, $nods, $addons, $calendar, $groups );
+		// Private links to a chastity photo (0.31.0, CMP_Photo_Shares). No
+		// token is stored: it's a keyed hash of the id and salt.
+		$shares = 'CREATE TABLE ' . self::table( 'photo_shares' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			wearer_id bigint(20) unsigned NOT NULL,
+			lock_id bigint(20) unsigned NOT NULL,
+			event_id bigint(20) unsigned NOT NULL,
+			salt char(32) NOT NULL,
+			created_at datetime NOT NULL,
+			expires_at datetime NOT NULL,
+			max_views smallint(5) unsigned NOT NULL DEFAULT 0,
+			views int(10) unsigned NOT NULL DEFAULT 0,
+			last_view_at datetime NULL,
+			revoked_at datetime NULL,
+			PRIMARY KEY  (id),
+			KEY idx_wearer (wearer_id,id),
+			KEY idx_lock (lock_id),
+			KEY idx_event (event_id)
+		) $charset;";
+
+		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports, $follows, $nods, $addons, $calendar, $groups, $shares );
 	}
 }
