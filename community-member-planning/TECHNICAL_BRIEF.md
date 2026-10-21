@@ -23,7 +23,7 @@ community-member-planning/
 │   ├── class-cmp-access.php        the gate: logged_out → unverified → unattested (no 18+ date of birth, or locked) → member
 │   ├── class-cmp-dynamics.php      dynamics between members: propose/accept/end, lead_can_direct(), connections, Dynamics tab
 │   ├── class-cmp-homework.php      homework programs: tasks, daily entries, proof photos, lead review, Homework tab
-│   ├── class-cmp-chastity.php      chastity locks: keyholder-proposed locks, keyholder controls, verification codes/photos and "verified elsewhere" marks (0.28.0, event type `verified_else`), hygiene, emergency unlock, Chastity tab
+│   ├── class-cmp-chastity.php      chastity locks: keyholder-proposed locks, keyholder controls, verification codes/photos and "verified elsewhere" marks (0.28.0, event type `verified_else`), handing a running self-lock to a keyholder and setting the end date (0.30.0, event types `keyholder_set`, `end_set`), hygiene, emergency unlock, Chastity tab
 │   ├── class-cmp-member-admin.php  Users → Member Dynamics & Locks: site-team corrections to locks and dynamics (0.26.0)
 │   ├── class-cmp-feed.php          member feed: text/photo posts, event tags, likes, reports, admin hide, Feed tab
 │   ├── class-cmp-messages.php      member messages: requests, blocks, reports (Users → Member reports), Messages tab

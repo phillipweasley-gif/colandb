@@ -327,12 +327,68 @@ ok "keyholder can withdraw; wearer told" $(echo "$r" | grep -q 'cl_withdrawn' &&
 r=$(act solo $WN start -F "keyholder=0" -F "option=a" -F "length=60")
 OWN=$(q "SELECT MAX(id) FROM $L_T WHERE wearer_id=$SOLO AND status='locked'")
 r=$(act kh $SN propose -F "wearer=$SOLO" -F "option=a" -F "length=60" -F "hygiene_minutes=0")
-ok "no proposal while they're already locked" $(echo "$r" | grep -q 'cl_pending' && echo 1 || echo 0)
+ok "no proposal while they're already locked (says they can hand it over, 0.30.0)" $(echo "$r" | grep -q 'cl_pending_lock' && echo 1 || echo 0)
 r=$(act solo $WN emergency -F "lock=$OWN")
 r=$(act kh $SN propose -F "wearer=$SOLO" -F "option=a" -F "length=60" -F "hygiene_minutes=0")
 P4=$(q "SELECT MAX(id) FROM $L_T WHERE wearer_id=$SOLO AND status='proposed'")
 ev "global \$wpdb; \$d=CMP_Dynamics::get($DYN2); \$wpdb->update('$D_T',array('status'=>'ended'),array('id'=>$DYN2)); do_action('cmp_dynamic_ended',\$d,$SOLO);" >/dev/null
 ok "dynamic ending drops a waiting proposal" $([ "$(q "SELECT COUNT(*) FROM $L_T WHERE id=$P4")" = 0 ] && echo 1 || echo 0)
+
+echo "== Handing a running lock to a keyholder (0.30.0)"
+get solo h0 "$PAGE&cmp_tab=chastity"
+HN=$(hnonce $T/h0.html)
+r=$(act solo $HN start -F "keyholder=named" -F "keyholder_name=Alex" -F "option=a" -F "length=10080")
+HID=$(q "SELECT MAX(id) FROM $L_T WHERE wearer_id=$SOLO AND status='locked'")
+ev "global \$wpdb; \$wpdb->update('$L_T',array('started_at'=>gmdate('Y-m-d H:i:s',time()-3*86400)),array('id'=>$HID));" >/dev/null
+HSTART=$(lk $HID started_at)
+get solo h1 "$PAGE&cmp_tab=chastity"
+ok "self-lock without a keyholder in a dynamic: explains how, no form" $([ "$(has $T/h1.html 'Give your keyholder this lock')$(hasnt $T/h1.html 'value="assign_keyholder"')" = 11 ] && echo 1 || echo 0)
+r=$(act solo $HN assign_keyholder -F "lock=$HID" -F "keyholder=$KH")
+ok "can't hand it to someone who doesn't hold your key" $(echo "$r" | grep -q 'cl_invalid' && [ "$(lk $HID keyholder_id)" = 0 ] && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->insert('$D_T',array('type'=>'keyholder','proposer_id'=>$KH,'partner_id'=>$SOLO,'proposer_side'=>'a','status'=>'active','proposer_show'=>1,'partner_show'=>1,'created_at'=>gmdate('Y-m-d H:i:s'))); CMP_Dynamics::grant('chastity',$KH,$SOLO);" >/dev/null
+DYN3=$(q "SELECT MAX(id) FROM $D_T")
+r=$(act kh $SN assign_keyholder -F "lock=$HID" -F "keyholder=$KH")
+ok "the keyholder can't take the lock themselves" $(echo "$r" | grep -q 'cl_gone' && [ "$(lk $HID keyholder_id)" = 0 ] && echo 1 || echo 0)
+get nosy hx "$PAGE&cmp_tab=chastity"
+r=$(act nosy $(hnonce $T/hx.html) assign_keyholder -F "lock=$HID" -F "keyholder=$KH")
+ok "...nor can another member hand it over" $(echo "$r" | grep -q 'cl_gone' && [ "$(lk $HID keyholder_id)" = 0 ] && echo 1 || echo 0)
+get solo h2 "$PAGE&cmp_tab=chastity"
+ok "wearer is offered their keyholder" $([ "$(has $T/h2.html 'value="assign_keyholder"')$(grep -o 'id="cmp_cl_assign"[^/]*' $T/h2.html | grep -q "value=\"$KH\"" && echo 1 || echo 0)" = 11 ] && echo 1 || echo 0)
+r=$(act solo $HN assign_keyholder -F "lock=$HID" -F "keyholder=$KH")
+ok "wearer hands the lock over: same lock, start kept, typed name cleared" $(echo "$r" | grep -q 'cl_kh_set' && [ "$(lk $HID status keyholder_id keyholder_name started_at)" = "locked|$KH||$HSTART" ] && echo 1 || echo 0)
+ok "keyholder told, history and audit recorded" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$KH AND message LIKE '%handed you the key%'")" -ge 1 ] && [ "$(q "SELECT COUNT(*) FROM $E_T WHERE lock_id=$HID AND type='keyholder_set'")" = 1 ] && ev "global \$wpdb; echo false===strpos((string)\$wpdb->get_var(\"SELECT CONCAT(old_value,new_value) FROM \".CMP_Install::table('audit_log').\" WHERE action='lock_keyholder_set' AND object_id=$HID\"),'Alex')?1:0;" | grep -q 1 && echo 1 || echo 0)
+r=$(act solo $HN assign_keyholder -F "lock=$HID" -F "keyholder=$KH")
+ok "can't hand over a lock that already has a keyholder" $(echo "$r" | grep -q 'cl_invalid' && echo 1 || echo 0)
+get solo h3 "$PAGE&cmp_tab=chastity"
+ok "wearer now sees a keyholder lock (ask to unlock, emergency, no hand-over)" $([ "$(has $T/h3.html 'Keyholder: Sample Keyholder')$(has $T/h3.html 'value="ask_unlock"')$(has $T/h3.html 'value="emergency"')$(hasnt $T/h3.html 'Give your keyholder this lock')" = 1111 ] && echo 1 || echo 0)
+get kh h4 "$PAGE&cmp_tab=chastity&lock=$HID"
+ok "keyholder manages it, with Set the end date" $([ "$(has $T/h4.html 'Add time')$(has $T/h4.html 'Set the end date')$(has $T/h4.html 'name="end_at"')" = 111 ] && echo 1 || echo 0)
+
+echo "== Keyholder sets the end date (0.30.0)"
+NEWEND=$(ev 'echo wp_date("Y-m-d\TH:i", time()+10*86400);')
+WANT=$(ev "echo gmdate('Y-m-d H:i:s', DateTime::createFromFormat('!Y-m-d\TH:i','$NEWEND',wp_timezone())->getTimestamp());")
+r=$(act kh $SN end_date -F "lock=$HID" -F "end_at=$NEWEND")
+ok "end date set (site time)" $(echo "$r" | grep -q 'cl_saved' && [ "$(lk $HID planned_end)" = "$WANT" ] && echo 1 || echo 0)
+ok "wearer told the new end" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$SOLO AND message LIKE '%set your lock to end%'")" -ge 1 ] && echo 1 || echo 0)
+get solo h5 "$PAGE&cmp_tab=chastity"
+ok "wearer's history shows it" $(has $T/h5.html 'Keyholder set the end to')
+PAST=$(ev 'echo wp_date("Y-m-d\TH:i", time()-3600);')
+r=$(act kh $SN end_date -F "lock=$HID" -F "end_at=$PAST")
+ok "a past date is refused" $(echo "$r" | grep -q 'cl_invalid' && [ "$(lk $HID planned_end)" = "$WANT" ] && echo 1 || echo 0)
+r=$(act kh $SN end_date -F "lock=$HID" -F "end_at=2026-02-31T10:00")
+ok "an impossible date is refused" $(echo "$r" | grep -q 'cl_invalid' && [ "$(lk $HID planned_end)" = "$WANT" ] && echo 1 || echo 0)
+r=$(act solo $HN end_date -F "lock=$HID" -F "end_at=$NEWEND" -F "open_ended=1")
+ok "the wearer can't change the end of a keyholder lock" $(echo "$r" | grep -q 'cl_gone' && [ "$(lk $HID planned_end)" = "$WANT" ] && echo 1 || echo 0)
+r=$(act kh $SN end_date -F "lock=$HID" -F "open_ended=1")
+ok "keyholder makes it open-ended" $([ -z "$(lk $HID planned_end)" ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$SOLO AND message LIKE '%made your lock open-ended%'")" -ge 1 ] && echo 1 || echo 0)
+r=$(act kh $SN rules -F "lock=$HID" -F "option=a" -F "policy=none" -F "hygiene_minutes=15" -F "hide_timer=1")
+before=$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$SOLO")
+r=$(act kh $SN end_date -F "lock=$HID" -F "end_at=$NEWEND")
+get solo h6 "$PAGE&cmp_tab=chastity"
+ok "hidden timer: wearer not told, and the change isn't in their history" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$SOLO")" = "$before" ] && [ "$(hasnt $T/h6.html 'Keyholder set the end')$(hasnt $T/h6.html 'open-ended')" = 11 ] && echo 1 || echo 0)
+r=$(act solo $HN emergency -F "lock=$HID")
+ok "emergency unlock still ends it" $([ "$(lk $HID status end_reason)" = "ended|emergency" ] && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->update('$D_T',array('status'=>'ended'),array('id'=>$DYN3));" >/dev/null
 
 echo "== Privacy"
 ok "export lists the lock and its history" $(ev "\$j=wp_json_encode(CMP_Account::export('pup@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'One release a week') && false!==strpos(\$j,'Verification photo') && false!==strpos(\$j,'(photo kept)')?1:0;")

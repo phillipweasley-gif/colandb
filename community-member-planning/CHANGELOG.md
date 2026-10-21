@@ -4,6 +4,26 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.30.0
+
+**Chastity: hand a running lock to a keyholder, and let the keyholder set its end date** (owner, 2026-10-21: "if someone self locks because their keyholder isn't on the website yet and the lock has already been established there's no way to change the date. We need a keyholder able to change the date and be assigned to a lock that a sub already has established.").
+
+- Before, a lock started on your own (a self-lock, or a keyholder typed by name because they had no account) stayed that way: once the keyholder joined COL&B there was no way to give them that lock, so nobody could change its end date. Only the site team could (Users → Member Dynamics & Locks, 0.26.0/0.27.0).
+- **Wearer, on their running lock's Settings:** a new "Give your keyholder this lock" part. Once they've agreed chastity in a dynamic with the keyholder holding the key, they choose the keyholder and press **Hand over the key** (with a confirm).
+  - Only the wearer can do this, so nobody can take over someone's lock without the wearer choosing it. The keyholder can't claim it, and if they try to set up a new lock for someone already locked they're now told the wearer can hand it over from their lock's Settings.
+  - It's the same lock: start date, end date and history are kept, the typed name is cleared. From then on it's an ordinary keyholder lock: the keyholder gets every control (time, end date, rules, hidden timer, verification), the wearer asks to be unlocked, and Emergency unlock stays available.
+  - Recorded as a new history event `keyholder_set` ("Lock handed to a keyholder"), an audit-log row (`lock_keyholder_set`, noting only whether there was a typed name, not the name), and a notification to the keyholder.
+  - Without a keyholder in a dynamic, the part explains how to get there instead of showing a form.
+- **Keyholder, under Time:** besides Add time / Remove time, **Set the end date** takes a date and time (site time) and **Make it open-ended** clears it. Applies to every keyholder lock, not just handed-over ones. The date must be in the future (and within 5 years). Recorded as history event `end_set`; the wearer is notified unless the time left is hidden from them, and then it's also left out of their history, like time changes.
+- No database change (`CMP_DB_VERSION` unchanged).
+- **Verification** (local WordPress test kit, Linux, PHP 8.3):
+  - `tests/chastity-e2e.sh` 134/134 (was 115). New: without a dynamic the wearer sees the explanation and no form, and handing over is refused; the keyholder can't take the lock, nor can another member; the wearer is offered their keyholder; handing over keeps the lock, its start date and status and clears the typed name; keyholder notified, history and audit recorded (name not in the audit); a lock that already has a keyholder can't be handed over; the wearer then sees a keyholder lock; the keyholder sees Set the end date; setting it stores the right UTC time and tells the wearer, and shows in their history; past and impossible dates refused; the wearer can't set it; open-ended works and tells the wearer; with the timer hidden the wearer isn't told and it's not in their history; Emergency unlock still ends it. The "no proposal while they're already locked" check now expects the new notice.
+  - `tests/member-admin-e2e.sh` 43/43.
+  - `php -l` on the changed file. No plugin warnings in `debug.log`.
+- **After this is live:** the Help & FAQ Chastity answers can mention that a self-lock can be handed to a keyholder later, and that keyholders can set an end date (that page is edited on the site).
+
+---
+
 ## 0.29.0
 
 **Profile badges show when the lock was last verified, and how** (owner, 2026-10-13: "There should be a Lock last verified message with the date and how on the member's profile"; "Being locked and showing it off/proof is very important in chastity"; chose: part of the badge, method + where).

@@ -41,6 +41,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - 0.27.0: the site team can also change a lock's settings (badge,
  *   keyholder's name on badges, hidden timer, daily verification, hygiene,
  *   option and release rule) and its keyholder, for members who can't.
+ * - 0.30.0: a wearer whose lock is running without a member keyholder
+ *   (a self-lock, or a keyholder without an account) can hand it to a
+ *   member who holds their key in a dynamic. Only the wearer can do this,
+ *   so nobody takes over a lock without the wearer choosing it. From then
+ *   on it's an ordinary keyholder lock, and the keyholder can also set the
+ *   end date directly (or make it open-ended), besides adding or removing
+ *   time.
  */
 class CMP_Chastity {
 
@@ -131,6 +138,8 @@ class CMP_Chastity {
 			'cl_declined' => array( 'success', __( 'Declined. Your keyholder has been told.', 'cmp' ) ),
 			'cl_withdrawn'=> array( 'success', __( 'Withdrawn.', 'cmp' ) ),
 			'cl_pending'  => array( 'error', __( 'They already have a lock, or a lock from you waiting for an answer.', 'cmp' ) ),
+			'cl_pending_lock' => array( 'error', __( 'They already have a lock running. They can hand it to you from the Settings of their lock on the Chastity tab, and then you can change its end date.', 'cmp' ) ),
+			'cl_kh_set'   => array( 'success', __( 'Your keyholder now holds this lock. They\'ve been told.', 'cmp' ) ),
 			'cl_verified_day' => array( 'error', __( 'That day already counts as verified, or has a photo waiting for you to review.', 'cmp' ) ),
 			'upload_too_large' => array( 'error', __( 'That was too large to send, so nothing was saved. Try a smaller photo, or send it without one.', 'cmp' ) ),
 		);
@@ -437,8 +446,8 @@ class CMP_Chastity {
 		if ( ! $lock || 'locked' !== $lock->status ) {
 			self::go( array(), 'cl_gone' );
 		}
-		$wearer_actions    = array( 'verify', 'hygiene_open', 'hygiene_close', 'release', 'ask_unlock', 'unlock', 'emergency', 'wearer_settings' );
-		$keyholder_actions = array( 'time', 'rules', 'allow_release', 'review', 'verified_else', 'kh_unlock' );
+		$wearer_actions    = array( 'verify', 'hygiene_open', 'hygiene_close', 'release', 'ask_unlock', 'unlock', 'emergency', 'wearer_settings', 'assign_keyholder' );
+		$keyholder_actions = array( 'time', 'end_date', 'rules', 'allow_release', 'review', 'verified_else', 'kh_unlock' );
 		if ( in_array( $do, $wearer_actions, true ) && self::is_wearer( $lock, $user_id ) ) {
 			call_user_func( array( __CLASS__, 'do_' . $do ), $lock, $user_id );
 		}
@@ -527,8 +536,11 @@ class CMP_Chastity {
 		if ( ! isset( self::wearer_choices( $user_id )[ $wearer ] ) || ! isset( $options[ $option ] ) || ( $length && ! isset( self::lengths()[ $length ] ) ) || ! isset( self::hygiene_choices()[ $hygiene ] ) ) {
 			self::go( array(), 'cl_invalid' );
 		}
-		if ( self::active_lock( $wearer ) || self::proposal_for( $wearer ) ) {
+		if ( self::proposal_for( $wearer ) ) {
 			self::go( array(), 'cl_pending' );
+		}
+		if ( self::active_lock( $wearer ) ) {
+			self::go( array(), 'cl_pending_lock' );
 		}
 		list( $name, $rule, $policy ) = $options[ $option ];
 		if ( 'custom' === $option ) {
@@ -715,6 +727,34 @@ class CMP_Chastity {
 		self::go( array(), 'cl_saved' );
 	}
 
+	/**
+	 * 0.30.0: the wearer hands a running lock with no member keyholder (a
+	 * self-lock, or a keyholder typed by name because they had no account)
+	 * to a member who holds their key in a dynamic. Only the wearer can do
+	 * this. The lock keeps its start, end and history; the keyholder gets
+	 * the usual controls, the wearer the usual keyholder-lock view (and
+	 * Emergency unlock, always).
+	 */
+	private static function do_assign_keyholder( $lock, $user_id ) {
+		$keyholder = self::posted_int( 'keyholder' );
+		if ( $lock->keyholder_id || ! $keyholder || ! isset( self::keyholder_choices( $user_id )[ $keyholder ] ) ) {
+			self::go( array(), 'cl_invalid' );
+		}
+		$typed = (string) $lock->keyholder_name;
+		self::update_lock( $lock->id, array( 'keyholder_id' => $keyholder, 'keyholder_name' => '', 'release_allowed' => 0 ) );
+		self::add_event( $lock->id, $user_id, 'keyholder_set' );
+		// As at the start of a lock, a typed name is someone else's detail: the audit only notes there was one.
+		CMP_Audit::log( 'lock_keyholder_set', 'lock', $lock->id, array( 'keyholder' => 0, 'named_keyholder' => '' !== $typed ), array( 'keyholder' => $keyholder ) );
+		CMP_Notifications::add(
+			$keyholder,
+			'lock',
+			/* translators: 1: wearer, 2: how long they've been locked */
+			sprintf( __( '%1$s handed you the key to the lock they started on their own (locked %2$s so far). You can now change its end date and rules.', 'cmp' ), self::me(), self::duration( self::locked_seconds( $lock ) ) ),
+			self::url( array( 'lock' => $lock->id ) )
+		);
+		self::go( array(), 'cl_kh_set' );
+	}
+
 	/* Keyholder ------------------------------------------------------- */
 
 	private static function do_time( $lock, $user_id ) {
@@ -731,6 +771,42 @@ class CMP_Chastity {
 		if ( ! $lock->hide_timer ) {
 			/* translators: 1: keyholder, 2: length */
 			CMP_Notifications::add( (int) $lock->wearer_id, 'lock', sprintf( $sign > 0 ? __( '%1$s added %2$s to your lock.', 'cmp' ) : __( '%1$s took %2$s off your lock.', 'cmp' ), self::me(), self::lengths()[ $minutes ] ), self::url() );
+		}
+		self::go( $back, 'cl_saved' );
+	}
+
+	/**
+	 * 0.30.0: the keyholder sets the end date and time directly (site time),
+	 * or makes the lock open-ended. The date must be in the future.
+	 */
+	private static function do_end_date( $lock, $user_id ) {
+		$back = array( 'lock' => $lock->id );
+		if ( ! empty( $_POST['open_ended'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			if ( ! $lock->planned_end ) {
+				self::go( $back, 'cl_saved' );
+			}
+			$end = null;
+		} else {
+			$raw = isset( $_POST['end_at'] ) ? sanitize_text_field( wp_unslash( $_POST['end_at'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			$dt  = preg_match( '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/', $raw ) ? DateTime::createFromFormat( '!Y-m-d\TH:i', $raw, wp_timezone() ) : false;
+			if ( ! $dt || $dt->format( 'Y-m-d\TH:i' ) !== $raw || $dt->getTimestamp() <= time() || $dt->getTimestamp() > time() + 5 * YEAR_IN_SECONDS ) {
+				self::go( $back, 'cl_invalid' );
+			}
+			$end = gmdate( 'Y-m-d H:i:s', $dt->getTimestamp() );
+		}
+		self::update_lock( $lock->id, array( 'planned_end' => $end ) );
+		self::add_event( $lock->id, $user_id, 'end_set', array( 'note' => (string) $end ) );
+		if ( ! $lock->hide_timer ) {
+			CMP_Notifications::add(
+				(int) $lock->wearer_id,
+				'lock',
+				$end
+					/* translators: 1: keyholder, 2: date and time */
+					? sprintf( __( '%1$s set your lock to end %2$s.', 'cmp' ), self::me(), wp_date( 'M j, g:i A', self::ts( $end ) ) )
+					/* translators: %s: keyholder */
+					: sprintf( __( '%s made your lock open-ended.', 'cmp' ), self::me() ),
+				self::url()
+			);
 		}
 		self::go( $back, 'cl_saved' );
 	}
@@ -1229,7 +1305,7 @@ class CMP_Chastity {
 		$html .= '<div class="cmp-grid cmp-grid-3"><p class="cmp-field"><label for="cmp_cl_kh">' . esc_html__( 'Keyholder', 'cmp' ) . '</label>' . self::select( 'keyholder', 'cmp_cl_kh', $keyholders, 0 ) . '</p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_opt">' . esc_html__( 'Option', 'cmp' ) . '</label>' . self::select( 'option', 'cmp_cl_opt', $options, 'a' ) . '</p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_len">' . esc_html__( 'Planned length', 'cmp' ) . '</label>' . self::select( 'length', 'cmp_cl_len', array( 0 => __( 'Open-ended', 'cmp' ) ) + self::lengths(), 10080 ) . '</p></div>';
-		$html .= '<p class="cmp-field" data-cmp-kh-name><label for="cmp_cl_khn">' . esc_html__( 'Keyholder\'s name (if they don\'t have an account)', 'cmp' ) . '</label><input type="text" id="cmp_cl_khn" name="keyholder_name" maxlength="60" autocomplete="off" aria-describedby="cmp_cl_khn_help" /><span class="cmp-muted" id="cmp_cl_khn_help">' . esc_html__( 'Used when Keyholder is "Someone without an account". It\'s just a name for your record: they can\'t sign in to manage the lock, so it works like a self-lock and you keep control. Once they join and you agree chastity in a dynamic, choose them as a member next time.', 'cmp' ) . '</span></p>';
+		$html .= '<p class="cmp-field" data-cmp-kh-name><label for="cmp_cl_khn">' . esc_html__( 'Keyholder\'s name (if they don\'t have an account)', 'cmp' ) . '</label><input type="text" id="cmp_cl_khn" name="keyholder_name" maxlength="60" autocomplete="off" aria-describedby="cmp_cl_khn_help" /><span class="cmp-muted" id="cmp_cl_khn_help">' . esc_html__( 'Used when Keyholder is "Someone without an account". It\'s just a name for your record: they can\'t sign in to manage the lock, so it works like a self-lock and you keep control. Once they join and you agree chastity in a dynamic, you can hand them the running lock from its Settings.', 'cmp' ) . '</span></p>';
 		$html .= '<details class="cmp-hw-taskedit"><summary>' . esc_html__( 'Custom option', 'cmp' ) . '</summary><p class="cmp-muted">' . esc_html__( 'Used when Option is "Custom".', 'cmp' ) . '</p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_name">' . esc_html__( 'Name', 'cmp' ) . '</label><input type="text" id="cmp_cl_name" name="option_name" maxlength="60" /></p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_rule">' . esc_html__( 'Rule', 'cmp' ) . '</label><input type="text" id="cmp_cl_rule" name="rule" maxlength="300" /></p>';
@@ -1390,13 +1466,34 @@ class CMP_Chastity {
 			$html .= self::check( 'verify_daily', 'cmp_cl_vd', __( 'Remind me to verify every day', 'cmp' ), (int) $lock->verify_daily );
 			$html .= '<p class="cmp-field"><label for="cmp_cl_khn_edit">' . esc_html__( 'Keyholder without an account (optional)', 'cmp' ) . '</label><input type="text" id="cmp_cl_khn_edit" name="keyholder_name" maxlength="60" value="' . esc_attr( $lock->keyholder_name ) . '" aria-describedby="cmp_cl_khn_edit_help" /><span class="cmp-muted" id="cmp_cl_khn_edit_help">' . esc_html__( 'Just a name for your record. They can\'t sign in to manage the lock, so you keep control of it. Leave empty for a self-lock.', 'cmp' ) . '</span></p>';
 		}
-		$html .= '<button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Save', 'cmp' ) . '</button></form></section>';
+		$html .= '<button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Save', 'cmp' ) . '</button></form>';
+		if ( ! $has_kh ) {
+			$html .= self::assign_html( $lock );
+		}
+		$html .= '</section>';
 
 		$html .= self::history_html( $lock, false );
 
 		// Emergency unlock: always there.
 		$html .= '<section class="cmp-panel cmp-cl-emergency">' . self::form_open( 'emergency', $lock->id ) . '<button type="submit" class="cmp-btn cmp-btn-outline cmp-btn-danger" data-cmp-confirm="' . esc_attr__( 'End this lock now? Your keyholder will be told.', 'cmp' ) . '">' . esc_html( $has_kh || self::seconds_left( $lock ) ? __( 'Emergency unlock', 'cmp' ) : __( 'End lock', 'cmp' ) ) . '</button></form><p class="cmp-muted">' . esc_html__( 'Always available. Ends the lock now; it\'s recorded and your keyholder is told.', 'cmp' ) . '</p></section>';
 		return $html;
+	}
+
+	/**
+	 * 0.30.0: hand a running self-lock to a member keyholder. Shown to the
+	 * wearer only, while the lock has no member keyholder.
+	 */
+	private static function assign_html( $lock ) {
+		$choices = self::keyholder_choices( $lock->wearer_id );
+		$html    = '<div class="cmp-cl-assign"><h4>' . esc_html__( 'Give your keyholder this lock', 'cmp' ) . '</h4>';
+		if ( ! $choices ) {
+			return $html . '<p class="cmp-muted">' . esc_html__( 'Started this lock on your own because your keyholder wasn\'t on COL&B yet? Once they join and you agree chastity with them in a dynamic (them holding the key), you can hand them this lock here. It keeps its start date and history.', 'cmp' ) . '</p></div>';
+		}
+		$html .= self::form_open( 'assign_keyholder', $lock->id );
+		$html .= '<p class="cmp-muted">' . esc_html__( 'Your lock keeps its start date and history. Your keyholder can then change the end date, hide the time left and set the rules, and you\'ll ask them to unlock you. Emergency unlock stays available to you.', 'cmp' ) . '</p>';
+		$html .= '<p class="cmp-field"><label for="cmp_cl_assign">' . esc_html__( 'Keyholder', 'cmp' ) . '</label>' . self::select( 'keyholder', 'cmp_cl_assign', $choices, (string) key( $choices ) ) . '</p>';
+		$html .= '<button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline" data-cmp-confirm="' . esc_attr__( 'Hand this lock to your keyholder? They\'ll control its end date and rules. You can still use Emergency unlock.', 'cmp' ) . '">' . esc_html__( 'Hand over the key', 'cmp' ) . '</button></form>';
+		return $html . '</div>';
 	}
 
 	private static function render_keyholder( $lock ) {
@@ -1412,7 +1509,12 @@ class CMP_Chastity {
 		// Time.
 		$html .= '<section class="cmp-panel"><h3 class="cmp-panel-title">' . esc_html__( 'Time', 'cmp' ) . '</h3>' . self::form_open( 'time', $lock->id, false, 'cmp-form cmp-cl-time' );
 		$html .= '<p class="cmp-field"><label for="cmp_cl_min">' . esc_html__( 'Amount', 'cmp' ) . '</label>' . self::select( 'minutes', 'cmp_cl_min', self::lengths(), 1440 ) . '</p>';
-		$html .= '<div class="cmp-actions"><button type="submit" name="direction" value="add" class="cmp-btn cmp-btn-small">' . esc_html__( 'Add time', 'cmp' ) . '</button>' . ( $lock->planned_end ? '<button type="submit" name="direction" value="remove" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Remove time', 'cmp' ) . '</button>' : '' ) . '</div></form></section>';
+		$html .= '<div class="cmp-actions"><button type="submit" name="direction" value="add" class="cmp-btn cmp-btn-small">' . esc_html__( 'Add time', 'cmp' ) . '</button>' . ( $lock->planned_end ? '<button type="submit" name="direction" value="remove" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Remove time', 'cmp' ) . '</button>' : '' ) . '</div></form>';
+		// 0.30.0: set the end date directly.
+		$end_val = $lock->planned_end ? wp_date( 'Y-m-d\TH:i', self::ts( $lock->planned_end ) ) : '';
+		$html   .= '<details class="cmp-hw-taskedit cmp-cl-enddate"><summary>' . esc_html__( 'Set the end date', 'cmp' ) . '</summary>' . self::form_open( 'end_date', $lock->id );
+		$html   .= '<p class="cmp-field"><label for="cmp_cl_endat">' . esc_html__( 'Ends', 'cmp' ) . '</label><input type="datetime-local" id="cmp_cl_endat" name="end_at" value="' . esc_attr( $end_val ) . '" min="' . esc_attr( wp_date( 'Y-m-d\TH:i' ) ) . '" aria-describedby="cmp_cl_endat_help" /><span class="cmp-muted" id="cmp_cl_endat_help">' . esc_html( sprintf( /* translators: %s: timezone */ __( 'Site time (%s).', 'cmp' ), wp_timezone_string() ) ) . '</span></p>';
+		$html   .= '<div class="cmp-actions"><button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Set end date', 'cmp' ) . '</button>' . ( $lock->planned_end ? '<button type="submit" name="open_ended" value="1" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Make it open-ended', 'cmp' ) . '</button>' : '' ) . '</div></form></details></section>';
 
 		// Verification photos waiting.
 		$events = self::events( $lock->id, 40 );
@@ -1493,6 +1595,10 @@ class CMP_Chastity {
 				return sprintf( /* translators: %s: length */ __( 'Keyholder removed %s', 'cmp' ), $len );
 			case 'rules':
 				return __( 'Rules changed', 'cmp' );
+			case 'keyholder_set':
+				return __( 'Lock handed to a keyholder', 'cmp' );
+			case 'end_set':
+				return $hide_length ? __( 'Keyholder changed the end', 'cmp' ) : ( $e->note ? sprintf( /* translators: %s: date and time */ __( 'Keyholder set the end to %s', 'cmp' ), wp_date( 'M j, g:i A', self::ts( $e->note ) ) ) : __( 'Keyholder made the lock open-ended', 'cmp' ) );
 			case 'keyholder_left':
 				return __( 'Dynamic ended; now a self-lock', 'cmp' );
 			case 'unlocked':
@@ -1508,7 +1614,7 @@ class CMP_Chastity {
 	private static function history_html( $lock, $as_keyholder ) {
 		$html = '<section class="cmp-panel cmp-cl-history"><h3 class="cmp-panel-title">' . esc_html__( 'History', 'cmp' ) . '</h3><ul>';
 		foreach ( self::events( $lock->id, 20 ) as $e ) {
-			if ( ! $as_keyholder && $lock->hide_timer && ( in_array( $e->type, array( 'time_added', 'time_removed' ), true ) || ( 'admin_fix' === $e->type && 'end' === $e->review ) ) ) {
+			if ( ! $as_keyholder && $lock->hide_timer && ( in_array( $e->type, array( 'time_added', 'time_removed', 'end_set' ), true ) || ( 'admin_fix' === $e->type && 'end' === $e->review ) ) ) {
 				continue;
 			}
 			// 0.28.0: a "verified elsewhere" mark is for a day, not a time.
