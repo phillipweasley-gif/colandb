@@ -522,7 +522,19 @@ ok "longest run is the joined 2025 run (1 month)" $([ "$(ev "\$b=CMP_Chastity::b
 login ltw ltw ltwpass123456
 get ltw lt0 "$PAGE&cmp_tab=chastity"
 LN=$(hnonce $T/lt0.html)
-ok "Your stars: longest run with its stars and the Locktober medals; private until shown" $([ "$(has $T/lt0.html 'Longest run')$(has $T/lt0.html 'Locktober 2025')$(has $T/lt0.html 'Locktober 2022')$(has $T/lt0.html 'Show on my profile')" = 1111 ] && [ -z "$(ev "echo CMP_Chastity::profile_badge_html($LTW);")" ] && echo 1 || echo 0)
+ok "Your stars: longest run with its stars and the Locktober medals; private until shown" $([ "$(has $T/lt0.html 'Longest run')$(has $T/lt0.html 'Locktober 2025')$(has $T/lt0.html 'Locktober 2022')$(has $T/lt0.html 'Icons only')" = 1111 ] && [ -z "$(ev "echo CMP_Chastity::profile_badge_html($LTW);")" ] && echo 1 || echo 0)
+ok "while hidden, a one-tap prompt asks to show them (labels, icons only, or not now) (0.38.0)" $([ "$(has $T/lt0.html 'Show your stars on your profile?')$(has $T/lt0.html 'name="show" value="icons"')$(has $T/lt0.html 'name="show" value="later"')" = 111 ] && echo 1 || echo 0)
+r=$(act ltw $LN stars_show -F "show=later")
+get ltw lt0b "$PAGE&cmp_tab=chastity"
+ok "'Not now' hides the prompt, and nothing shows on the profile" $([ "$(hasnt $T/lt0b.html 'Show your stars on your profile?')" = 1 ] && [ -z "$(ev "echo CMP_Chastity::profile_badge_html($LTW);")" ] && echo 1 || echo 0)
+ev "update_user_meta($LTW,'cmp_cl_stars_prompt','older');" >/dev/null
+get ltw lt0c "$PAGE&cmp_tab=chastity"
+ok "...and it comes back with the next milestone" $(has $T/lt0c.html 'Show your stars on your profile?')
+r=$(act ltw $LN stars_show -F "show=icons")
+PB=$(ev "echo CMP_Chastity::profile_badge_html($LTW);")
+ok "icons only: stars and medals on the profile with no words saying what they are" $(echo "$PB" | grep -q 'cmp-star is-gold' && echo "$PB" | grep -q '🏅 2025' && ! echo "$PB" | grep -qi 'locktober\|longest\|locked\|lock:' && echo 1 || echo 0)
+r=$(act ltw $LN stars_show -F "show=sideways")
+ok "an unknown choice changes nothing" $([ "$(ev "echo CMP_Chastity::stars_mode($LTW);")" = icons ] && echo 1 || echo 0)
 r=$(act ltw $LN stars_show -F "show=1")
 ok "shown on the profile, even when not locked" $(ev "echo CMP_Chastity::profile_badge_html($LTW);" | grep -q 'Longest lock: 1 month' && ev "echo CMP_Chastity::profile_badge_html($LTW);" | grep -q 'Locktober 2025' && echo 1 || echo 0)
 mk "$(ev "echo wp_date('Y-m-d H:i', time()-30*HOUR_IN_SECONDS);")" "$(ev "echo wp_date('Y-m-d H:i', time()-10*HOUR_IN_SECONDS);")" ended >/dev/null

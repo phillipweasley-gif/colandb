@@ -4,6 +4,25 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.38.0
+
+**Stars on the profile: a one-tap prompt, and an "icons only" style** (owner, 2026-10-22, after asking whether stars and medals could show on profiles by default without saying what they mean. Advice given: no, chastity and Locktober are about someone's sex life, which needs opt-in consent under GDPR and US state laws, the privacy statement promises badges only when the member turns them on, and an unexplained star is soon decoded. So: keep it opt-in, but make opting in easy and allow a discreet style. Owner: "Both").
+
+- **Three choices** under Your stars: **Hidden** (the default), **Stars and labels** (as in 0.36.0: "Longest lock: 1 month ★ · 🏅 Locktober 2025"), or **Icons only**. Icons only shows the stars and "🏅 2025" with nothing saying what they're for, including no hover titles; screen readers hear just "Stars" and "Medal 2025". Stored in `cmp_cl_show_stars` as '0', '1' or 'icons'.
+- **One-tap prompt.** While stars are hidden, Your stars asks "Show your stars on your profile?" with **Show stars and labels**, **Show icons only** and **Not now**.
+  - Any answer hides the prompt until the next star or medal (`cmp_cl_stars_prompt`), so it never nags.
+  - The new-star notification now says "Share it, or show it on your profile, from the Chastity tab."
+- Erase also removes the prompt record. No database change.
+- **Verification** (local WordPress test kit, PHP 8.3):
+  - `tests/chastity-e2e.sh` 222/222 (was 217). New checks:
+    - the prompt shows with its three buttons while hidden;
+    - "Not now" hides it and nothing shows on the profile, and it comes back with the next milestone;
+    - icons only puts stars and "🏅 2025" on the profile with no words such as Locktober, longest or locked;
+    - an unknown choice changes nothing.
+  - `php -l`.
+
+---
+
 ## 0.37.0
 
 **A notification for each new star or Locktober medal, and a way to share it** (owner, 2026-10-22: "We also want a notification for when they earn their new star and a way to share that via the social media options we currently provide as an announcement").

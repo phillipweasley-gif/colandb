@@ -857,3 +857,6 @@
 .cmp-member-area .cmp-cl-undo { border-color: var(--cmp-primary); }
 /* 0.37.0: share your milestone. */
 .cmp-member-area .cmp-cl-share-links { display: flex; flex-wrap: wrap; gap: 8px; }
+/* 0.38.0: profile stars prompt. */
+.cmp-member-area .cmp-cl-prompt { border: 1px solid #F5C518; border-radius: 10px; padding: 10px 12px; margin: 10px 0; background: rgba(245, 197, 24, .08); }
+.cmp-member-area .cmp-cl-prompt p { margin: 0 0 8px; }

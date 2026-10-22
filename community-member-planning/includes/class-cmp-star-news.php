@@ -28,6 +28,7 @@ class CMP_Star_News {
 	const HOOK      = 'cmp_cl_stars_check';
 	const META_STAR = 'cmp_cl_star_seen';   // "<run start>|<label>"
 	const META_LT   = 'cmp_cl_lt_seen';     // last Locktober year announced
+	const META_PROMPT = 'cmp_cl_stars_prompt'; // 0.38.0: the milestone the profile prompt was last answered for
 
 	public static function init() {
 		add_action( self::HOOK, array( __CLASS__, 'check_all' ) );
@@ -91,7 +92,7 @@ class CMP_Star_News {
 					$tier = self::top_tier( $m );
 					$name = CMP_Chastity::star_tiers()[ $tier ];
 					/* translators: 1: "an emerald star", 2: "2 weeks" */
-					CMP_Notifications::add( $wearer_id, 'lock', sprintf( __( 'You earned %1$s: %2$s locked! Share your milestone from the Chastity tab.', 'cmp' ), $name, $label ), self::share_url() );
+					CMP_Notifications::add( $wearer_id, 'lock', sprintf( __( 'You earned %1$s: %2$s locked! Share it, or show it on your profile, from the Chastity tab.', 'cmp' ), $name, $label ), self::share_url() );
 					if ( $lock->keyholder_id && CMP_Chastity::is_keyholder( $lock, (int) $lock->keyholder_id ) ) {
 						/* translators: 1: wearer, 2: "an emerald star", 3: "2 weeks" */
 						CMP_Notifications::add( (int) $lock->keyholder_id, 'lock', sprintf( __( '%1$s earned %2$s: %3$s locked.', 'cmp' ), get_userdata( $wearer_id ) ? get_userdata( $wearer_id )->display_name : '', $name, $label ), CMP_Chastity::url( array( 'lock' => $lock->id ) ) );
@@ -114,6 +115,27 @@ class CMP_Star_News {
 			update_user_meta( $wearer_id, self::META_LT, $top );
 		}
 		return $done;
+	}
+
+	/** 0.38.0: what the member has now (latest star and medal), so the prompt comes back with each new one. */
+	public static function prompt_sig( $user_id ) {
+		return (string) get_user_meta( $user_id, self::META_STAR, true ) . '#' . (string) get_user_meta( $user_id, self::META_LT, true );
+	}
+
+	/**
+	 * 0.38.0: "Show your stars on your profile?" with one-tap answers, while
+	 * they're hidden. Answering (or "Not now") hides it until the next star.
+	 */
+	public static function prompt_html( $user_id ) {
+		if ( '0' !== CMP_Chastity::stars_mode( $user_id ) || '' === self::share_text( $user_id ) || (string) get_user_meta( $user_id, self::META_PROMPT, true ) === self::prompt_sig( $user_id ) ) {
+			return '';
+		}
+		$html  = '<div class="cmp-cl-prompt" role="group" aria-labelledby="cmp-cl-prompt-q"><p id="cmp-cl-prompt-q"><b>' . esc_html__( 'Show your stars on your profile?', 'cmp' ) . '</b> <span class="cmp-muted">' . esc_html__( 'Only signed-in members see profiles. "Icons only" shows the stars and medals without saying what they\'re for. You can change this any time.', 'cmp' ) . '</span></p>';
+		$html .= '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="cmp-form"><input type="hidden" name="action" value="cmp_chastity" /><input type="hidden" name="do" value="stars_show" /><input type="hidden" name="_cmp_nonce" value="' . esc_attr( wp_create_nonce( CMP_Chastity::NONCE ) ) . '" /><div class="cmp-actions">';
+		$html .= '<button type="submit" name="show" value="1" class="cmp-btn cmp-btn-small">' . esc_html__( 'Show stars and labels', 'cmp' ) . '</button>';
+		$html .= '<button type="submit" name="show" value="icons" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Show icons only', 'cmp' ) . '</button>';
+		$html .= '<button type="submit" name="show" value="later" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Not now', 'cmp' ) . '</button>';
+		return $html . '</div></form></div>';
 	}
 
 	public static function share_url( $what = 'star' ) {

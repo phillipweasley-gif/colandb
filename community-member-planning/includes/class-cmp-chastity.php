@@ -536,7 +536,14 @@ class CMP_Chastity {
 			self::go( array( 'share' => 'star' ), CMP_Star_News::announce( $user_id ) ? 'cl_announced' : 'cl_invalid' ); // 0.37.0
 		}
 		if ( 'stars_show' === $do ) {
-			update_user_meta( $user_id, self::META_SHOW_STARS, empty( $_POST['show'] ) ? '0' : '1' ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			// 0.38.0: hidden ('0'), stars and labels ('1'), icons only ('icons'), or "Not now" on the prompt.
+			$show = isset( $_POST['show'] ) ? sanitize_key( wp_unslash( $_POST['show'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			if ( 'later' === $show ) {
+				update_user_meta( $user_id, CMP_Star_News::META_PROMPT, CMP_Star_News::prompt_sig( $user_id ) );
+			} elseif ( in_array( $show, array( '0', '1', 'icons' ), true ) ) {
+				update_user_meta( $user_id, self::META_SHOW_STARS, $show );
+				update_user_meta( $user_id, CMP_Star_News::META_PROMPT, CMP_Star_News::prompt_sig( $user_id ) );
+			}
 			self::go( array(), 'cl_saved' );
 		}
 		if ( 'undo_end' === $do ) {
@@ -2038,7 +2045,16 @@ class CMP_Chastity {
 		return array_values( $years );
 	}
 
-	public static function medal( $year ) {
+	/** 0.38.0: '0' hidden, '1' stars and labels, 'icons' icons only. */
+	public static function stars_mode( $user_id ) {
+		$m = (string) get_user_meta( $user_id, self::META_SHOW_STARS, true );
+		return in_array( $m, array( '1', 'icons' ), true ) ? $m : '0';
+	}
+
+	public static function medal( $year, $plain = false ) {
+		if ( $plain ) { // 0.38.0: icons only.
+			return '<span class="cmp-cl-medal" role="img" aria-label="' . esc_attr( sprintf( /* translators: %d: year */ __( 'Medal %d', 'cmp' ), $year ) ) . '">🏅 ' . (int) $year . '</span>';
+		}
 		/* translators: %d: year */
 		return '<span class="cmp-cl-medal" title="' . esc_attr( sprintf( __( 'Completed Locktober %d', 'cmp' ), $year ) ) . '">🏅 ' . esc_html( sprintf( __( 'Locktober %d', 'cmp' ), $year ) ) . '</span>';
 	}
@@ -2091,8 +2107,19 @@ class CMP_Chastity {
 		if ( $years ) {
 			$html .= '<p>' . implode( ' ', array_map( array( __CLASS__, 'medal' ), $years ) ) . '</p>';
 		}
-		$on    = '1' === (string) get_user_meta( $user_id, self::META_SHOW_STARS, true );
-		$html .= self::form_open( 'stars_show' ) . '<input type="hidden" name="show" value="' . ( $on ? '0' : '1' ) . '" /><p class="cmp-muted">' . esc_html( $on ? __( 'Your longest run and Locktober medals show on your profile, even when you\'re not locked.', 'cmp' ) : __( 'Only you see these. You can show your longest run and Locktober medals on your profile, even when you\'re not locked.', 'cmp' ) ) . '</p><button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html( $on ? __( 'Hide from my profile', 'cmp' ) : __( 'Show on my profile', 'cmp' ) ) . '</button></form>';
+		// 0.38.0: three choices for the profile.
+		$mode  = self::stars_mode( $user_id );
+		$says  = array(
+			'0'     => __( 'Only you see these.', 'cmp' ),
+			'1'     => __( 'Your stars, longest run and Locktober medals show on your profile, with labels, even when you\'re not locked.', 'cmp' ),
+			'icons' => __( 'Your stars and medals show on your profile as icons only, without saying what they\'re for.', 'cmp' ),
+		);
+		$html .= CMP_Star_News::prompt_html( $user_id );
+		$html .= self::form_open( 'stars_show', 0, false, 'cmp-form cmp-cl-stars-mode' ) . '<p class="cmp-muted">' . esc_html( $says[ $mode ] ) . '</p><div class="cmp-actions" role="group" aria-label="' . esc_attr__( 'On my profile', 'cmp' ) . '">';
+		foreach ( array( '0' => __( 'Hidden', 'cmp' ), '1' => __( 'Stars and labels', 'cmp' ), 'icons' => __( 'Icons only', 'cmp' ) ) as $k => $l ) {
+			$html .= '<button type="submit" name="show" value="' . esc_attr( $k ) . '" class="cmp-btn cmp-btn-small' . ( $mode === $k ? '' : ' cmp-btn-outline' ) . '" aria-pressed="' . ( $mode === $k ? 'true' : 'false' ) . '">' . esc_html( $l ) . '</button>';
+		}
+		$html .= '</div></form>';
 		return $html . $share . '</section>';
 	}
 
@@ -2189,7 +2216,7 @@ class CMP_Chastity {
 	 * The stars for a lock, with an accessible label. $with_next adds "Next
 	 * star: <what> on <date>" for a running lock.
 	 */
-	public static function stars_html( $lock, $with_next = false ) {
+	public static function stars_html( $lock, $with_next = false, $plain = false ) {
 		$m     = self::milestones( $lock );
 		$label = self::milestone_label( $m );
 		$html  = '';
@@ -2200,7 +2227,8 @@ class CMP_Chastity {
 			}
 			/* translators: %s: e.g. "2 months" */
 			$text  = sprintf( __( 'Stars: %s locked', 'cmp' ), $label );
-			$html .= '<span class="cmp-cl-stars" role="img" aria-label="' . esc_attr( $text ) . '" title="' . esc_attr( $text ) . '">' . $stars . '</span>';
+			// 0.38.0: "icons only" on a profile says nothing about what they're for.
+			$html .= $plain ? '<span class="cmp-cl-stars" role="img" aria-label="' . esc_attr__( 'Stars', 'cmp' ) . '">' . $stars . '</span>' : '<span class="cmp-cl-stars" role="img" aria-label="' . esc_attr( $text ) . '" title="' . esc_attr( $text ) . '">' . $stars . '</span>';
 		}
 		if ( $with_next && 'locked' === $lock->status && self::next_milestone_at( $lock ) ) {
 			$at   = self::next_milestone_at( $lock );
@@ -2454,19 +2482,21 @@ class CMP_Chastity {
 			$out .= '<p class="cmp-cl-badge is-key">' . self::icon( 'key' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . ' ' . self::stars_html( self::run_for( $h ) ) . ( $ver ? ' · ' . $ver : '' ) . '</span></p>';
 		}
 		// 0.36.0: the member's choice: their longest run and Locktober medals, locked or not.
-		if ( '1' === (string) get_user_meta( $owner_id, self::META_SHOW_STARS, true ) ) {
+		$mode = self::stars_mode( $owner_id );
+		if ( '0' !== $mode ) {
+			$plain = 'icons' === $mode; // 0.38.0
 			$best  = self::best_run( $owner_id );
 			$years = self::locktober_years( $owner_id );
 			$bits  = array();
 			if ( $best && self::locked_seconds( $best ) >= WEEK_IN_SECONDS ) {
 				/* translators: %s: e.g. "2 months" */
-				$bits[] = esc_html( sprintf( __( 'Longest lock: %s', 'cmp' ), self::milestone_label( self::milestones( $best ) ) ) ) . ' ' . self::stars_html( $best );
+				$bits[] = $plain ? self::stars_html( $best, false, true ) : esc_html( sprintf( __( 'Longest lock: %s', 'cmp' ), self::milestone_label( self::milestones( $best ) ) ) ) . ' ' . self::stars_html( $best );
 			}
 			foreach ( $years as $y ) {
-				$bits[] = self::medal( $y );
+				$bits[] = self::medal( $y, $plain );
 			}
 			if ( $bits ) {
-				$out .= '<p class="cmp-cl-badge is-stars"><span>' . implode( ' · ', $bits ) . '</span></p>';
+				$out .= '<p class="cmp-cl-badge is-stars' . ( $plain ? ' is-plain' : '' ) . '"><span>' . implode( $plain ? ' ' : ' · ', $bits ) . '</span></p>';
 			}
 		}
 		return $out ? '<div class="cmp-cl-badges">' . $out . '</div>' : '';
@@ -2497,6 +2527,7 @@ class CMP_Chastity {
 		$n = CMP_Photo_Shares::erase( $user_id );
 		CMP_E2E::erase( $user_id ); // 0.33.0
 		delete_user_meta( $user_id, self::META_SHOW_STARS ); // 0.36.0
+		delete_user_meta( $user_id, CMP_Star_News::META_PROMPT ); // 0.38.0
 		foreach ( $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM ' . self::t( 'locks' ) . ' WHERE wearer_id = %d', $user_id ) ) as $id ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			$n += (int) $wpdb->delete( self::t( 'lock_events' ), array( 'lock_id' => $id ), array( '%d' ) );
 			$n += (int) $wpdb->delete( self::t( 'locks' ), array( 'id' => $id ), array( '%d' ) );
