@@ -41,6 +41,7 @@ Since 2026-10-04 the owner works on colandb.com only. The staging site (`stg-mtb
 - **Verifying a release on live is read-only:** load public pages, event pages, the `.ics` files and feeds, and check the plugin version in the page source (`?ver=`), the output you changed, and that there are no PHP warnings. Anything you can't check that way, say so rather than test it on live.
 - **Emails and notices to members need the owner's approval first.** Before sending any email, in-app notice or push to members (or any group of people), show the owner the exact subject, text, sender name and who it goes to, and wait for their OK. Never send a member email or notice the owner hasn't approved word for word, even if they asked for it to be sent. Member emails go out as "COL&B" (FluentSMTP sender name) from noreply@colandb.com.
 - **Settings changes only when the owner asks**, one at a time. After saving, reload the settings page and check the value really stuck (a click on Save has silently failed on this site before), then confirm the effect on the public site.
+- **No analytics on the site.** The Privacy Policy promises none, so don't add Google Analytics or other tracking (see `docs/seo.md` for the SEO setup).
 - **Never copy the staging site over live.** Staging still has email simulation on, Brevo auto-push off, "ZZ TEST" events and a fake subscriber.
 
 ## Boundaries that must not be crossed
