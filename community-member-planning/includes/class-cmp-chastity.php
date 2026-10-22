@@ -1848,43 +1848,63 @@ class CMP_Chastity {
 	 * ---------------------------------------------------------------- */
 
 	/**
-	 * Stars for one lock's unbroken time locked (owner, 2026-10-22). Ladder
-	 * after the usual loyalty tiers (bronze < gold < platinum < diamond):
-	 * a bronze star for each of the first 3 weeks; a gold star for each
-	 * month; a platinum star for each year; a diamond for every 3 years
-	 * (3 years = 1 diamond, 4 years = 1 diamond + 1 platinum).
+	 * Stars for one lock's unbroken time locked (owner, 2026-10-22). After
+	 * the usual loyalty ladder (bronze < gold < platinum < diamond), with the
+	 * owner's gems (0.35.1): week 1 bronze, week 2 emerald, week 3 ruby (one
+	 * star, the latest); then a gold star per month; a sapphire at 6 months
+	 * (between gold and platinum: 7 months = sapphire + gold); a platinum
+	 * star per year; a diamond for every 3 years.
 	 *
-	 * @return int[] diamond, platinum, gold, bronze
+	 * @return int[] diamond, platinum, sapphire, gold, ruby, emerald, bronze
 	 */
 	public static function milestones( $lock ) {
 		$secs  = self::locked_seconds( $lock );
 		$start = ( new DateTime( '@' . self::ts( $lock->started_at ) ) )->setTimezone( wp_timezone() );
 		$now   = ( new DateTime( '@' . ( self::ts( $lock->started_at ) + $secs ) ) )->setTimezone( wp_timezone() );
 		$d     = $start->diff( $now );
-		$out   = array( 'diamond' => intdiv( $d->y, 3 ), 'platinum' => $d->y % 3, 'gold' => $d->m, 'bronze' => 0 );
+		$out   = array( 'diamond' => intdiv( $d->y, 3 ), 'platinum' => $d->y % 3, 'sapphire' => intdiv( $d->m, 6 ), 'gold' => $d->m % 6, 'ruby' => 0, 'emerald' => 0, 'bronze' => 0 );
 		if ( ! $d->y && ! $d->m ) {
-			$out['bronze'] = min( 3, intdiv( $secs, WEEK_IN_SECONDS ) );
+			$weeks = min( 3, intdiv( $secs, WEEK_IN_SECONDS ) );
+			$week  = array( 1 => 'bronze', 2 => 'emerald', 3 => 'ruby' );
+			if ( $weeks ) {
+				$out[ $week[ $weeks ] ] = 1;
+			}
 		}
 		return $out;
 	}
 
-	/** "3 weeks", "1 month", "1 year, 2 months"… for a milestone count. */
+	/** "3 weeks", "1 month", "1 year, 7 months"… for a milestone count. */
 	public static function milestone_label( $m ) {
-		$years = $m['diamond'] * 3 + $m['platinum'];
-		$parts = array();
+		$years  = $m['diamond'] * 3 + $m['platinum'];
+		$months = $m['sapphire'] * 6 + $m['gold'];
+		$weeks  = $m['ruby'] ? 3 : ( $m['emerald'] ? 2 : ( $m['bronze'] ? 1 : 0 ) );
+		$parts  = array();
 		if ( $years ) {
 			/* translators: %d: years */
 			$parts[] = sprintf( _n( '%d year', '%d years', $years, 'cmp' ), $years );
 		}
-		if ( $m['gold'] ) {
+		if ( $months ) {
 			/* translators: %d: months */
-			$parts[] = sprintf( _n( '%d month', '%d months', $m['gold'], 'cmp' ), $m['gold'] );
+			$parts[] = sprintf( _n( '%d month', '%d months', $months, 'cmp' ), $months );
 		}
-		if ( ! $parts && $m['bronze'] ) {
+		if ( ! $parts && $weeks ) {
 			/* translators: %d: weeks */
-			$parts[] = sprintf( _n( '%d week', '%d weeks', $m['bronze'], 'cmp' ), $m['bronze'] );
+			$parts[] = sprintf( _n( '%d week', '%d weeks', $weeks, 'cmp' ), $weeks );
 		}
 		return implode( ', ', $parts );
+	}
+
+	/** The star names, highest first. */
+	public static function star_tiers() {
+		return array(
+			'diamond'  => __( 'a diamond', 'cmp' ),
+			'platinum' => __( 'a platinum star', 'cmp' ),
+			'sapphire' => __( 'a sapphire star', 'cmp' ),
+			'gold'     => __( 'a gold star', 'cmp' ),
+			'ruby'     => __( 'a ruby star', 'cmp' ),
+			'emerald'  => __( 'an emerald star', 'cmp' ),
+			'bronze'   => __( 'a bronze star', 'cmp' ),
+		);
 	}
 
 	/** When the next star comes for a running lock, as a timestamp. */
@@ -1922,7 +1942,7 @@ class CMP_Chastity {
 		$html  = '';
 		if ( '' !== $label ) {
 			$stars = '';
-			foreach ( array( 'diamond', 'platinum', 'gold', 'bronze' ) as $tier ) {
+			foreach ( array_keys( self::star_tiers() ) as $tier ) {
 				$stars .= str_repeat( self::star_svg( $tier ), (int) $m[ $tier ] );
 			}
 			/* translators: %s: e.g. "2 months" */
@@ -1933,9 +1953,13 @@ class CMP_Chastity {
 			$at   = self::next_milestone_at( $lock );
 			$fake = (object) array( 'started_at' => $lock->started_at, 'status' => 'ended', 'ended_at' => gmdate( 'Y-m-d H:i:s', $at + 60 ) );
 			$nm   = self::milestones( $fake );
-			$yrs  = $m['diamond'] * 3 + $m['platinum'];
-			$nyrs = $nm['diamond'] * 3 + $nm['platinum'];
-			$tier = $nm['diamond'] > $m['diamond'] ? __( 'a diamond', 'cmp' ) : ( $nyrs > $yrs ? __( 'a platinum star', 'cmp' ) : ( $nm['gold'] !== $m['gold'] ? __( 'a gold star', 'cmp' ) : __( 'a bronze star', 'cmp' ) ) );
+			$tier = __( 'a star', 'cmp' );
+			foreach ( self::star_tiers() as $k => $name ) {
+				if ( $nm[ $k ] > $m[ $k ] ) {
+					$tier = $name;
+					break;
+				}
+			}
 			/* translators: 1: "a gold star", 2: e.g. "1 month", 3: date */
 			$html .= '<p class="cmp-cl-next">' . esc_html( sprintf( __( 'Next: %1$s at %2$s, on %3$s', 'cmp' ), $tier, self::milestone_label( $nm ), wp_date( 'M j', $at ) ) ) . '</p>';
 		}
