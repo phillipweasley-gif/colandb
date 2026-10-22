@@ -4,6 +4,36 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.36.0
+
+**Chastity: longest run with its stars, Locktober, and room for human error** (owner, 2026-10-22: "And what about longest run showing their star? Some people only do it for locktober. Please research Locktober as a lot of the features need to accommodate human error associated with that").
+
+- **What Locktober is** (research): an annual October challenge in the kink and chastity community, locked for the month, alone or with a keyholder. It has no official rules: people set their own, many only take part in October, and slips are common (a late start, a missed check-in, an unlock by mistake or for cleaning, a backup key used). So the features here forgive those instead of resetting someone's progress.
+- **Runs, not just locks.** A new lock started within a day of the last one ending continues the same **run** (`CMP_Chastity::runs()`, `RUN_GAP`). Stars on the timer, in "Locks you hold" and on the badges now count the whole run. One mistaken unlock, a long cleaning break, or ending and re-logging a lock no longer resets the stars.
+- **Longest run.** A new **Your stars** panel on the Chastity tab shows the wearer's longest run with its stars and dates (and says when it's the current lock), plus their Locktober medals. It's private until they press **Show on my profile** (user meta `cmp_cl_show_stars`). After that, their profile shows "Longest lock: 1 month ★" and the medals, even when they're not locked, for people who only lock in October.
+- **Locktober** (`locktober_years()`).
+  - Completed when one run covers October 2 at 23:59 through October 31 at 00:00 (site time). That gives a day's grace at each end (locked on the 2nd, or out on Halloween morning), and breaks under a day are already forgiven.
+  - Each completed year earns a 🏅 Locktober medal.
+  - During October a **Locktober** card shows "Day 15 of 31" with a progress bar and whether the run is on track. If it started after October 2 it still earns stars every day, it just isn't a full Locktober. If you're not locked yet on October 1–2, it points to "I locked earlier".
+  - After completion it says "Completed. Well done!" until November 7.
+- **"I locked earlier (logging it late)."** Starting or accepting a lock can record a start up to **48 hours** back (`posted_start()`). It can't be in the future or before the last lock ended. The planned end counts from that start, and the history says "logged later".
+- **Undo an end made by mistake**, for an hour (`undoable()`, `do_undo_end()`). After Emergency unlock, End lock or the keyholder's Unlock now, the wearer's tab offers **Undo, I'm still locked**. The lock carries on with the same start, the history shows "Ending undone", and the keyholder is told. Only the wearer can undo it, so nobody is put back in a lock without choosing it. Not offered after the site team ends a lock, or once another lock has started.
+- **Self-locks catch up.** Without a member keyholder, the wearer can mark a past day of the lock they forgot to check in: "Forgot to check in?", or tap the day on the calendar. It gets its star and shows as "Checked in late (self-reported)". With a member keyholder, only the keyholder can (0.35.0).
+- **Privacy:** erase removes the profile-stars setting. No database change.
+- **Verification** (local WordPress test kit, PHP 8.3):
+  - `tests/chastity-e2e.sh` 206/206 (was 190). New checks:
+    - a 6-hour break joins two locks and a 2-day gap doesn't;
+    - Locktober counts for 2025 (joined run) and 2022 (Oct 2 evening to Halloween morning), not 2024 (2-day gap) or 2023 (started Oct 3);
+    - the longest run is the joined one;
+    - Your stars shows the run and medals and is private until shown, then the profile shows them while not locked;
+    - "I locked earlier" refuses more than 48 hours back and anything before the last lock ended; 5 hours back records the start, the planned end and "logged later", and joins the run;
+    - the self-lock form and calendar links; a self-reported catch-up;
+    - undo: offered, another member can't, the wearer can (locked again, history), not after an hour;
+    - the Locktober card on October 15 (day 15 of 31) and not in June (a test filter sets the date).
+  - `tests/member-admin-e2e.sh` 43/43, `tests/account-e2e.sh` 69/69. `php -l`.
+
+---
+
 ## 0.35.1
 
 **Gem stars for the first weeks, and a sapphire at 6 months** (owner, 2026-10-22: "Would it make sense to do week 1 bronze, 2 emerald, 3 ruby, and 4 gold? Also what about a 6 month mark? Can we make that something between gold and platinum?").

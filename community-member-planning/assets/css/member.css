@@ -848,3 +848,10 @@
 .cmp-star.is-emerald path { fill: #2ECC71; stroke: #13703b; stroke-width: 1; }
 .cmp-star.is-ruby path { fill: #E0115F; stroke: #7d0934; stroke-width: 1; }
 .cmp-star.is-sapphire path { fill: #3B7DDD; stroke: #163f80; stroke-width: 1; }
+/* 0.36.0: Locktober, your stars, undo. */
+.cmp-member-area .cmp-cl-locktober { border-color: #F5C518; }
+.cmp-member-area .cmp-cl-lt-day { font-size: 22px; font-weight: 800; margin: 0 0 6px; }
+.cmp-member-area .cmp-cl-lt-bar { height: 10px; border-radius: 999px; background: rgba(255,255,255,.1); overflow: hidden; margin-bottom: 10px; }
+.cmp-member-area .cmp-cl-lt-bar span { display: block; height: 100%; background: linear-gradient(90deg, #ff7a18, #F5C518); }
+.cmp-cl-medal { display: inline-block; padding: 2px 10px; border-radius: 999px; background: rgba(245, 197, 24, .15); border: 1px solid rgba(245, 197, 24, .5); font-weight: 700; white-space: nowrap; }
+.cmp-member-area .cmp-cl-undo { border-color: var(--cmp-primary); }
