@@ -334,6 +334,25 @@ class CMP_Feed {
 		self::back( 'fd_posted' );
 	}
 
+	/**
+	 * 0.37.0: a text post made for the member from elsewhere on the site (a
+	 * new chastity star, CMP_Star_News), after they pressed "Post to the feed".
+	 *
+	 * @return int|false Post id.
+	 */
+	public static function announce( $user_id, $body, $visibility ) {
+		global $wpdb;
+		if ( ! isset( self::visibilities()[ $visibility ] ) || '' === trim( $body ) || mb_strlen( $body ) > self::MAX_BODY ) {
+			return false;
+		}
+		$now = gmdate( 'Y-m-d H:i:s' );
+		$wpdb->insert( self::t( 'posts' ), array( 'author_id' => (int) $user_id, 'body' => $body, 'event_id' => 0, 'visibility' => $visibility, 'status' => 'published', 'reports' => 0, 'created_at' => $now, 'updated_at' => $now ) );
+		$post_id = (int) $wpdb->insert_id;
+		CMP_Audit::log( 'post_created', 'post', $post_id, null, array( 'photos' => 0, 'event' => 0, 'visibility' => $visibility, 'from' => 'milestone' ) );
+		CMP_Follows::on_post( self::post( $post_id ) );
+		return $post_id;
+	}
+
 	private static function like( $post, $user_id ) {
 		global $wpdb;
 		if ( self::liked( $post->id, $user_id ) ) {

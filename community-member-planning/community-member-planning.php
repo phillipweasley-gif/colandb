@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Community Member Planning
  * Description: Private member area for the Community Events Calendar: member access (verified email + 18+ self-attestation), in-app notifications, an append-only audit log, and a front-end Account page (name, email, password, devices, privacy requests) that replaces the WordPress dashboard for members, and member profiles with per-field visibility and private profile/cover photos. My Calendars, connections, sharing and the member directory are added in later releases. Reads public events only through the Community Events Calendar's read-only API. Shortcode: [cmp_member_area]. Setup: Settings → Member Planning.
- * Version: 0.36.0
+ * Version: 0.37.0
  * Requires at least: 6.5
  * Requires PHP: 8.1
  * Author: RA Marketing
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CMP_VERSION', '0.36.0' );
+define( 'CMP_VERSION', '0.37.0' );
 define( 'CMP_DB_VERSION', 21 );
 define( 'CMP_FILE', __FILE__ );
 define( 'CMP_DIR', plugin_dir_path( __FILE__ ) );
@@ -45,6 +45,7 @@ require_once CMP_DIR . 'includes/class-cmp-photo-consent.php';
 require_once CMP_DIR . 'includes/class-cmp-image-reports.php';
 require_once CMP_DIR . 'includes/class-cmp-e2e.php';
 require_once CMP_DIR . 'includes/class-cmp-feedback.php';
+require_once CMP_DIR . 'includes/class-cmp-star-news.php';
 require_once CMP_DIR . 'includes/class-cmp-feed.php';
 require_once CMP_DIR . 'includes/class-cmp-messages.php';
 require_once CMP_DIR . 'includes/class-cmp-follows.php';
@@ -63,6 +64,7 @@ require_once CMP_DIR . 'includes/class-cmp-account-bar.php';
 register_activation_hook( __FILE__, array( 'CMP_Install', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'CMP_Retention', 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( 'CMP_Reminders', 'unschedule' ) );
+register_deactivation_hook( __FILE__, array( 'CMP_Star_News', 'unschedule' ) );
 
 final class CMP_Plugin {
 
@@ -82,6 +84,7 @@ final class CMP_Plugin {
 		CMP_Dynamics::init();
 		CMP_Homework::init();
 		CMP_Chastity::init();
+		CMP_Star_News::init();
 		CMP_Photo_Shares::init();
 		CMP_Image_Reports::init();
 		CMP_Feedback::init();

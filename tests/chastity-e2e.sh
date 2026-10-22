@@ -563,6 +563,34 @@ rm -f wp-content/mu-plugins/zz-lt-now.php
 ok "a Locktober card in October (day 15 of 31), none in June" $([ "$(has $T/lt4.html 'Day 15 of 31')$(hasnt $T/lt5.html 'cmp-cl-locktober')" = 11 ] && echo 1 || echo 0)
 ev "global \$wpdb; foreach(\$wpdb->get_col(\"SELECT id FROM $L_T WHERE wearer_id=$LTW\") as \$i) \$wpdb->delete('$E_T',array('lock_id'=>\$i)); \$wpdb->delete('$L_T',array('wearer_id'=>$LTW));" >/dev/null
 
+echo "== New-star notifications and sharing (CMP 0.37.0)"
+ev "delete_user_meta($LTW,'cmp_cl_star_seen'); delete_user_meta($LTW,'cmp_cl_lt_seen'); global \$wpdb; \$wpdb->insert('$D_T',array('type'=>'keyholder','proposer_id'=>$KH,'partner_id'=>$LTW,'proposer_side'=>'a','status'=>'active','proposer_show'=>1,'partner_show'=>1,'created_at'=>gmdate('Y-m-d H:i:s'))); CMP_Dynamics::grant('chastity',$KH,$LTW);" >/dev/null
+SL=$(ev "global \$wpdb; \$wpdb->insert('$L_T',array('wearer_id'=>$LTW,'keyholder_id'=>$KH,'status'=>'locked','option_key'=>'a','option_name'=>'Full lockdown','release_policy'=>'none','started_at'=>gmdate('Y-m-d H:i:s',time()-8*DAY_IN_SECONDS),'created_at'=>gmdate('Y-m-d H:i:s'),'updated_at'=>gmdate('Y-m-d H:i:s'))); echo \$wpdb->insert_id;")
+N0=$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$LTW")
+ev "CMP_Star_News::check($LTW);" >/dev/null
+ok "the first check only records where someone is (no announcement of old stars)" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$LTW")" = "$N0" ] && [ -n "$(ev "echo get_user_meta($LTW,'cmp_cl_star_seen',true);")" ] && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->update('$L_T',array('started_at'=>gmdate('Y-m-d H:i:s',time()-15*DAY_IN_SECONDS)),array('id'=>$SL));" >/dev/null
+OUT=$(ev "echo implode(',',CMP_Star_News::check($LTW));")
+ok "reaching 2 weeks: the wearer is told they earned an emerald star, with a link to share it" $([ "$OUT" = star ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$LTW AND message LIKE 'You earned an emerald star: 2 weeks locked!%' AND url LIKE '%share=star%'")" = 1 ] && echo 1 || echo 0)
+ok "...and so is their keyholder" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$KH AND message LIKE '%October Pup earned an emerald star: 2 weeks locked.%'")" = 1 ] && echo 1 || echo 0)
+ev "CMP_Star_News::check($LTW); CMP_Star_News::check_all();" >/dev/null
+ok "announced once (checking again, or the hourly run, doesn't repeat it)" $([ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$LTW AND message LIKE 'You earned%'")" = 1 ] && echo 1 || echo 0)
+ok "the hourly check is scheduled" $([ -n "$(ev "echo wp_next_scheduled('cmp_cl_stars_check');")" ] && echo 1 || echo 0)
+ev "global \$wpdb; \$tz=wp_timezone(); \$u=function(\$s) use(\$tz){ return (new DateTime(\$s,\$tz))->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s'); }; \$wpdb->insert('$L_T',array('wearer_id'=>$LTW,'keyholder_id'=>0,'status'=>'ended','option_key'=>'a','option_name'=>'x','release_policy'=>'none','started_at'=>\$u('2025-10-01 09:00'),'ended_at'=>\$u('2025-11-01 09:00'),'end_reason'=>'completed','created_at'=>gmdate('Y-m-d H:i:s'),'updated_at'=>gmdate('Y-m-d H:i:s')));" >/dev/null
+OUT=$(ev "echo implode(',',CMP_Star_News::check($LTW));")
+ok "a newly completed Locktober is announced once, with a share link" $([ "$OUT" = locktober ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$LTW AND message LIKE 'You completed Locktober 2025!%' AND url LIKE '%share=locktober%'")" = 1 ] && [ -z "$(ev "echo implode(',',CMP_Star_News::check($LTW));")" ] && echo 1 || echo 0)
+get ltw sh1 "$PAGE&cmp_tab=chastity&share=star"
+LN=$(hnonce $T/sh1.html)
+ok "Share your milestone: open from the notification, editable announcement text, outside links" $([ "$(has $T/sh1.html 'id="cmp-cl-share" open')$(has $T/sh1.html 'I just earned an emerald star: 2 weeks locked!')$(has $T/sh1.html 'https://wa.me/?text=')$(has $T/sh1.html 'https://twitter.com/intent/tweet?text=')$(has $T/sh1.html 't.me/share/url')$(has $T/sh1.html 'facebook.com/sharer')" = 111111 ] && echo 1 || echo 0)
+ok "outside links carry only the text and the site address, never a member page" $(grep -o 'data-share="[a-z]*"' $T/sh1.html >/dev/null; grep -o 'href="[^"]*" target="_blank" rel="noopener noreferrer" data-share' $T/sh1.html | grep -c 'page_id\|cmp_tab' | grep -qx 0 && echo 1 || echo 0)
+get ltw sh2 "$PAGE&cmp_tab=chastity&share=locktober"
+ok "the Locktober share text" $(has $T/sh2.html 'I completed Locktober 2025! 🏅 #Locktober')
+r=$(act ltw $LN announce -F "body=I just earned an emerald star: 2 weeks locked! Thanks Sir" -F "visibility=connections")
+ok "Post to the feed: an announcement post, with the chosen audience" $(echo "$r" | grep -q 'cl_announced' && [ "$(q "SELECT CONCAT(visibility,'|',body) FROM $(TBL posts) WHERE author_id=$LTW ORDER BY id DESC LIMIT 1")" = "connections|I just earned an emerald star: 2 weeks locked! Thanks Sir" ] && echo 1 || echo 0)
+r=$(act ltw $LN announce -F "body=x" -F "visibility=public")
+ok "...an unknown audience is refused" $(echo "$r" | grep -q 'cl_invalid' && echo 1 || echo 0)
+ev "global \$wpdb; foreach(\$wpdb->get_col(\"SELECT id FROM $L_T WHERE wearer_id=$LTW\") as \$i) \$wpdb->delete('$E_T',array('lock_id'=>\$i)); \$wpdb->delete('$L_T',array('wearer_id'=>$LTW)); \$wpdb->delete(CMP_Install::table('posts'),array('author_id'=>$LTW));" >/dev/null
+
 echo "== Privacy"
 ok "export lists the lock and its history" $(ev "\$j=wp_json_encode(CMP_Account::export('pup@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'One release a week') && false!==strpos(\$j,'Verification photo') && false!==strpos(\$j,'photo removed after 90 days')?1:0;")
 ok "erase removes the wearer's locks and history" $(ev "CMP_Account::erase('pup@example.com'); global \$wpdb; echo 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $L_T WHERE wearer_id=$PUP\") && 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $E_T WHERE lock_id=$LID\") && 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $S_T WHERE wearer_id=$PUP\")?1:0;")
