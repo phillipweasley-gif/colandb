@@ -163,6 +163,7 @@ class CMP_Chastity {
 			'cl_e2e_bad'  => CMP_E2E::notices()['cl_e2e_bad'],
 			'cl_e2e_needed' => CMP_E2E::notices()['cl_e2e_needed'],
 			'cl_e2e_lockphoto' => CMP_E2E::notices()['cl_e2e_lockphoto'],
+			'cl_announced' => array( 'success', __( 'Posted to the member feed. Congratulations!', 'cmp' ) ),
 			'cl_undone'   => array( 'success', __( 'Undone. Your lock carries on as if it never ended.', 'cmp' ) ),
 			'cl_began'    => array( 'error', __( 'That start time can\'t be used: it must be within the last 48 hours, and not before your last lock ended.', 'cmp' ) ),
 			'cl_consent'  => array( 'error', __( 'Nothing was saved. To send a photo, tick the box to agree to how it\'s kept.', 'cmp' ) ),
@@ -530,6 +531,9 @@ class CMP_Chastity {
 		}
 		if ( 'propose' === $do ) {
 			self::propose( $user_id );
+		}
+		if ( 'announce' === $do ) {
+			self::go( array( 'share' => 'star' ), CMP_Star_News::announce( $user_id ) ? 'cl_announced' : 'cl_invalid' ); // 0.37.0
 		}
 		if ( 'stars_show' === $do ) {
 			update_user_meta( $user_id, self::META_SHOW_STARS, empty( $_POST['show'] ) ? '0' : '1' ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
@@ -1411,6 +1415,7 @@ class CMP_Chastity {
 			<?php endif; ?>
 		</section>
 		<?php
+		CMP_Star_News::check( $user_id ); // 0.37.0: announce a new star or medal right away.
 		$undo = $lock ? null : self::undoable( $user_id ); // 0.36.0
 		if ( $undo ) {
 			echo '<section class="cmp-panel cmp-cl-undo"><p><b>' . esc_html__( 'Ended by mistake?', 'cmp' ) . '</b> ' . esc_html( sprintf( /* translators: %s: time */ __( 'Your lock ended at %s. You can undo that until an hour after; your run, stars and history carry on as if it never ended.', 'cmp' ), wp_date( 'g:i A', self::ts( $undo->ended_at ) ) ) ) . '</p>' . self::form_open( 'undo_end', $undo->id ) . '<button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Undo, I\'m still locked', 'cmp' ) . '</button></form></section>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
@@ -2033,7 +2038,7 @@ class CMP_Chastity {
 		return array_values( $years );
 	}
 
-	private static function medal( $year ) {
+	public static function medal( $year ) {
 		/* translators: %d: year */
 		return '<span class="cmp-cl-medal" title="' . esc_attr( sprintf( __( 'Completed Locktober %d', 'cmp' ), $year ) ) . '">🏅 ' . esc_html( sprintf( __( 'Locktober %d', 'cmp' ), $year ) ) . '</span>';
 	}
@@ -2074,7 +2079,8 @@ class CMP_Chastity {
 	private static function my_stars_html( $user_id ) {
 		$best  = self::best_run( $user_id );
 		$years = self::locktober_years( $user_id );
-		if ( ( ! $best || self::locked_seconds( $best ) < WEEK_IN_SECONDS ) && ! $years ) {
+		$share = CMP_Star_News::share_html( $user_id ); // 0.37.0
+		if ( ( ! $best || self::locked_seconds( $best ) < WEEK_IN_SECONDS ) && ! $years && '' === $share ) {
 			return '';
 		}
 		$html = '<section class="cmp-panel cmp-cl-mystars"><h3 class="cmp-panel-title">' . esc_html__( 'Your stars', 'cmp' ) . '</h3>';
@@ -2087,7 +2093,7 @@ class CMP_Chastity {
 		}
 		$on    = '1' === (string) get_user_meta( $user_id, self::META_SHOW_STARS, true );
 		$html .= self::form_open( 'stars_show' ) . '<input type="hidden" name="show" value="' . ( $on ? '0' : '1' ) . '" /><p class="cmp-muted">' . esc_html( $on ? __( 'Your longest run and Locktober medals show on your profile, even when you\'re not locked.', 'cmp' ) : __( 'Only you see these. You can show your longest run and Locktober medals on your profile, even when you\'re not locked.', 'cmp' ) ) . '</p><button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html( $on ? __( 'Hide from my profile', 'cmp' ) : __( 'Show on my profile', 'cmp' ) ) . '</button></form>';
-		return $html . '</section>';
+		return $html . $share . '</section>';
 	}
 
 	/* ------------------------------------------------------------------

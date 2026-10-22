@@ -4,6 +4,35 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.37.0
+
+**A notification for each new star or Locktober medal, and a way to share it** (owner, 2026-10-22: "We also want a notification for when they earn their new star and a way to share that via the social media options we currently provide as an announcement").
+
+- **Notifications** (`CMP_Star_News`, new).
+  - When a running lock's run reaches a new star (bronze, emerald, ruby, gold, sapphire, platinum, diamond), the wearer gets "You earned an emerald star: 2 weeks locked! Share your milestone from the Chastity tab." A member keyholder gets "<name> earned an emerald star: 2 weeks locked."
+  - A newly completed Locktober sends "You completed Locktober 2025! 🏅".
+  - Checked hourly (cron `cmp_cl_stars_check`, cleared on deactivation) and whenever the wearer opens the Chastity tab. What was last announced is kept in user meta (`cmp_cl_star_seen`, `cmp_cl_lt_seen`), so each is announced once.
+  - The first check after this update only records where everyone is, so nobody gets a burst of old stars.
+- **Share your milestone**, in **Your stars** on the Chastity tab (the notification opens it):
+  - **Announce it on the member feed:** editable text, for all members or connections only (`CMP_Feed::announce()`, new).
+  - **Or share it outside COL&B**, with the same options the events offer (WhatsApp, Telegram, text message, Facebook, X, email) plus Copy.
+  - Text: "I just earned a gold star: 1 month locked! ⭐" (plus #Locktober in October), "I completed Locktober 2025! 🏅 #Locktober", or "My longest lock: …" when not locked.
+  - Outside links carry only that text and colandb.com, never a member page, and nothing is shared until the member presses a button. The panel says to think about who will see it.
+- No database change.
+- **Verification** (local WordPress test kit, PHP 8.3):
+  - `tests/chastity-e2e.sh` 217/217 (was 206). New checks:
+    - the first check records without announcing;
+    - reaching 2 weeks tells the wearer (with a share link) and the keyholder;
+    - checking again, or the hourly run, doesn't repeat it; the hourly check is scheduled;
+    - a completed Locktober is announced once;
+    - the share panel opens from the notification with the text and the WhatsApp, Telegram, Facebook and X links;
+    - outside links never include a member page;
+    - the Locktober text;
+    - posting to the feed with the chosen audience; an unknown audience is refused.
+  - `tests/feed-e2e.sh` 41/41. `php -l`.
+
+---
+
 ## 0.36.0
 
 **Chastity: longest run with its stars, Locktober, and room for human error** (owner, 2026-10-22: "And what about longest run showing their star? Some people only do it for locktober. Please research Locktober as a lot of the features need to accommodate human error associated with that").
