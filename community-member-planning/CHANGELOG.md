@@ -4,6 +4,22 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.38.1
+
+**Usernames kept out of public view** (owner, 2026-10-22, while checking SEO). The site's users sitemap listed the login names of the 3 administrators and of 6 members who had submitted events. The same names were also available from `/author/<name>/` pages, `?author=<id>` redirects and the public users API (`/wp-json/wp/v2/users`). Login names help password guessing and can identify members. New class `CMP_Username_Privacy`, for visitors and members:
+
+- no users sitemap, whether from WordPress or Yoast SEO;
+- author pages and `?author=` show "not found", without redirecting to the name first;
+- links to author pages go to the home page;
+- `/wp/v2/users` answers "not allowed" (members still get their own `/wp/v2/users/me`), and that includes authors embedded in other API answers;
+- oEmbed data names the site, not the author.
+
+Administrators and calendar managers (anyone who can edit posts) keep all of this, because the WordPress editor's author picker uses the users API. Filter `cmp_show_usernames` changes who keeps it.
+
+**Member page stays hidden with Yoast SEO.** The member page was already left out of WordPress's own sitemap and marked noindex. It's now left out of Yoast's sitemap too (`wpseo_exclude_from_sitemap_by_post_ids`), and Yoast's robots tag says `noindex, nofollow` there (`wpseo_robots`).
+
+**Verified** in the local WordPress kit: new `tests/seo-privacy-e2e.sh`, 30/30 checks, run with WordPress's sitemap and again with Yoast SEO 28.7 active. Regression suites: account 69, profile 84, app 29, all passing.
+
 ## 0.38.0
 
 **Stars on the profile: a one-tap prompt, and an "icons only" style** (owner, 2026-10-22, after asking whether stars and medals could show on profiles by default without saying what they mean. Advice given: no, chastity and Locktober are about someone's sex life, which needs opt-in consent under GDPR and US state laws, the privacy statement promises badges only when the member turns them on, and an unexplained star is soon decoded. So: keep it opt-in, but make opting in easy and allow a discreet style. Owner: "Both").

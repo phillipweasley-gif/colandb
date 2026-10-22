@@ -33,6 +33,9 @@ class CMP_Member_Area {
 		add_action( 'template_redirect', array( __CLASS__, 'private_page_headers' ) );
 		add_filter( 'wp_robots', array( __CLASS__, 'robots' ) );
 		add_filter( 'wp_sitemaps_posts_query_args', array( __CLASS__, 'exclude_from_sitemap' ), 10, 2 );
+		// The same for Yoast SEO's sitemap and robots tag (0.38.1).
+		add_filter( 'wpseo_exclude_from_sitemap_by_post_ids', array( __CLASS__, 'exclude_from_yoast_sitemap' ) );
+		add_filter( 'wpseo_robots', array( __CLASS__, 'yoast_robots' ) );
 		add_action( 'pre_get_posts', array( __CLASS__, 'exclude_from_search' ) );
 	}
 
@@ -119,6 +122,19 @@ class CMP_Member_Area {
 			$args['post__not_in'] = array_merge( isset( $args['post__not_in'] ) ? (array) $args['post__not_in'] : array(), array( $page_id ) );
 		}
 		return $args;
+	}
+
+	public static function exclude_from_yoast_sitemap( $ids ) {
+		$page_id = (int) CMP_Settings::get( 'member_page_id' );
+		if ( $page_id ) {
+			$ids   = (array) $ids;
+			$ids[] = $page_id;
+		}
+		return $ids;
+	}
+
+	public static function yoast_robots( $robots ) {
+		return self::is_member_page() ? 'noindex, nofollow' : $robots;
 	}
 
 	public static function exclude_from_search( $query ) {
