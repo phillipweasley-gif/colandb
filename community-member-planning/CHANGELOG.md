@@ -4,6 +4,47 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.35.0
+
+**Chastity: correct any day of a lock, a star calendar beside Verification, and milestone stars** (owner, 2026-10-22: "When going back to correct a date it only seems to go back a week … It is vital that Keyholders have access to a calendar to select a specific date for correction. Also, under verification it does not organize them by date … Even better a visual guide on the right hand side such as a calendar with gold stars … We should also allow someone to earn stars based on how long they have been in chastity").
+
+- **Correct any day.**
+  - The keyholder's "Verified elsewhere" (now **Mark a day verified**) used to offer only today and the 6 days before. It now takes any day from the lock's first day to today, through a date picker, or by tapping a day on the calendar.
+  - The form says it's also for a day missed by mistake.
+  - A day before the lock started or in the future is refused. A day with a photo waiting for review still can't be marked (accept the photo instead), and the wearer still can't mark days.
+- **In date order.** The lock history (and so the keyholder's latest photos and the data export) is sorted by the day things happened (`created_at`), not by when they were entered. A back-dated correction now sits on its own day instead of at the top.
+- **A calendar of stars beside Verification**, on the right on wide screens and below on phones, for the wearer and the keyholder:
+  - a **gold star** on each day that counts: an accepted photo, a "verified elsewhere" mark, or, without a member keyholder, any photo not sent back;
+  - an **outline star** while a photo waits for review;
+  - a dashed box on a locked day with nothing;
+  - month arrows covering only the lock's months (`?cmp_cm=YYYY-MM`), and "18 of 22 days verified".
+  - For the keyholder of a running lock, each day without a star is a link that opens Mark a day verified with that date filled in.
+  - While a lock runs, this calendar replaces the old monthly one on the wearer's tab, which stays for the months without a lock.
+- **Milestone stars** for one lock's unbroken time.
+  - Research: loyalty programs usually climb bronze → silver → gold → platinum → diamond, with 3–5 levels. I used the owner's steps on that ladder:
+    - a bronze star for each of the first 3 weeks;
+    - a gold star for each month;
+    - a platinum star for each year;
+    - a diamond for every 3 years (4 years = 1 diamond + 1 platinum).
+  - Shown under the timer, with "Next: a gold star at 2 months, on Nov 4". Also next to each lock under "Locks you hold" and "Past locks", and on the profile badges (wearer and keyholder) when the wearer has their badge on.
+  - Each set of stars has a text label for screen readers ("Stars: 2 months locked").
+- No database change.
+- **Verification** (local WordPress test kit, PHP 8.3):
+  - `tests/chastity-e2e.sh` 190/190 (was 176). New checks:
+    - the date picker runs from the lock's first day to today;
+    - the keyholder's calendar sits beside Verification, and missed days two weeks back link to the correction;
+    - tapping a day opens the form with that date;
+    - a day 14 days back is recorded on that day; before the start and future days are refused; the wearer can't mark days;
+    - history is in date order, with the correction not on top;
+    - the corrected day gets a gold star, with the "days verified" count;
+    - months outside the lock are clamped; the wearer sees the calendar without links;
+    - stars at 5 days (none), 8 days (1 bronze), 22 days (3 bronze), 35 days (1 gold), 75 days (2 gold), 400 days (1 platinum + 1 gold), 3 years 40 days (1 diamond + 1 gold), 7 years (2 diamonds + 1 platinum);
+    - the timer shows 2 bronze stars at 20 days and "Next: a bronze star at 3 weeks".
+  - Earlier checks updated for the date picker and the new calendar.
+  - Screenshots in Chromium at 1280 px and 390 px (the calendar sits beside Verification, then stacks below it on a phone). `php -l`.
+
+---
+
 ## 0.34.1
 
 **"Need help?" passes only the page path, never the query string.** I found this checking 0.34.0 on colandb.com. The host caches whole pages, header included, and ignores some query strings: `/events/?a=…` was served with the "Need help?" link built for an earlier request (`?from=%2Fevents%2F%3Fr%3D…`). So a query string from one visitor could be shown to others, and query strings can carry private things, like an emailed edit or unsubscribe link's token.

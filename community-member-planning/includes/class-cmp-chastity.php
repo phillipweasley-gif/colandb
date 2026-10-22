@@ -221,7 +221,7 @@ class CMP_Chastity {
 
 	public static function events( $lock_id, $limit = 30 ) {
 		global $wpdb;
-		return $wpdb->get_results( $wpdb->prepare( 'SELECT id, lock_id, actor_id, type, minutes, note, photo_sha, photo_e2e, code, review, created_at FROM ' . self::t( 'lock_events' ) . ' WHERE lock_id = %d ORDER BY id DESC LIMIT %d', $lock_id, $limit ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return $wpdb->get_results( $wpdb->prepare( 'SELECT id, lock_id, actor_id, type, minutes, note, photo_sha, photo_e2e, code, review, created_at FROM ' . self::t( 'lock_events' ) . ' WHERE lock_id = %d ORDER BY created_at DESC, id DESC LIMIT %d', $lock_id, $limit ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- 0.35.0: by date, so a back-dated correction sits on its own day.
 	}
 
 	public static function event( $id ) {
@@ -365,14 +365,16 @@ class CMP_Chastity {
 
 	/**
 	 * 0.28.0: the days a keyholder may mark "verified elsewhere" (the wearer
-	 * sent their verification outside COL&B): today and the 6 days before,
-	 * never before the lock started. Site dates, newest first.
+	 * sent their verification outside COL&B), never before the lock
+	 * started. Site dates, newest first. 0.35.0: any day of the lock, not
+	 * just the last week (owner: "someone may have missed a different date
+	 * two weeks ago").
 	 */
 	public static function elsewhere_days( $lock ) {
 		$tz    = wp_timezone();
 		$start = wp_date( 'Y-m-d', self::ts( $lock->started_at ) );
 		$out   = array();
-		for ( $i = 0; $i < 7; $i++ ) {
+		for ( $i = 0; $i < 3700; $i++ ) {
 			$d   = ( new DateTime( 'today', $tz ) )->modify( '-' . $i . ' day' );
 			$ymd = $d->format( 'Y-m-d' );
 			if ( $ymd < $start ) {
@@ -1395,7 +1397,9 @@ class CMP_Chastity {
 		} else {
 			echo self::start_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		}
-		echo self::calendar_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
+		if ( ! $lock ) { // 0.35.0: a running lock has its own calendar with stars, beside Verification.
+			echo self::calendar_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
+		}
 		echo CMP_E2E::panel_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		echo self::photos_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		?>
@@ -1405,7 +1409,7 @@ class CMP_Chastity {
 				<p class="cmp-empty"><?php esc_html_e( 'When a member whose key you hold (chastity in a dynamic) locks up with you as keyholder, or accepts a lock you set up for them, their lock appears here.', 'cmp' ); ?></p>
 			<?php endif; ?>
 			<?php foreach ( $held as $h ) : ?>
-				<p class="cmp-hw-item"><a href="<?php echo esc_url( self::url( array( 'lock' => $h->id ) ) ); ?>"><b><?php echo esc_html( self::name( $h->wearer_id ) ); ?></b></a> · <?php echo esc_html( $h->option_name ); ?> · <?php echo esc_html( sprintf( /* translators: %s: duration */ __( 'locked %s', 'cmp' ), self::duration( self::locked_seconds( $h ) ) ) ); ?></p>
+				<p class="cmp-hw-item"><a href="<?php echo esc_url( self::url( array( 'lock' => $h->id ) ) ); ?>"><b><?php echo esc_html( self::name( $h->wearer_id ) ); ?></b></a> · <?php echo esc_html( $h->option_name ); ?> · <?php echo esc_html( sprintf( /* translators: %s: duration */ __( 'locked %s', 'cmp' ), self::duration( self::locked_seconds( $h ) ) ) ); ?> <?php echo self::stars_html( $h ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?></p>
 			<?php endforeach; ?>
 			<?php echo self::sent_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 		</section>
@@ -1417,7 +1421,7 @@ class CMP_Chastity {
 			<section class="cmp-panel">
 				<h3 class="cmp-panel-title"><?php esc_html_e( 'Past locks', 'cmp' ); ?></h3>
 				<?php foreach ( $past as $p ) : ?>
-					<p class="cmp-hw-item"><?php echo esc_html( wp_date( 'M j', self::ts( $p->started_at ) ) . ' – ' . wp_date( 'M j', self::ts( $p->ended_at ) ) . ' · ' . self::duration( self::locked_seconds( $p ) ) . ' · ' . $p->option_name . ' · ' . ( isset( $reasons[ $p->end_reason ] ) ? $reasons[ $p->end_reason ] : '' ) ); ?></p>
+					<p class="cmp-hw-item"><?php echo esc_html( wp_date( 'M j', self::ts( $p->started_at ) ) . ' – ' . wp_date( 'M j', self::ts( $p->ended_at ) ) . ' · ' . self::duration( self::locked_seconds( $p ) ) . ' · ' . $p->option_name . ' · ' . ( isset( $reasons[ $p->end_reason ] ) ? $reasons[ $p->end_reason ] : '' ) ); ?> <?php echo self::stars_html( $p ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?></p>
 				<?php endforeach; ?>
 			</section>
 		<?php endif; ?>
@@ -1536,6 +1540,7 @@ class CMP_Chastity {
 	private static function timer_html( $lock, $show_left ) {
 		$left = self::seconds_left( $lock );
 		$html = '<div class="cmp-cl-timer"><span class="cmp-cl-icon" aria-hidden="true">' . ( $lock->opened_at ? '🔓' : '🔒' ) . '</span><b data-cmp-since="' . (int) self::ts( $lock->started_at ) . '">' . esc_html( self::duration( self::locked_seconds( $lock ) ) ) . '</b><small>' . esc_html__( 'Locked for', 'cmp' ) . '</small>';
+		$html .= self::stars_html( $lock, true ); // 0.35.0
 		if ( $lock->opened_at ) {
 			$html .= '<p class="cmp-cl-open">' . esc_html( sprintf( /* translators: %s: time */ __( 'Open for hygiene since %s', 'cmp' ), wp_date( 'g:i A', self::ts( $lock->opened_at ) ) ) ) . '</p>';
 		}
@@ -1566,7 +1571,7 @@ class CMP_Chastity {
 
 		// Verification.
 		$today  = self::today_verification( $lock );
-		$html  .= '<section class="cmp-panel"><h3 class="cmp-panel-title">' . esc_html__( 'Verification', 'cmp' ) . '</h3>';
+		$html  .= '<section class="cmp-panel cmp-cl-verify"><div class="cmp-cl-verify-main"><h3 class="cmp-panel-title">' . esc_html__( 'Verification', 'cmp' ) . '</h3>';
 		$html  .= '<p>' . esc_html( $lock->verify_daily ? __( 'Every day: a photo of the device with today\'s code written on paper.', 'cmp' ) : __( 'Optional: a photo of the device with today\'s code written on paper.', 'cmp' ) ) . '</p>';
 		$html  .= '<p class="cmp-cl-codewrap"><span class="cmp-cl-code" data-cmp-code>' . esc_html( self::code( $lock->id ) ) . '</span></p>';
 		if ( $today && 'verified_else' === $today->type ) {
@@ -1586,7 +1591,7 @@ class CMP_Chastity {
 		} else {
 			$html .= self::form_open( 'verify', $lock->id, true );
 		}
-		$html .= '<p class="cmp-field"><label for="cmp_cl_vphoto">' . esc_html__( 'Photo', 'cmp' ) . '</label><input type="file" id="cmp_cl_vphoto" name="photo" accept="image/jpeg,image/png,image/webp" required /></p>' . CMP_Photo_Consent::field_html( $lock->wearer_id, 'cmp_cl_consent_v', true ) . '<button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Send verification', 'cmp' ) . '</button></form></section>';
+		$html .= '<p class="cmp-field"><label for="cmp_cl_vphoto">' . esc_html__( 'Photo', 'cmp' ) . '</label><input type="file" id="cmp_cl_vphoto" name="photo" accept="image/jpeg,image/png,image/webp" required /></p>' . CMP_Photo_Consent::field_html( $lock->wearer_id, 'cmp_cl_consent_v', true ) . '<button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Send verification', 'cmp' ) . '</button></form></div>' . self::verify_calendar_html( $lock, false ) . '</section>';
 
 		// Hygiene, release, unlock.
 		$html .= '<section class="cmp-panel"><h3 class="cmp-panel-title">' . esc_html__( 'Opening and release', 'cmp' ) . '</h3>';
@@ -1668,7 +1673,7 @@ class CMP_Chastity {
 
 		// Verification photos waiting.
 		$events = self::events( $lock->id, 40 );
-		$html  .= '<section class="cmp-panel"><h3 class="cmp-panel-title">' . esc_html( sprintf( /* translators: %s: code */ __( 'Verification · today\'s code %s', 'cmp' ), self::code( $lock->id ) ) ) . '</h3>';
+		$html  .= '<section class="cmp-panel cmp-cl-verify"><div class="cmp-cl-verify-main"><h3 class="cmp-panel-title">' . esc_html( sprintf( /* translators: %s: code */ __( 'Verification · today\'s code %s', 'cmp' ), self::code( $lock->id ) ) ) . '</h3>';
 		$shown  = 0;
 		foreach ( $events as $e ) {
 			if ( 'verification' !== $e->type || $shown >= 3 ) {
@@ -1690,13 +1695,15 @@ class CMP_Chastity {
 		}
 		$days = self::elsewhere_days( $lock );
 		if ( $days ) {
-			$html .= '<details class="cmp-hw-taskedit cmp-cl-elsewhere"><summary>' . esc_html__( 'Verified elsewhere', 'cmp' ) . '</summary>' . self::form_open( 'verified_else', $lock->id );
-			$html .= '<p class="cmp-muted">' . esc_html__( 'Did they send you their verification another way, like Telegram or a text? Mark the day here so it counts. No photo is kept.', 'cmp' ) . '</p>';
-			$html .= '<p class="cmp-field"><label for="cmp_cl_vday">' . esc_html__( 'Day', 'cmp' ) . '</label>' . self::select( 'day', 'cmp_cl_vday', $days, (string) key( $days ) ) . '</p>';
+			// 0.35.0: any day of the lock, picked with a date field or from the calendar.
+			$pick  = isset( $_GET['vday'] ) && isset( $days[ sanitize_text_field( wp_unslash( $_GET['vday'] ) ) ] ) ? sanitize_text_field( wp_unslash( $_GET['vday'] ) ) : (string) key( $days ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$html .= '<details class="cmp-hw-taskedit cmp-cl-elsewhere" id="cmp-cl-elsewhere"' . ( isset( $_GET['vday'] ) ? ' open' : '' ) . '><summary>' . esc_html__( 'Mark a day verified', 'cmp' ) . '</summary>' . self::form_open( 'verified_else', $lock->id ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$html .= '<p class="cmp-muted">' . esc_html__( 'Did they send you their verification another way, like Telegram or a text, or was a day missed by mistake? Pick any day of this lock, or tap a day without a star on the calendar, so it counts. No photo is kept.', 'cmp' ) . '</p>';
+			$html .= '<p class="cmp-field"><label for="cmp_cl_vday">' . esc_html__( 'Day', 'cmp' ) . '</label><input type="date" id="cmp_cl_vday" name="day" value="' . esc_attr( $pick ) . '" min="' . esc_attr( (string) array_key_last( $days ) ) . '" max="' . esc_attr( (string) key( $days ) ) . '" required /></p>';
 			$html .= '<p class="cmp-field"><label for="cmp_cl_vnote">' . esc_html__( 'Where (optional)', 'cmp' ) . '</label><input type="text" id="cmp_cl_vnote" name="note" maxlength="200" placeholder="' . esc_attr__( 'e.g. Telegram', 'cmp' ) . '" /></p>';
 			$html .= '<button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Mark verified', 'cmp' ) . '</button></form></details>';
 		}
-		$html .= '</section>';
+		$html .= '</div>' . self::verify_calendar_html( $lock, true ) . '</section>';
 
 		// Rules.
 		$html .= '<section class="cmp-panel"><h3 class="cmp-panel-title">' . esc_html__( 'Rules', 'cmp' ) . '</h3>' . self::form_open( 'rules', $lock->id );
@@ -1836,6 +1843,200 @@ class CMP_Chastity {
 		return $html . '</div></details></section>';
 	}
 
+	/* ------------------------------------------------------------------
+	 * 0.35.0: milestone stars and the verification calendar
+	 * ---------------------------------------------------------------- */
+
+	/**
+	 * Stars for one lock's unbroken time locked (owner, 2026-10-22). Ladder
+	 * after the usual loyalty tiers (bronze < gold < platinum < diamond):
+	 * a bronze star for each of the first 3 weeks; a gold star for each
+	 * month; a platinum star for each year; a diamond for every 3 years
+	 * (3 years = 1 diamond, 4 years = 1 diamond + 1 platinum).
+	 *
+	 * @return int[] diamond, platinum, gold, bronze
+	 */
+	public static function milestones( $lock ) {
+		$secs  = self::locked_seconds( $lock );
+		$start = ( new DateTime( '@' . self::ts( $lock->started_at ) ) )->setTimezone( wp_timezone() );
+		$now   = ( new DateTime( '@' . ( self::ts( $lock->started_at ) + $secs ) ) )->setTimezone( wp_timezone() );
+		$d     = $start->diff( $now );
+		$out   = array( 'diamond' => intdiv( $d->y, 3 ), 'platinum' => $d->y % 3, 'gold' => $d->m, 'bronze' => 0 );
+		if ( ! $d->y && ! $d->m ) {
+			$out['bronze'] = min( 3, intdiv( $secs, WEEK_IN_SECONDS ) );
+		}
+		return $out;
+	}
+
+	/** "3 weeks", "1 month", "1 year, 2 months"… for a milestone count. */
+	public static function milestone_label( $m ) {
+		$years = $m['diamond'] * 3 + $m['platinum'];
+		$parts = array();
+		if ( $years ) {
+			/* translators: %d: years */
+			$parts[] = sprintf( _n( '%d year', '%d years', $years, 'cmp' ), $years );
+		}
+		if ( $m['gold'] ) {
+			/* translators: %d: months */
+			$parts[] = sprintf( _n( '%d month', '%d months', $m['gold'], 'cmp' ), $m['gold'] );
+		}
+		if ( ! $parts && $m['bronze'] ) {
+			/* translators: %d: weeks */
+			$parts[] = sprintf( _n( '%d week', '%d weeks', $m['bronze'], 'cmp' ), $m['bronze'] );
+		}
+		return implode( ', ', $parts );
+	}
+
+	/** When the next star comes for a running lock, as a timestamp. */
+	public static function next_milestone_at( $lock ) {
+		$t0    = self::ts( $lock->started_at );
+		$start = ( new DateTime( '@' . $t0 ) )->setTimezone( wp_timezone() );
+		$month = ( clone $start )->modify( '+1 month' )->getTimestamp();
+		for ( $w = 1; $w <= 3; $w++ ) {
+			$t = $t0 + $w * WEEK_IN_SECONDS;
+			if ( $t > time() && $t < $month ) {
+				return $t;
+			}
+		}
+		for ( $n = 1; $n < 1200; $n++ ) {
+			$t = ( clone $start )->modify( '+' . $n . ' months' )->getTimestamp();
+			if ( $t > time() ) {
+				return $t;
+			}
+		}
+		return 0;
+	}
+
+	private static function star_svg( $tier ) {
+		$path = 'diamond' === $tier ? 'M6 3h12l4 6-10 12L2 9z' : 'M12 2.5l2.9 6.2 6.8.7-5.1 4.6 1.5 6.7L12 17.3l-6.1 3.4 1.5-6.7-5.1-4.6 6.8-.7z';
+		return '<svg class="cmp-star is-' . esc_attr( $tier ) . '" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="' . $path . '"/></svg>';
+	}
+
+	/**
+	 * The stars for a lock, with an accessible label. $with_next adds "Next
+	 * star: <what> on <date>" for a running lock.
+	 */
+	public static function stars_html( $lock, $with_next = false ) {
+		$m     = self::milestones( $lock );
+		$label = self::milestone_label( $m );
+		$html  = '';
+		if ( '' !== $label ) {
+			$stars = '';
+			foreach ( array( 'diamond', 'platinum', 'gold', 'bronze' ) as $tier ) {
+				$stars .= str_repeat( self::star_svg( $tier ), (int) $m[ $tier ] );
+			}
+			/* translators: %s: e.g. "2 months" */
+			$text  = sprintf( __( 'Stars: %s locked', 'cmp' ), $label );
+			$html .= '<span class="cmp-cl-stars" role="img" aria-label="' . esc_attr( $text ) . '" title="' . esc_attr( $text ) . '">' . $stars . '</span>';
+		}
+		if ( $with_next && 'locked' === $lock->status && self::next_milestone_at( $lock ) ) {
+			$at   = self::next_milestone_at( $lock );
+			$fake = (object) array( 'started_at' => $lock->started_at, 'status' => 'ended', 'ended_at' => gmdate( 'Y-m-d H:i:s', $at + 60 ) );
+			$nm   = self::milestones( $fake );
+			$yrs  = $m['diamond'] * 3 + $m['platinum'];
+			$nyrs = $nm['diamond'] * 3 + $nm['platinum'];
+			$tier = $nm['diamond'] > $m['diamond'] ? __( 'a diamond', 'cmp' ) : ( $nyrs > $yrs ? __( 'a platinum star', 'cmp' ) : ( $nm['gold'] !== $m['gold'] ? __( 'a gold star', 'cmp' ) : __( 'a bronze star', 'cmp' ) ) );
+			/* translators: 1: "a gold star", 2: e.g. "1 month", 3: date */
+			$html .= '<p class="cmp-cl-next">' . esc_html( sprintf( __( 'Next: %1$s at %2$s, on %3$s', 'cmp' ), $tier, self::milestone_label( $nm ), wp_date( 'M j', $at ) ) ) . '</p>';
+		}
+		return $html;
+	}
+
+	/**
+	 * Each site day of one lock in a month: 'done' (an accepted photo, a
+	 * "verified elsewhere" mark, or for a lock without a member keyholder any
+	 * photo not sent back), 'pending' (a photo waiting for review), 'again'.
+	 */
+	private static function day_states( $lock, $from_utc, $to_utc ) {
+		global $wpdb;
+		$out  = array();
+		$rank = array( 'again' => 1, 'pending' => 2, 'done' => 3 );
+		foreach ( $wpdb->get_results( $wpdb->prepare( 'SELECT type, review, created_at FROM ' . self::t( 'lock_events' ) . " WHERE lock_id = %d AND type IN ('verification','verified_else') AND created_at >= %s AND created_at < %s", $lock->id, $from_utc, $to_utc ) ) as $e ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( 'verified_else' === $e->type || 'accepted' === $e->review || ( ! $lock->keyholder_id && 'again' !== $e->review ) ) {
+				$st = 'done';
+			} else {
+				$st = 'again' === $e->review ? 'again' : 'pending';
+			}
+			$ymd = wp_date( 'Y-m-d', self::ts( $e->created_at ) );
+			if ( ! isset( $out[ $ymd ] ) || $rank[ $st ] > $rank[ $out[ $ymd ] ] ) {
+				$out[ $ymd ] = $st;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * A month of one lock beside Verification: a gold star on each day that
+	 * counts, an outline star while a photo waits for review, and (for the
+	 * keyholder of a running lock) each locked day without a star links to
+	 * "Mark a day verified" for that date. ?cmp_cm=YYYY-MM moves between the
+	 * lock's months.
+	 */
+	private static function verify_calendar_html( $lock, $as_keyholder ) {
+		$tz     = wp_timezone();
+		$startd = wp_date( 'Y-m-d', self::ts( $lock->started_at ) );
+		$endd   = 'locked' === $lock->status ? wp_date( 'Y-m-d' ) : wp_date( 'Y-m-d', self::ts( $lock->ended_at ) );
+		$first  = substr( $startd, 0, 7 );
+		$last   = substr( $endd, 0, 7 );
+		$want   = isset( $_GET['cmp_cm'] ) ? sanitize_text_field( wp_unslash( $_GET['cmp_cm'] ) ) : $last; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$month  = preg_match( '/^\d{4}-\d{2}$/', $want ) ? max( $first, min( $last, $want ) ) : $last;
+		$mstart = new DateTime( $month . '-01 00:00:00', $tz );
+		$mnext  = ( clone $mstart )->modify( '+1 month' );
+		$utc    = new DateTimeZone( 'UTC' );
+		$states = self::day_states( $lock, ( clone $mstart )->setTimezone( $utc )->format( 'Y-m-d H:i:s' ), ( clone $mnext )->setTimezone( $utc )->format( 'Y-m-d H:i:s' ) );
+		$base   = $as_keyholder ? array( 'lock' => $lock->id ) : array();
+		$prev   = ( clone $mstart )->modify( '-1 month' )->format( 'Y-m' );
+		$next   = $mnext->format( 'Y-m' );
+		$today  = wp_date( 'Y-m-d' );
+		$link   = $as_keyholder && 'locked' === $lock->status && self::is_keyholder( $lock, get_current_user_id() );
+		$done   = 0;
+		$total  = 0;
+
+		$html  = '<aside class="cmp-cl-verify-cal" aria-labelledby="cmp-cl-cal-title-' . (int) $lock->id . '"><div class="cmp-cl-cal-head">';
+		$html .= $prev >= $first ? '<a class="cmp-cl-cal-nav" href="' . esc_url( self::url( $base + array( 'cmp_cm' => $prev ) ) ) . '#cmp-cl-cal-title-' . (int) $lock->id . '" aria-label="' . esc_attr__( 'Previous month', 'cmp' ) . '">‹</a>' : '<span class="cmp-cl-cal-nav is-off" aria-hidden="true">‹</span>';
+		$html .= '<h4 id="cmp-cl-cal-title-' . (int) $lock->id . '">' . esc_html( wp_date( 'F Y', $mstart->getTimestamp() ) ) . '</h4>';
+		$html .= $next <= $last ? '<a class="cmp-cl-cal-nav" href="' . esc_url( self::url( $base + array( 'cmp_cm' => $next ) ) ) . '#cmp-cl-cal-title-' . (int) $lock->id . '" aria-label="' . esc_attr__( 'Next month', 'cmp' ) . '">›</a>' : '<span class="cmp-cl-cal-nav is-off" aria-hidden="true">›</span>';
+		$html .= '</div><div class="cmp-cl-stars-cal">';
+		foreach ( array( __( 'Mo', 'cmp' ), __( 'Tu', 'cmp' ), __( 'We', 'cmp' ), __( 'Th', 'cmp' ), __( 'Fr', 'cmp' ), __( 'Sa', 'cmp' ), __( 'Su', 'cmp' ) ) as $wd ) {
+			$html .= '<span class="is-wd" aria-hidden="true">' . esc_html( $wd ) . '</span>';
+		}
+		$html .= str_repeat( '<span class="is-blank"></span>', (int) $mstart->format( 'N' ) - 1 );
+		for ( $day = clone $mstart; $day < $mnext; $day->modify( '+1 day' ) ) {
+			$ymd    = $day->format( 'Y-m-d' );
+			$n      = (int) $day->format( 'j' );
+			$in     = $ymd >= $startd && $ymd <= $endd;
+			$st     = isset( $states[ $ymd ] ) ? $states[ $ymd ] : '';
+			$date   = wp_date( 'l, F j', $day->getTimestamp() + 12 * HOUR_IN_SECONDS );
+			$cls    = array( $ymd === $today ? 'is-today' : '' );
+			if ( ! $in ) {
+				$html .= '<span class="is-out ' . esc_attr( implode( ' ', $cls ) ) . '">' . $n . '</span>';
+				continue;
+			}
+			++$total;
+			if ( 'done' === $st ) {
+				++$done;
+				/* translators: %s: date */
+				$html .= '<span class="is-done ' . esc_attr( implode( ' ', $cls ) ) . '" title="' . esc_attr( sprintf( __( '%s: verified', 'cmp' ), $date ) ) . '"><i>' . $n . '</i>' . self::star_svg( 'gold' ) . '<span class="screen-reader-text">' . esc_html__( 'verified', 'cmp' ) . '</span></span>';
+				continue;
+			}
+			/* translators: %s: date */
+			$tip = 'pending' === $st ? sprintf( __( '%s: photo waiting for review', 'cmp' ), $date ) : ( 'again' === $st ? sprintf( __( '%s: asked for another photo', 'cmp' ), $date ) : sprintf( __( '%s: not verified', 'cmp' ), $date ) );
+			$in_html = '<i>' . $n . '</i>' . ( 'pending' === $st ? self::star_svg( 'outline' ) : '' ) . '<span class="screen-reader-text">' . esc_html( 'pending' === $st ? __( 'waiting for review', 'cmp' ) : __( 'not verified', 'cmp' ) ) . '</span>';
+			$cls[]   = 'pending' === $st ? 'is-pending' : 'is-missed';
+			if ( $link ) {
+				/* translators: %s: date */
+				$html .= '<a class="' . esc_attr( implode( ' ', $cls ) ) . '" href="' . esc_url( self::url( $base + array( 'cmp_cm' => $month, 'vday' => $ymd ) ) ) . '#cmp-cl-elsewhere" title="' . esc_attr( $tip . ' · ' . __( 'mark it verified', 'cmp' ) ) . '">' . $in_html . '</a>';
+			} else {
+				$html .= '<span class="' . esc_attr( implode( ' ', $cls ) ) . '" title="' . esc_attr( $tip ) . '">' . $in_html . '</span>';
+			}
+		}
+		$html .= '</div>';
+		/* translators: 1: verified days, 2: days locked this month */
+		$html .= '<p class="cmp-cl-cal-sum">' . esc_html( sprintf( _n( '%1$d of %2$d day verified', '%1$d of %2$d days verified', $total, 'cmp' ), $done, $total ) ) . '</p>';
+		$html .= '<p class="cmp-muted cmp-cl-legend2">' . self::star_svg( 'gold' ) . ' ' . esc_html__( 'Verified', 'cmp' ) . ' ' . self::star_svg( 'outline' ) . ' ' . esc_html__( 'Waiting for review', 'cmp' ) . ( $link ? ' · ' . esc_html__( 'Tap a day without a star to mark it verified.', 'cmp' ) : '' ) . '</p>';
+		return $html . '</aside>';
+	}
+
 	/** This month: days with any time locked, and verified days (a photo, or 0.28.0 "verified elsewhere"). */
 	private static function calendar_html( $user_id ) {
 		global $wpdb;
@@ -1961,7 +2162,7 @@ class CMP_Chastity {
 				/* translators: %d: days */
 				: esc_html( sprintf( _n( 'Locked · %d day', 'Locked · %d days', $days, 'cmp' ), $days ) );
 			$ver  = self::last_verified_text( $lock );
-			$out .= '<p class="cmp-cl-badge">' . self::icon( 'lock' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . ( $ver ? ' · ' . $ver : '' ) . '</span></p>';
+			$out .= '<p class="cmp-cl-badge">' . self::icon( 'lock' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . ' ' . self::stars_html( $lock ) . ( $ver ? ' · ' . $ver : '' ) . '</span></p>';
 		}
 		$held = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . self::t( 'locks' ) . " WHERE keyholder_id = %d AND status = 'locked' AND show_profile = 1 AND kh_show = 1 ORDER BY started_at", $owner_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		foreach ( $held as $h ) {
@@ -1973,7 +2174,7 @@ class CMP_Chastity {
 			/* translators: 1: wearer link, 2: days */
 			$text = sprintf( _n( 'Holds the key for %1$s · %2$d day', 'Holds the key for %1$s · %2$d days', $days, 'cmp' ), $who, $days );
 			$ver  = self::last_verified_text( $h );
-			$out .= '<p class="cmp-cl-badge is-key">' . self::icon( 'key' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . ( $ver ? ' · ' . $ver : '' ) . '</span></p>';
+			$out .= '<p class="cmp-cl-badge is-key">' . self::icon( 'key' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . ' ' . self::stars_html( $h ) . ( $ver ? ' · ' . $ver : '' ) . '</span></p>';
 		}
 		return $out ? '<div class="cmp-cl-badges">' . $out . '</div>' : '';
 	}

@@ -11,7 +11,7 @@ bash tests/account-e2e.sh            # member plugin Account tab + dashboard loc
 bash tests/profile-e2e.sh            # member plugin profiles, photos, preferences, menus, account bar: 80 checks
 bash tests/dynamics-e2e.sh           # dynamics between members: 34 checks
 bash tests/homework-e2e.sh           # homework programs: 44 checks
-bash tests/chastity-e2e.sh           # chastity tracking, incl. keyholder-proposed locks, "verified elsewhere", last verified on badges, handing a running lock to a keyholder and setting the end date, encrypted photos, share links, the 90-day purge, consent, download and delete: 176 checks
+bash tests/chastity-e2e.sh           # chastity tracking, incl. keyholder-proposed locks, "verified elsewhere", last verified on badges, handing a running lock to a keyholder and setting the end date, encrypted photos, share links, the 90-day purge, consent, download and delete, correcting any day, the star calendar and milestone stars: 190 checks
 bash tests/image-report-e2e.sh        # intimate-image reports (CMP 0.32.0): public form, limits, emails, admin screen, remove a photo by link, never cached: 24 checks
 bash tests/e2e-photos-e2e.sh          # end-to-end photos (CMP 0.33.0) in real Chromium via Playwright: 33 checks
 bash tests/feedback-e2e.sh            # "Need help?" link and form (CMP 0.34.0): 20 checks
