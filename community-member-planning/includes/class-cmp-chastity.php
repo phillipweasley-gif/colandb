@@ -62,6 +62,10 @@ class CMP_Chastity {
 	const CODE_CHARS  = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 	const PURGED      = 'purged';
 	const DELETED     = 'deleted';
+	const META_SHOW_STARS = 'cmp_cl_show_stars'; // 0.36.0: longest run and Locktober awards on the profile.
+	const RUN_GAP     = DAY_IN_SECONDS;      // 0.36.0: a new lock within a day of the last one continues the run.
+	const LATE_START  = 2 * DAY_IN_SECONDS;  // 0.36.0: "I locked earlier", up to 48 hours back.
+	const UNDO_WINDOW = HOUR_IN_SECONDS;     // 0.36.0: undo an end made by mistake.
 
 	/** 0.33.0: the photo just posted is an end-to-end envelope. */
 	private static $posted_e2e = false;
@@ -159,6 +163,8 @@ class CMP_Chastity {
 			'cl_e2e_bad'  => CMP_E2E::notices()['cl_e2e_bad'],
 			'cl_e2e_needed' => CMP_E2E::notices()['cl_e2e_needed'],
 			'cl_e2e_lockphoto' => CMP_E2E::notices()['cl_e2e_lockphoto'],
+			'cl_undone'   => array( 'success', __( 'Undone. Your lock carries on as if it never ended.', 'cmp' ) ),
+			'cl_began'    => array( 'error', __( 'That start time can\'t be used: it must be within the last 48 hours, and not before your last lock ended.', 'cmp' ) ),
 			'cl_consent'  => array( 'error', __( 'Nothing was saved. To send a photo, tick the box to agree to how it\'s kept.', 'cmp' ) ),
 			'cl_photo_deleted' => array( 'success', __( 'Photo deleted. Any links to it have stopped working.', 'cmp' ) ),
 			'cl_unshared' => array( 'success', __( 'Link turned off. It no longer shows the photo.', 'cmp' ) ),
@@ -525,6 +531,13 @@ class CMP_Chastity {
 		if ( 'propose' === $do ) {
 			self::propose( $user_id );
 		}
+		if ( 'stars_show' === $do ) {
+			update_user_meta( $user_id, self::META_SHOW_STARS, empty( $_POST['show'] ) ? '0' : '1' ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			self::go( array(), 'cl_saved' );
+		}
+		if ( 'undo_end' === $do ) {
+			self::do_undo_end( self::lock( self::posted_int( 'lock' ) ), $user_id ); // 0.36.0
+		}
 		if ( 0 === strpos( $do, 'e2e_' ) ) {
 			CMP_E2E::handle( $do, $user_id ); // 0.33.0
 		}
@@ -548,6 +561,10 @@ class CMP_Chastity {
 		$keyholder_actions = array( 'time', 'end_date', 'rules', 'allow_release', 'review', 'verified_else', 'kh_unlock' );
 		if ( in_array( $do, $wearer_actions, true ) && self::is_wearer( $lock, $user_id ) ) {
 			call_user_func( array( __CLASS__, 'do_' . $do ), $lock, $user_id );
+		}
+		// 0.36.0: without a member keyholder, the wearer catches up a day they forgot to check in.
+		if ( 'verified_else' === $do && self::is_wearer( $lock, $user_id ) && ! $lock->keyholder_id ) {
+			self::do_verified_else( $lock, $user_id );
 		}
 		if ( in_array( $do, $keyholder_actions, true ) && self::is_keyholder( $lock, $user_id ) ) {
 			call_user_func( array( __CLASS__, 'do_' . $do ), $lock, $user_id );
@@ -583,6 +600,7 @@ class CMP_Chastity {
 		}
 		$photo = self::posted_photo( array() );
 		$now   = gmdate( 'Y-m-d H:i:s' );
+		$began = self::posted_start( $user_id ); // 0.36.0: "I locked earlier".
 		$wpdb->insert(
 			self::t( 'locks' ),
 			array(
@@ -593,8 +611,8 @@ class CMP_Chastity {
 				'option_name'     => $name,
 				'rule'            => $rule,
 				'release_policy'  => $policy,
-				'started_at'      => $now,
-				'planned_end'     => $length ? gmdate( 'Y-m-d H:i:s', time() + $length * MINUTE_IN_SECONDS ) : null,
+				'started_at'      => gmdate( 'Y-m-d H:i:s', $began ),
+				'planned_end'     => $length ? gmdate( 'Y-m-d H:i:s', $began + $length * MINUTE_IN_SECONDS ) : null,
 				'hide_timer'      => 0,
 				'verify_daily'    => 0,
 				'hygiene_minutes' => 15,
@@ -606,7 +624,7 @@ class CMP_Chastity {
 			)
 		);
 		$lock_id = (int) $wpdb->insert_id;
-		$extra   = array( 'minutes' => $length, 'note' => $name );
+		$extra   = array( 'minutes' => $length, 'note' => $name, 'created_at' => gmdate( 'Y-m-d H:i:s', $began ), 'review' => $began < time() - 300 ? 'late' : '' );
 		if ( $photo ) {
 			$extra += array( 'photo' => $photo );
 		}
@@ -692,16 +710,17 @@ class CMP_Chastity {
 		}
 		$minutes = self::proposed_minutes( $lock );
 		$photo   = self::posted_photo( array() );
+		$began   = max( self::posted_start( $user_id ), self::ts( $lock->created_at ) ); // 0.36.0, not before it was set up.
 		self::update_lock(
 			$lock->id,
 			array(
 				'status'       => 'locked',
-				'started_at'   => gmdate( 'Y-m-d H:i:s' ),
-				'planned_end'  => $minutes ? gmdate( 'Y-m-d H:i:s', time() + $minutes * MINUTE_IN_SECONDS ) : null,
+				'started_at'   => gmdate( 'Y-m-d H:i:s', $began ),
+				'planned_end'  => $minutes ? gmdate( 'Y-m-d H:i:s', $began + $minutes * MINUTE_IN_SECONDS ) : null,
 				'show_profile' => empty( $_POST['show_profile'] ) ? 0 : 1, // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			)
 		);
-		$extra = array( 'minutes' => $minutes, 'note' => $lock->option_name );
+		$extra = array( 'minutes' => $minutes, 'note' => $lock->option_name, 'created_at' => gmdate( 'Y-m-d H:i:s', $began ), 'review' => $began < time() - 300 ? 'late' : '' );
 		if ( $photo ) {
 			$extra += array( 'photo' => $photo );
 		}
@@ -1026,7 +1045,11 @@ class CMP_Chastity {
 			$at = ( new DateTime( $day . ' 12:00:00', wp_timezone() ) )->setTimezone( new DateTimeZone( 'UTC' ) )->format( 'Y-m-d H:i:s' );
 			$at = max( $at, $lock->started_at );
 		}
-		self::add_event( $lock->id, $user_id, 'verified_else', array( 'note' => self::text( 'note', 200 ), 'created_at' => $at ) );
+		$self = (int) $user_id === (int) $lock->wearer_id;
+		self::add_event( $lock->id, $user_id, 'verified_else', array( 'note' => self::text( 'note', 200 ), 'created_at' => $at, 'review' => $self ? 'self' : '' ) );
+		if ( $self ) {
+			self::go( array(), 'cl_saved' ); // 0.36.0: a self-lock wearer catching up a day they forgot.
+		}
 		CMP_Notifications::add(
 			(int) $lock->wearer_id,
 			'lock',
@@ -1388,6 +1411,11 @@ class CMP_Chastity {
 			<?php endif; ?>
 		</section>
 		<?php
+		$undo = $lock ? null : self::undoable( $user_id ); // 0.36.0
+		if ( $undo ) {
+			echo '<section class="cmp-panel cmp-cl-undo"><p><b>' . esc_html__( 'Ended by mistake?', 'cmp' ) . '</b> ' . esc_html( sprintf( /* translators: %s: time */ __( 'Your lock ended at %s. You can undo that until an hour after; your run, stars and history carry on as if it never ended.', 'cmp' ), wp_date( 'g:i A', self::ts( $undo->ended_at ) ) ) ) . '</p>' . self::form_open( 'undo_end', $undo->id ) . '<button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Undo, I\'m still locked', 'cmp' ) . '</button></form></section>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
+		}
+		echo self::locktober_html( $user_id, $lock ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		$proposal = self::proposal_for( $user_id );
 		if ( $proposal ) {
 			echo self::proposal_html( $proposal, (bool) $lock ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
@@ -1400,6 +1428,7 @@ class CMP_Chastity {
 		if ( ! $lock ) { // 0.35.0: a running lock has its own calendar with stars, beside Verification.
 			echo self::calendar_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		}
+		echo self::my_stars_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		echo CMP_E2E::panel_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		echo self::photos_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		?>
@@ -1409,7 +1438,7 @@ class CMP_Chastity {
 				<p class="cmp-empty"><?php esc_html_e( 'When a member whose key you hold (chastity in a dynamic) locks up with you as keyholder, or accepts a lock you set up for them, their lock appears here.', 'cmp' ); ?></p>
 			<?php endif; ?>
 			<?php foreach ( $held as $h ) : ?>
-				<p class="cmp-hw-item"><a href="<?php echo esc_url( self::url( array( 'lock' => $h->id ) ) ); ?>"><b><?php echo esc_html( self::name( $h->wearer_id ) ); ?></b></a> · <?php echo esc_html( $h->option_name ); ?> · <?php echo esc_html( sprintf( /* translators: %s: duration */ __( 'locked %s', 'cmp' ), self::duration( self::locked_seconds( $h ) ) ) ); ?> <?php echo self::stars_html( $h ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?></p>
+				<p class="cmp-hw-item"><a href="<?php echo esc_url( self::url( array( 'lock' => $h->id ) ) ); ?>"><b><?php echo esc_html( self::name( $h->wearer_id ) ); ?></b></a> · <?php echo esc_html( $h->option_name ); ?> · <?php echo esc_html( sprintf( /* translators: %s: duration */ __( 'locked %s', 'cmp' ), self::duration( self::locked_seconds( $h ) ) ) ); ?> <?php echo self::stars_html( self::run_for( $h ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?></p>
 			<?php endforeach; ?>
 			<?php echo self::sent_html( $user_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside. ?>
 		</section>
@@ -1441,6 +1470,7 @@ class CMP_Chastity {
 		$html .= '<div class="cmp-grid cmp-grid-3"><p class="cmp-field"><label for="cmp_cl_kh">' . esc_html__( 'Keyholder', 'cmp' ) . '</label>' . self::select( 'keyholder', 'cmp_cl_kh', $keyholders, 0 ) . '</p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_opt">' . esc_html__( 'Option', 'cmp' ) . '</label>' . self::select( 'option', 'cmp_cl_opt', $options, 'a' ) . '</p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_len">' . esc_html__( 'Planned length', 'cmp' ) . '</label>' . self::select( 'length', 'cmp_cl_len', array( 0 => __( 'Open-ended', 'cmp' ) ) + self::lengths(), 10080 ) . '</p></div>';
+		$html .= self::start_field_html( 'cmp_cl_began' );
 		$html .= '<p class="cmp-field" data-cmp-kh-name><label for="cmp_cl_khn">' . esc_html__( 'Keyholder\'s name (if they don\'t have an account)', 'cmp' ) . '</label><input type="text" id="cmp_cl_khn" name="keyholder_name" maxlength="60" autocomplete="off" aria-describedby="cmp_cl_khn_help" /><span class="cmp-muted" id="cmp_cl_khn_help">' . esc_html__( 'Used when Keyholder is "Someone without an account". It\'s just a name for your record: they can\'t sign in to manage the lock, so it works like a self-lock and you keep control. Once they join and you agree chastity in a dynamic, you can hand them the running lock from its Settings.', 'cmp' ) . '</span></p>';
 		$html .= '<details class="cmp-hw-taskedit"><summary>' . esc_html__( 'Custom option', 'cmp' ) . '</summary><p class="cmp-muted">' . esc_html__( 'Used when Option is "Custom".', 'cmp' ) . '</p>';
 		$html .= '<p class="cmp-field"><label for="cmp_cl_name">' . esc_html__( 'Name', 'cmp' ) . '</label><input type="text" id="cmp_cl_name" name="option_name" maxlength="60" /></p>';
@@ -1484,7 +1514,7 @@ class CMP_Chastity {
 		if ( $busy ) {
 			$html .= '<p class="cmp-muted">' . esc_html__( 'End your current lock to accept this one.', 'cmp' ) . '</p>';
 		} else {
-			$html .= self::form_open( 'accept', $lock->id, true );
+			$html .= self::form_open( 'accept', $lock->id, true ) . self::start_field_html( 'cmp_cl_abegan' );
 			if ( ! CMP_E2E::is_on( $lock->wearer_id ) ) {
 				$html .= '<p class="cmp-field"><label for="cmp_cl_aphoto">' . esc_html__( 'Photo of the lock (optional)', 'cmp' ) . '</label><input type="file" id="cmp_cl_aphoto" name="photo" accept="image/jpeg,image/png,image/webp" /></p>' . CMP_Photo_Consent::field_html( $lock->wearer_id, 'cmp_cl_consent_a' );
 			}
@@ -1540,7 +1570,7 @@ class CMP_Chastity {
 	private static function timer_html( $lock, $show_left ) {
 		$left = self::seconds_left( $lock );
 		$html = '<div class="cmp-cl-timer"><span class="cmp-cl-icon" aria-hidden="true">' . ( $lock->opened_at ? '🔓' : '🔒' ) . '</span><b data-cmp-since="' . (int) self::ts( $lock->started_at ) . '">' . esc_html( self::duration( self::locked_seconds( $lock ) ) ) . '</b><small>' . esc_html__( 'Locked for', 'cmp' ) . '</small>';
-		$html .= self::stars_html( $lock, true ); // 0.35.0
+		$html .= self::stars_html( self::run_for( $lock ), true ); // 0.35.0; 0.36.0: the whole run.
 		if ( $lock->opened_at ) {
 			$html .= '<p class="cmp-cl-open">' . esc_html( sprintf( /* translators: %s: time */ __( 'Open for hygiene since %s', 'cmp' ), wp_date( 'g:i A', self::ts( $lock->opened_at ) ) ) ) . '</p>';
 		}
@@ -1591,7 +1621,7 @@ class CMP_Chastity {
 		} else {
 			$html .= self::form_open( 'verify', $lock->id, true );
 		}
-		$html .= '<p class="cmp-field"><label for="cmp_cl_vphoto">' . esc_html__( 'Photo', 'cmp' ) . '</label><input type="file" id="cmp_cl_vphoto" name="photo" accept="image/jpeg,image/png,image/webp" required /></p>' . CMP_Photo_Consent::field_html( $lock->wearer_id, 'cmp_cl_consent_v', true ) . '<button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Send verification', 'cmp' ) . '</button></form></div>' . self::verify_calendar_html( $lock, false ) . '</section>';
+		$html .= '<p class="cmp-field"><label for="cmp_cl_vphoto">' . esc_html__( 'Photo', 'cmp' ) . '</label><input type="file" id="cmp_cl_vphoto" name="photo" accept="image/jpeg,image/png,image/webp" required /></p>' . CMP_Photo_Consent::field_html( $lock->wearer_id, 'cmp_cl_consent_v', true ) . '<button type="submit" class="cmp-btn cmp-btn-small">' . esc_html__( 'Send verification', 'cmp' ) . '</button></form>' . self::catch_up_html( $lock ) . '</div>' . self::verify_calendar_html( $lock, false ) . '</section>';
 
 		// Hygiene, release, unlock.
 		$html .= '<section class="cmp-panel"><h3 class="cmp-panel-title">' . esc_html__( 'Opening and release', 'cmp' ) . '</h3>';
@@ -1741,13 +1771,15 @@ class CMP_Chastity {
 		$len     = isset( $lengths[ (int) $e->minutes ] ) ? $lengths[ (int) $e->minutes ] : '';
 		switch ( $e->type ) {
 			case 'locked':
-				return sprintf( /* translators: %s: option */ __( 'Locked: %s', 'cmp' ), $e->note ) . ( $len && ! $hide_length ? ' · ' . $len : '' );
+				return sprintf( /* translators: %s: option */ __( 'Locked: %s', 'cmp' ), $e->note ) . ( $len && ! $hide_length ? ' · ' . $len : '' ) . ( 'late' === $e->review ? ' · ' . __( 'logged later', 'cmp' ) : '' );
 			case 'proposed':
 				return __( 'Keyholder set up this lock', 'cmp' ) . ( $len && ! $hide_length ? ' · ' . $len : '' );
 			case 'verification':
 				return sprintf( /* translators: %s: code */ __( 'Verification photo (code %s)', 'cmp' ), $e->code );
 			case 'verified_else':
-				return __( 'Verified elsewhere (marked by the keyholder; no photo kept)', 'cmp' );
+				return 'self' === $e->review ? __( 'Checked in late (self-reported; no photo kept)', 'cmp' ) : __( 'Verified elsewhere (marked by the keyholder; no photo kept)', 'cmp' );
+			case 'end_undone':
+				return __( 'Ending undone (it was a mistake); the lock carries on', 'cmp' );
 			case 'hygiene_open':
 				return __( 'Opened for hygiene', 'cmp' );
 			case 'hygiene_close':
@@ -1841,6 +1873,221 @@ class CMP_Chastity {
 			$html .= '<p class="cmp-empty">' . esc_html__( 'No photos kept right now.', 'cmp' ) . '</p>';
 		}
 		return $html . '</div></details></section>';
+	}
+
+	/* ------------------------------------------------------------------
+	 * 0.36.0: forgiving human error (Locktober), runs, personal best
+	 * ---------------------------------------------------------------- */
+
+	/** 0.36.0: without a member keyholder, the wearer can catch up a day they forgot to check in. */
+	private static function catch_up_html( $lock ) {
+		if ( $lock->keyholder_id ) {
+			return '';
+		}
+		$days = self::elsewhere_days( $lock );
+		$pick = isset( $_GET['vday'] ) && isset( $days[ sanitize_text_field( wp_unslash( $_GET['vday'] ) ) ] ) ? sanitize_text_field( wp_unslash( $_GET['vday'] ) ) : (string) key( $days ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$html = '<details class="cmp-hw-taskedit cmp-cl-elsewhere" id="cmp-cl-elsewhere"' . ( isset( $_GET['vday'] ) ? ' open' : '' ) . '><summary>' . esc_html__( 'Forgot to check in?', 'cmp' ) . '</summary>' . self::form_open( 'verified_else', $lock->id ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$html .= '<p class="cmp-muted">' . esc_html__( 'Were you locked on a day you didn\'t check in? Mark it here (or tap the day on the calendar) so it gets its star. It\'s on your honour and shows as self-reported.', 'cmp' ) . '</p>';
+		$html .= '<p class="cmp-field"><label for="cmp_cl_sday">' . esc_html__( 'Day', 'cmp' ) . '</label><input type="date" id="cmp_cl_sday" name="day" value="' . esc_attr( $pick ) . '" min="' . esc_attr( (string) array_key_last( $days ) ) . '" max="' . esc_attr( (string) key( $days ) ) . '" required /></p>';
+		$html .= '<p class="cmp-field"><label for="cmp_cl_snote">' . esc_html__( 'Note (optional)', 'cmp' ) . '</label><input type="text" id="cmp_cl_snote" name="note" maxlength="200" /></p>';
+		return $html . '<button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html__( 'Mark checked in', 'cmp' ) . '</button></form></details>';
+	}
+
+	/** "I locked earlier": an optional start time up to 48 hours back. */
+	private static function start_field_html( $id ) {
+		return '<details class="cmp-hw-taskedit cmp-cl-began"><summary>' . esc_html__( 'I locked earlier (logging it late)', 'cmp' ) . '</summary><p class="cmp-field"><label for="' . esc_attr( $id ) . '">' . esc_html__( 'When you locked', 'cmp' ) . '</label><input type="datetime-local" id="' . esc_attr( $id ) . '" name="began" min="' . esc_attr( wp_date( 'Y-m-d\TH:i', time() - self::LATE_START ) ) . '" max="' . esc_attr( wp_date( 'Y-m-d\TH:i' ) ) . '" /><span class="cmp-muted">' . esc_html( sprintf( /* translators: %s: timezone */ __( 'Up to 48 hours back, site time (%s). Leave it empty if you locked just now.', 'cmp' ), wp_timezone_string() ) ) . '</span></p></details>';
+	}
+
+	/** The posted start, as a timestamp: now, or (0.36.0) up to 48 hours back, never overlapping the last lock. */
+	private static function posted_start( $user_id ) {
+		global $wpdb;
+		$raw = isset( $_POST['began'] ) ? sanitize_text_field( wp_unslash( $_POST['began'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		if ( '' === $raw ) {
+			return time();
+		}
+		$dt = DateTime::createFromFormat( 'Y-m-d\TH:i', $raw, wp_timezone() );
+		if ( ! $dt || $dt->getTimestamp() > time() + 60 || $dt->getTimestamp() < time() - self::LATE_START - 60 ) {
+			self::go( array(), 'cl_began' );
+		}
+		$last = $wpdb->get_var( $wpdb->prepare( 'SELECT MAX(ended_at) FROM ' . self::t( 'locks' ) . " WHERE wearer_id = %d AND status = 'ended'", $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( $last && $dt->getTimestamp() < self::ts( $last ) ) {
+			self::go( array(), 'cl_began' );
+		}
+		return min( time(), $dt->getTimestamp() );
+	}
+
+	/** The wearer's last lock, if it ended within the undo window and nothing has started since. */
+	public static function undoable( $wearer_id ) {
+		global $wpdb;
+		if ( self::active_lock( $wearer_id ) ) {
+			return null;
+		}
+		$l = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::t( 'locks' ) . " WHERE wearer_id = %d AND status = 'ended' ORDER BY ended_at DESC, id DESC LIMIT 1", $wearer_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return $l && 'admin' !== $l->end_reason && self::ts( $l->ended_at ) > time() - self::UNDO_WINDOW ? $l : null;
+	}
+
+	/**
+	 * 0.36.0: the wearer undoes an end made by mistake (their Emergency unlock
+	 * or End lock, or the keyholder's Unlock now), within an hour. Only the
+	 * wearer can, so nobody is put back in a lock without choosing it.
+	 */
+	private static function do_undo_end( $lock, $user_id ) {
+		$last = self::undoable( $user_id );
+		if ( ! $lock || ! $last || (int) $last->id !== (int) $lock->id ) {
+			self::go( array(), 'cl_gone' );
+		}
+		self::update_lock( $lock->id, array( 'status' => 'locked', 'ended_at' => null, 'ended_by' => 0, 'end_reason' => '' ) );
+		self::add_event( $lock->id, $user_id, 'end_undone' );
+		CMP_Audit::log( 'lock_end_undone', 'lock', $lock->id, array( 'end_reason' => $lock->end_reason ), null );
+		if ( $lock->keyholder_id ) {
+			/* translators: %s: wearer */
+			CMP_Notifications::add( (int) $lock->keyholder_id, 'lock', sprintf( __( '%s undid the end of their lock (it was a mistake). The lock carries on.', 'cmp' ), self::me() ), self::url( array( 'lock' => $lock->id ) ) );
+		}
+		self::go( array(), 'cl_undone' );
+	}
+
+	/**
+	 * A wearer's runs: locks joined when one starts within a day of the last
+	 * one ending (a mistaken unlock, a cleaning break, logging a new lock),
+	 * oldest first. Each is { started_at, ended_at, status, locks, breaks }
+	 * and works with locked_seconds() / milestones().
+	 */
+	public static function runs( $wearer_id ) {
+		global $wpdb;
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT id, started_at, ended_at, status FROM ' . self::t( 'locks' ) . " WHERE wearer_id = %d AND status IN ('locked','ended') ORDER BY started_at, id", $wearer_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$runs = array();
+		$cur  = null;
+		foreach ( $rows as $r ) {
+			if ( $cur && ( 'locked' === $cur->status || self::ts( $r->started_at ) - self::ts( $cur->ended_at ) <= self::RUN_GAP ) ) {
+				$cur->locks[] = (int) $r->id;
+				++$cur->breaks;
+				if ( 'locked' === $r->status || 'locked' === $cur->status ) {
+					$cur->status   = 'locked';
+					$cur->ended_at = null;
+				} elseif ( self::ts( $r->ended_at ) > self::ts( $cur->ended_at ) ) {
+					$cur->ended_at = $r->ended_at;
+				}
+				continue;
+			}
+			if ( $cur ) {
+				$runs[] = $cur;
+			}
+			$cur = (object) array( 'started_at' => $r->started_at, 'ended_at' => $r->ended_at, 'status' => $r->status, 'locks' => array( (int) $r->id ), 'breaks' => 0 );
+		}
+		if ( $cur ) {
+			$runs[] = $cur;
+		}
+		return $runs;
+	}
+
+	/** The run a lock belongs to (the lock itself if it stands alone). */
+	public static function run_for( $lock ) {
+		foreach ( self::runs( (int) $lock->wearer_id ) as $run ) {
+			if ( in_array( (int) $lock->id, $run->locks, true ) ) {
+				return $run;
+			}
+		}
+		return $lock;
+	}
+
+	/** The wearer's longest run, or null. */
+	public static function best_run( $wearer_id ) {
+		$best = null;
+		foreach ( self::runs( $wearer_id ) as $run ) {
+			if ( ! $best || self::locked_seconds( $run ) > self::locked_seconds( $best ) ) {
+				$best = $run;
+			}
+		}
+		return $best;
+	}
+
+	/** "now" for Locktober, filterable for tests. */
+	private static function now() {
+		return (int) apply_filters( 'cmp_chastity_now', time() );
+	}
+
+	/**
+	 * Locktober (the community's October chastity challenge, no official
+	 * rules): completed when one run covered October 2 at 23:59 through
+	 * October 31 at 00:00, site time. That allows a day's grace at each end
+	 * (locked on the 2nd, or out on Halloween), and runs already forgive
+	 * breaks of under a day.
+	 *
+	 * @return int[] Years completed, newest first.
+	 */
+	public static function locktober_years( $wearer_id ) {
+		$tz    = wp_timezone();
+		$years = array();
+		foreach ( self::runs( $wearer_id ) as $run ) {
+			$s = self::ts( $run->started_at );
+			$e = 'locked' === $run->status ? self::now() : self::ts( $run->ended_at );
+			for ( $y = (int) wp_date( 'Y', $s ); $y <= (int) wp_date( 'Y', $e ); $y++ ) {
+				$need_start = ( new DateTime( $y . '-10-02 23:59:59', $tz ) )->getTimestamp();
+				$need_end   = ( new DateTime( $y . '-10-31 00:00:00', $tz ) )->getTimestamp();
+				if ( $s <= $need_start && $e >= $need_end ) {
+					$years[ $y ] = $y;
+				}
+			}
+		}
+		krsort( $years );
+		return array_values( $years );
+	}
+
+	private static function medal( $year ) {
+		/* translators: %d: year */
+		return '<span class="cmp-cl-medal" title="' . esc_attr( sprintf( __( 'Completed Locktober %d', 'cmp' ), $year ) ) . '">🏅 ' . esc_html( sprintf( __( 'Locktober %d', 'cmp' ), $year ) ) . '</span>';
+	}
+
+	/** During October (and the first week of November): progress for this year's Locktober. */
+	private static function locktober_html( $user_id, $lock ) {
+		$tz  = wp_timezone();
+		$now = self::now();
+		$y   = (int) wp_date( 'Y', $now );
+		$oct = ( new DateTime( $y . '-10-01 00:00:00', $tz ) )->getTimestamp();
+		$nov = ( new DateTime( $y . '-11-08 00:00:00', $tz ) )->getTimestamp();
+		if ( $now < $oct || $now >= $nov ) {
+			return '';
+		}
+		$html = '<section class="cmp-panel cmp-cl-locktober"><h3 class="cmp-panel-title">' . esc_html( sprintf( /* translators: %d: year */ __( 'Locktober %d', 'cmp' ), $y ) ) . '</h3>';
+		if ( in_array( $y, self::locktober_years( $user_id ), true ) ) {
+			return $html . '<p>' . self::medal( $y ) . ' ' . esc_html__( 'Completed. Well done!', 'cmp' ) . '</p></section>';
+		}
+		$day = min( 31, (int) floor( ( $now - $oct ) / DAY_IN_SECONDS ) + 1 );
+		if ( $now >= ( new DateTime( $y . '-11-01 00:00:00', $tz ) )->getTimestamp() ) {
+			return '';
+		}
+		/* translators: %d: day of October */
+		$html .= '<p class="cmp-cl-lt-day">' . esc_html( sprintf( __( 'Day %d of 31', 'cmp' ), $day ) ) . '</p><div class="cmp-cl-lt-bar" role="img" aria-label="' . esc_attr( sprintf( __( 'Day %d of 31', 'cmp' ), $day ) ) . '"><span style="width:' . esc_attr( (string) round( $day / 31 * 100 ) ) . '%"></span></div>';
+		$run   = $lock ? self::run_for( $lock ) : null;
+		$late  = ( new DateTime( $y . '-10-02 23:59:59', $tz ) )->getTimestamp();
+		if ( $run && self::ts( $run->started_at ) <= $late ) {
+			$html .= '<p>' . esc_html__( 'You\'re on track. Stay locked until Halloween (October 31) to complete it. A break of under a day, or a lock ended by mistake and undone, doesn\'t break your run.', 'cmp' ) . '</p>';
+		} elseif ( $run ) {
+			$html .= '<p class="cmp-muted">' . esc_html( sprintf( /* translators: %s: date */ __( 'Your run started %s, so this year it won\'t count as a full Locktober (it needs a start by October 2). Every day still earns stars. Keep going!', 'cmp' ), wp_date( 'M j', self::ts( $run->started_at ) ) ) ) . '</p>';
+		} else {
+			$html .= '<p class="cmp-muted">' . esc_html( $day <= 2 ? __( 'Lock up by the end of October 2 to take part. Locked already and forgot to log it? Use "I locked earlier" when you start.', 'cmp' ) : __( 'Not locked right now. You can still lock up and earn stars for the rest of the month.', 'cmp' ) ) . '</p>';
+		}
+		return $html . '</section>';
+	}
+
+	/** "Your stars": the longest run, Locktober medals, and whether they show on the profile. */
+	private static function my_stars_html( $user_id ) {
+		$best  = self::best_run( $user_id );
+		$years = self::locktober_years( $user_id );
+		if ( ( ! $best || self::locked_seconds( $best ) < WEEK_IN_SECONDS ) && ! $years ) {
+			return '';
+		}
+		$html = '<section class="cmp-panel cmp-cl-mystars"><h3 class="cmp-panel-title">' . esc_html__( 'Your stars', 'cmp' ) . '</h3>';
+		if ( $best && self::locked_seconds( $best ) >= WEEK_IN_SECONDS ) {
+			$end   = 'locked' === $best->status ? __( 'now', 'cmp' ) : wp_date( 'M j, Y', self::ts( $best->ended_at ) );
+			$html .= '<p><b>' . esc_html__( 'Longest run', 'cmp' ) . '</b> ' . self::stars_html( $best ) . ' ' . esc_html( self::milestone_label( self::milestones( $best ) ) ) . ' <span class="cmp-muted">' . esc_html( wp_date( 'M j, Y', self::ts( $best->started_at ) ) . ' – ' . $end ) . ( 'locked' === $best->status ? ' · ' . __( 'this is your current lock', 'cmp' ) : '' ) . '</span></p>';
+		}
+		if ( $years ) {
+			$html .= '<p>' . implode( ' ', array_map( array( __CLASS__, 'medal' ), $years ) ) . '</p>';
+		}
+		$on    = '1' === (string) get_user_meta( $user_id, self::META_SHOW_STARS, true );
+		$html .= self::form_open( 'stars_show' ) . '<input type="hidden" name="show" value="' . ( $on ? '0' : '1' ) . '" /><p class="cmp-muted">' . esc_html( $on ? __( 'Your longest run and Locktober medals show on your profile, even when you\'re not locked.', 'cmp' ) : __( 'Only you see these. You can show your longest run and Locktober medals on your profile, even when you\'re not locked.', 'cmp' ) ) . '</p><button type="submit" class="cmp-btn cmp-btn-small cmp-btn-outline">' . esc_html( $on ? __( 'Hide from my profile', 'cmp' ) : __( 'Show on my profile', 'cmp' ) ) . '</button></form>';
+		return $html . '</section>';
 	}
 
 	/* ------------------------------------------------------------------
@@ -2012,7 +2259,7 @@ class CMP_Chastity {
 		$prev   = ( clone $mstart )->modify( '-1 month' )->format( 'Y-m' );
 		$next   = $mnext->format( 'Y-m' );
 		$today  = wp_date( 'Y-m-d' );
-		$link   = $as_keyholder && 'locked' === $lock->status && self::is_keyholder( $lock, get_current_user_id() );
+		$link   = 'locked' === $lock->status && ( $as_keyholder ? self::is_keyholder( $lock, get_current_user_id() ) : ( ! $lock->keyholder_id && self::is_wearer( $lock, get_current_user_id() ) ) ); // 0.36.0: self-locks catch up too.
 		$done   = 0;
 		$total  = 0;
 
@@ -2057,7 +2304,7 @@ class CMP_Chastity {
 		$html .= '</div>';
 		/* translators: 1: verified days, 2: days locked this month */
 		$html .= '<p class="cmp-cl-cal-sum">' . esc_html( sprintf( _n( '%1$d of %2$d day verified', '%1$d of %2$d days verified', $total, 'cmp' ), $done, $total ) ) . '</p>';
-		$html .= '<p class="cmp-muted cmp-cl-legend2">' . self::star_svg( 'gold' ) . ' ' . esc_html__( 'Verified', 'cmp' ) . ' ' . self::star_svg( 'outline' ) . ' ' . esc_html__( 'Waiting for review', 'cmp' ) . ( $link ? ' · ' . esc_html__( 'Tap a day without a star to mark it verified.', 'cmp' ) : '' ) . '</p>';
+		$html .= '<p class="cmp-muted cmp-cl-legend2">' . self::star_svg( 'gold' ) . ' ' . esc_html__( 'Verified', 'cmp' ) . ' ' . self::star_svg( 'outline' ) . ' ' . esc_html__( 'Waiting for review', 'cmp' ) . ( $link ? ' · ' . esc_html( $as_keyholder ? __( 'Tap a day without a star to mark it verified.', 'cmp' ) : __( 'Tap a day without a star if you forgot to check in.', 'cmp' ) ) : '' ) . '</p>';
 		return $html . '</aside>';
 	}
 
@@ -2186,7 +2433,7 @@ class CMP_Chastity {
 				/* translators: %d: days */
 				: esc_html( sprintf( _n( 'Locked · %d day', 'Locked · %d days', $days, 'cmp' ), $days ) );
 			$ver  = self::last_verified_text( $lock );
-			$out .= '<p class="cmp-cl-badge">' . self::icon( 'lock' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . ' ' . self::stars_html( $lock ) . ( $ver ? ' · ' . $ver : '' ) . '</span></p>';
+			$out .= '<p class="cmp-cl-badge">' . self::icon( 'lock' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . ' ' . self::stars_html( self::run_for( $lock ) ) . ( $ver ? ' · ' . $ver : '' ) . '</span></p>';
 		}
 		$held = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . self::t( 'locks' ) . " WHERE keyholder_id = %d AND status = 'locked' AND show_profile = 1 AND kh_show = 1 ORDER BY started_at", $owner_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		foreach ( $held as $h ) {
@@ -2198,7 +2445,23 @@ class CMP_Chastity {
 			/* translators: 1: wearer link, 2: days */
 			$text = sprintf( _n( 'Holds the key for %1$s · %2$d day', 'Holds the key for %1$s · %2$d days', $days, 'cmp' ), $who, $days );
 			$ver  = self::last_verified_text( $h );
-			$out .= '<p class="cmp-cl-badge is-key">' . self::icon( 'key' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . ' ' . self::stars_html( $h ) . ( $ver ? ' · ' . $ver : '' ) . '</span></p>';
+			$out .= '<p class="cmp-cl-badge is-key">' . self::icon( 'key' ) . '<span>' . wp_kses( $text, array( 'a' => array( 'href' => true ) ) ) . ' ' . self::stars_html( self::run_for( $h ) ) . ( $ver ? ' · ' . $ver : '' ) . '</span></p>';
+		}
+		// 0.36.0: the member's choice: their longest run and Locktober medals, locked or not.
+		if ( '1' === (string) get_user_meta( $owner_id, self::META_SHOW_STARS, true ) ) {
+			$best  = self::best_run( $owner_id );
+			$years = self::locktober_years( $owner_id );
+			$bits  = array();
+			if ( $best && self::locked_seconds( $best ) >= WEEK_IN_SECONDS ) {
+				/* translators: %s: e.g. "2 months" */
+				$bits[] = esc_html( sprintf( __( 'Longest lock: %s', 'cmp' ), self::milestone_label( self::milestones( $best ) ) ) ) . ' ' . self::stars_html( $best );
+			}
+			foreach ( $years as $y ) {
+				$bits[] = self::medal( $y );
+			}
+			if ( $bits ) {
+				$out .= '<p class="cmp-cl-badge is-stars"><span>' . implode( ' · ', $bits ) . '</span></p>';
+			}
 		}
 		return $out ? '<div class="cmp-cl-badges">' . $out . '</div>' : '';
 	}
@@ -2227,6 +2490,7 @@ class CMP_Chastity {
 		global $wpdb;
 		$n = CMP_Photo_Shares::erase( $user_id );
 		CMP_E2E::erase( $user_id ); // 0.33.0
+		delete_user_meta( $user_id, self::META_SHOW_STARS ); // 0.36.0
 		foreach ( $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM ' . self::t( 'locks' ) . ' WHERE wearer_id = %d', $user_id ) ) as $id ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			$n += (int) $wpdb->delete( self::t( 'lock_events' ), array( 'lock_id' => $id ), array( '%d' ) );
 			$n += (int) $wpdb->delete( self::t( 'locks' ), array( 'id' => $id ), array( '%d' ) );

@@ -37,7 +37,7 @@ PAGE_ID=$(ev 'echo (int) CMP_Settings::get("member_page_id");')
 PAGE="$H/?page_id=$PAGE_ID"
 L_T=$(TBL locks); E_T=$(TBL lock_events); D_T=$(TBL dynamics); N_T=$(TBL notifications)
 ev "global \$wpdb; foreach(array('$L_T','$E_T','$D_T',CMP_Install::table('photo_shares')) as \$t) \$wpdb->query(\"DELETE FROM \$t\");" >/dev/null
-for u in kh pup nosy solo; do $W user delete $u --yes >/dev/null 2>&1; done
+for u in kh pup nosy solo ltw; do $W user delete $u --yes >/dev/null 2>&1; done
 $W user create kh kh@example.com --role=subscriber --user_pass=khpass1234567 --display_name="Sample Keyholder" >/dev/null
 $W user create pup pup@example.com --role=subscriber --user_pass=puppass123456 --display_name="Sample Pup" >/dev/null
 $W user create nosy nosy@example.com --role=subscriber --user_pass=nosypass12345 >/dev/null
@@ -510,12 +510,65 @@ get kh pg1 "$PAGE&cmp_tab=chastity&lock=$HID"
 ok "...the history entry stays, marked 'photo removed after 90 days'" $([ "$(q "SELECT COUNT(*) FROM $E_T WHERE id=$VID")" = 1 ] && ev "\$e=CMP_Chastity::events($LID,100); foreach(\$e as \$x) if(\$x->id==$VID) echo (new ReflectionMethod('CMP_Chastity','event_text'))->invoke(null,\$x);" | grep -q 'photo removed after 90 days' && echo 1 || echo 0)
 ok "the period can be changed (cmp_retention_periods)" $(ev "add_filter('cmp_retention_periods',function(\$p){\$p['lock_photos']=30; return \$p;}); echo 30===CMP_Chastity::photo_days()?1:0;")
 
+echo "== Runs, Locktober, late logging, undo, self check-ins (CMP 0.36.0)"
+$W user create ltw ltw@example.com --role=subscriber --user_pass=ltwpass123456 --display_name="October Pup" >/dev/null; member ltw; LTW=$(uid ltw)
+mk(){ ev "global \$wpdb; \$tz=wp_timezone(); \$u=function(\$s) use(\$tz){ return (new DateTime(\$s,\$tz))->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s'); }; \$wpdb->insert('$L_T',array('wearer_id'=>$LTW,'keyholder_id'=>0,'status'=>'$3','option_key'=>'a','option_name'=>'Full lockdown','release_policy'=>'none','started_at'=>\$u('$1'),'ended_at'=>'$2'===''?null:\$u('$2'),'end_reason'=>'$2'===''?'':'completed','created_at'=>gmdate('Y-m-d H:i:s'),'updated_at'=>gmdate('Y-m-d H:i:s'))); echo \$wpdb->insert_id;"; }
+mk '2025-10-01 10:00' '2025-10-10 08:00' ended >/dev/null; mk '2025-10-10 14:00' '2025-11-02 09:00' ended >/dev/null
+mk '2024-10-01 10:00' '2024-10-12 08:00' ended >/dev/null; mk '2024-10-14 10:00' '2024-11-01 09:00' ended >/dev/null
+mk '2023-10-03 00:30' '2023-11-01 09:00' ended >/dev/null; mk '2022-10-02 20:00' '2022-10-31 06:00' ended >/dev/null
+ok "runs: a break of 6 hours joins two locks into one run; a 2-day gap doesn't" $(ev "\$r=CMP_Chastity::runs($LTW); \$n=array_map(function(\$x){return count(\$x->locks);},\$r); echo implode(',',\$n);" | grep -qx '1,1,1,1,2' && echo 1 || echo 0)
+ok "Locktober: 2025 (joined run) and 2022 (locked Oct 2 evening, out Halloween morning) count; 2024 (2-day gap) and 2023 (started Oct 3) don't" $([ "$(ev "echo implode(',',CMP_Chastity::locktober_years($LTW));")" = "2025,2022" ] && echo 1 || echo 0)
+ok "longest run is the joined 2025 run (1 month)" $([ "$(ev "\$b=CMP_Chastity::best_run($LTW); echo count(\$b->locks),'|',CMP_Chastity::milestone_label(CMP_Chastity::milestones(\$b));")" = "2|1 month" ] && echo 1 || echo 0)
+login ltw ltw ltwpass123456
+get ltw lt0 "$PAGE&cmp_tab=chastity"
+LN=$(hnonce $T/lt0.html)
+ok "Your stars: longest run with its stars and the Locktober medals; private until shown" $([ "$(has $T/lt0.html 'Longest run')$(has $T/lt0.html 'Locktober 2025')$(has $T/lt0.html 'Locktober 2022')$(has $T/lt0.html 'Show on my profile')" = 1111 ] && [ -z "$(ev "echo CMP_Chastity::profile_badge_html($LTW);")" ] && echo 1 || echo 0)
+r=$(act ltw $LN stars_show -F "show=1")
+ok "shown on the profile, even when not locked" $(ev "echo CMP_Chastity::profile_badge_html($LTW);" | grep -q 'Longest lock: 1 month' && ev "echo CMP_Chastity::profile_badge_html($LTW);" | grep -q 'Locktober 2025' && echo 1 || echo 0)
+mk "$(ev "echo wp_date('Y-m-d H:i', time()-30*HOUR_IN_SECONDS);")" "$(ev "echo wp_date('Y-m-d H:i', time()-10*HOUR_IN_SECONDS);")" ended >/dev/null
+r=$(act ltw $LN start -F "keyholder=0" -F "option=a" -F "length=0" -F "began=$(ev "echo wp_date('Y-m-d\TH:i', time()-50*HOUR_IN_SECONDS);")")
+ok "late start more than 48 hours back: refused" $(echo "$r" | grep -q 'cl_began' && [ "$(q "SELECT COUNT(*) FROM $L_T WHERE wearer_id=$LTW AND status='locked'")" = 0 ] && echo 1 || echo 0)
+r=$(act ltw $LN start -F "keyholder=0" -F "option=a" -F "length=0" -F "began=$(ev "echo wp_date('Y-m-d\TH:i', time()-20*HOUR_IN_SECONDS);")")
+ok "late start before the last lock ended: refused" $(echo "$r" | grep -q 'cl_began' && echo 1 || echo 0)
+r=$(act ltw $LN start -F "keyholder=0" -F "option=a" -F "length=1440" -F "began=$(ev "echo wp_date('Y-m-d\TH:i', time()-5*HOUR_IN_SECONDS);")")
+LTL=$(q "SELECT id FROM $L_T WHERE wearer_id=$LTW AND status='locked'")
+ok "'I locked earlier' 5 hours back: started then, planned end from then, history says 'logged later'" $(echo "$r" | grep -q 'cl_started' && ev "\$l=CMP_Chastity::lock($LTL); echo abs(time()-5*HOUR_IN_SECONDS-strtotime(\$l->started_at.' UTC'))<120 && abs(strtotime(\$l->planned_end.' UTC')-strtotime(\$l->started_at.' UTC')-DAY_IN_SECONDS)<5?1:0;" | grep -qx 1 && ev "foreach(CMP_Chastity::events($LTL,5) as \$e) echo (new ReflectionMethod('CMP_Chastity','event_text'))->invoke(null,\$e);" | grep -q 'logged later' && echo 1 || echo 0)
+ok "...and joins the lock that ended 10 hours ago into one run (stars count the whole run)" $([ "$(ev "echo count(CMP_Chastity::run_for(CMP_Chastity::lock($LTL))->locks);")" = 2 ] && echo 1 || echo 0)
+get ltw lt1 "$PAGE&cmp_tab=chastity"
+LN=$(hnonce $T/lt1.html)
+ok "start form offers 'I locked earlier' (a self-lock wearer sees 'Forgot to check in?' and calendar links)" $([ "$(has $T/lt1.html 'Forgot to check in?')$(has $T/lt1.html 'vday=')" = 11 ] && grep -q 'I locked earlier' $T/p0.html && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->update('$L_T',array('started_at'=>gmdate('Y-m-d H:i:s',time()-4*DAY_IN_SECONDS)),array('id'=>$LTL));" >/dev/null
+D2=$(ev "echo (new DateTime('-2 days', wp_timezone()))->format('Y-m-d');")
+r=$(act ltw $LN verified_else -F "lock=$LTL" -F "day=$D2")
+ok "self-lock: the wearer catches up a missed day, marked self-reported" $(echo "$r" | grep -q 'cl_saved' && [ "$(q "SELECT review FROM $E_T WHERE lock_id=$LTL AND type='verified_else'")" = self ] && ev "foreach(CMP_Chastity::events($LTL,9) as \$e) echo (new ReflectionMethod('CMP_Chastity','event_text'))->invoke(null,\$e),'/';" | grep -q 'self-reported' && echo 1 || echo 0)
+r=$(act ltw $LN emergency -F "lock=$LTL")
+get ltw lt2 "$PAGE&cmp_tab=chastity"
+ok "ended by mistake: 'Undo, I'm still locked' is offered" $([ "$(q "SELECT status FROM $L_T WHERE id=$LTL")" = ended ] && grep -q 'Ended by mistake?' $T/lt2.html && echo 1 || echo 0)
+get nosy nz "$PAGE&cmp_tab=chastity"; NZ=$(hnonce $T/nz.html)
+r=$(act nosy $NZ undo_end -F "lock=$LTL")
+ok "another member can't undo it" $(echo "$r" | grep -q 'cl_gone' && [ "$(q "SELECT status FROM $L_T WHERE id=$LTL")" = ended ] && echo 1 || echo 0)
+r=$(act ltw $LN undo_end -F "lock=$LTL")
+ok "the wearer undoes it: locked again, same start, history says so" $(echo "$r" | grep -q 'cl_undone' && [ "$(q "SELECT status FROM $L_T WHERE id=$LTL")" = locked ] && ev "foreach(CMP_Chastity::events($LTL,3) as \$e) echo \$e->type,'/';" | grep -q 'end_undone' && echo 1 || echo 0)
+r=$(act ltw $LN emergency -F "lock=$LTL")
+ev "global \$wpdb; \$wpdb->update('$L_T',array('ended_at'=>gmdate('Y-m-d H:i:s',time()-2*HOUR_IN_SECONDS)),array('id'=>$LTL));" >/dev/null
+get ltw lt3 "$PAGE&cmp_tab=chastity"
+r=$(act ltw $LN undo_end -F "lock=$LTL")
+ok "after an hour it can't be undone" $(echo "$r" | grep -q 'cl_gone' && ! grep -q 'Ended by mistake?' $T/lt3.html && echo 1 || echo 0)
+mkdir -p wp-content/mu-plugins
+echo "<?php add_filter('cmp_chastity_now', function(){ return (new DateTime(wp_date('Y').'-10-15 12:00:00', wp_timezone()))->getTimestamp(); });" > wp-content/mu-plugins/zz-lt-now.php
+get ltw lt4 "$PAGE&cmp_tab=chastity"
+echo "<?php add_filter('cmp_chastity_now', function(){ return (new DateTime(wp_date('Y').'-06-15 12:00:00', wp_timezone()))->getTimestamp(); });" > wp-content/mu-plugins/zz-lt-now.php
+get ltw lt5 "$PAGE&cmp_tab=chastity"
+rm -f wp-content/mu-plugins/zz-lt-now.php
+ok "a Locktober card in October (day 15 of 31), none in June" $([ "$(has $T/lt4.html 'Day 15 of 31')$(hasnt $T/lt5.html 'cmp-cl-locktober')" = 11 ] && echo 1 || echo 0)
+ev "global \$wpdb; foreach(\$wpdb->get_col(\"SELECT id FROM $L_T WHERE wearer_id=$LTW\") as \$i) \$wpdb->delete('$E_T',array('lock_id'=>\$i)); \$wpdb->delete('$L_T',array('wearer_id'=>$LTW));" >/dev/null
+
 echo "== Privacy"
 ok "export lists the lock and its history" $(ev "\$j=wp_json_encode(CMP_Account::export('pup@example.com'),JSON_UNESCAPED_SLASHES); echo false!==strpos(\$j,'One release a week') && false!==strpos(\$j,'Verification photo') && false!==strpos(\$j,'photo removed after 90 days')?1:0;")
 ok "erase removes the wearer's locks and history" $(ev "CMP_Account::erase('pup@example.com'); global \$wpdb; echo 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $L_T WHERE wearer_id=$PUP\") && 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $E_T WHERE lock_id=$LID\") && 0===(int)\$wpdb->get_var(\"SELECT COUNT(*) FROM $S_T WHERE wearer_id=$PUP\")?1:0;")
 
 pkill -f "php -S 127.0.0.1:8899" 2>/dev/null
 ev "global \$wpdb; foreach(array('$L_T','$E_T','$D_T',CMP_Install::table('photo_shares')) as \$t) \$wpdb->query(\"DELETE FROM \$t\");" >/dev/null
-for u in kh pup nosy solo; do $W user delete $u --yes >/dev/null 2>&1; done
+for u in kh pup nosy solo ltw; do $W user delete $u --yes >/dev/null 2>&1; done
 echo; echo "debug.log (plugin-related):"; grep -i 'cmp\|member-planning' wp-content/debug.log 2>/dev/null | grep -v 'Upgrad\|upgraded' | tail -5
 echo "RESULT: $PASS passed, $FAIL failed"
