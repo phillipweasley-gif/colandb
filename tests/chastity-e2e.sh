@@ -214,7 +214,7 @@ ev "global \$wpdb; \$wpdb->delete('$E_T',array('id'=>$DEL));" >/dev/null # the e
 ok "the daily code isn't an access code" $([ "$(curl -s -o /dev/null -w '%{http_code}' "$H/?cmp_share=$CODE")$(curl -s -o /dev/null -w '%{http_code}' "$H/?cmp_lockpic=$VID&code=$CODE")" = 404404 ] && echo 1 || echo 0)
 
 echo "== Verified elsewhere (CMP 0.28.0)"
-ok "keyholder sees 'Verified elsewhere' with Today (the lock started today)" $([ "$(has $T/k2.html 'name="do" value="verified_else"')$(has $T/k2.html '>Today</option>')$(hasnt $T/k2.html '>Yesterday</option>')" = 111 ] && echo 1 || echo 0)
+ok "keyholder sees 'Mark a day verified' with a date picker from the lock's first day to today (0.35.0)" $([ "$(has $T/k2.html 'name="do" value="verified_else"')$(has $T/k2.html "type=\"date\" id=\"cmp_cl_vday\" name=\"day\" value=\"$(ev "echo wp_date('Y-m-d');")\" min=\"$(ev "echo wp_date('Y-m-d');")\"")" = 11 ] && echo 1 || echo 0)
 r=$(act pup $PN verified_else -F "lock=$LID" -F "day=$(ev "echo wp_date('Y-m-d');")")
 ok "the wearer can't mark their own day verified" $([ "$(q "SELECT COUNT(*) FROM $E_T WHERE lock_id=$LID AND type='verified_else'")" = 0 ] && echo 1 || echo 0)
 TODAY=$(ev "echo wp_date('Y-m-d');")
@@ -233,17 +233,49 @@ YDAY=$(ev "echo (new DateTime('yesterday', wp_timezone()))->format('Y-m-d');")
 r=$(act kh $KN verified_else -F "lock=$LID" -F "day=$YDAY")
 ok "back-dated: yesterday is recorded on yesterday (site time)" $(echo "$r" | grep -q 'cl_saved' && [ "$(ev "global \$wpdb; echo wp_date('Y-m-d', strtotime(\$wpdb->get_var(\"SELECT created_at FROM $E_T WHERE lock_id=$LID AND type='verified_else' ORDER BY id DESC LIMIT 1\").' UTC'));")" = "$YDAY" ] && echo 1 || echo 0)
 get pup p6 "$PAGE&cmp_tab=chastity"
-ok "...and shows as verified on the wearer's month calendar" $([ "${YDAY:0:7}" != "${TODAY:0:7}" ] || grep -q "class=\"is-locked is-verified\" title=\"$YDAY\"" $T/p6.html && echo 1 || echo 0)
+YLAB=$(ev "echo wp_date('l, F j', strtotime('$YDAY 12:00:00 '.wp_timezone_string()));")
+ok "...and gets a gold star on the wearer's calendar beside Verification (0.35.0)" $([ "${YDAY:0:7}" != "${TODAY:0:7}" ] || grep -q "class=\"is-done[^\"]*\" title=\"$YLAB: verified\"" $T/p6.html && echo 1 || echo 0)
 D2=$(ev "echo (new DateTime('-2 days', wp_timezone()))->format('Y-m-d');")
 ev "global \$wpdb; \$wpdb->insert(CMP_Install::table('lock_events'),array('lock_id'=>$LID,'actor_id'=>$PUP,'type'=>'verification','code'=>'TEST22','review'=>'','created_at'=>(new DateTime('$D2 10:00:00', wp_timezone()))->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s')));" >/dev/null
 r=$(act kh $KN verified_else -F "lock=$LID" -F "day=$D2")
 ok "a day with a photo waiting for review can't be marked (accept the photo instead)" $(echo "$r" | grep -q 'cl_verified_day' && echo 1 || echo 0)
 D8=$(ev "echo (new DateTime('-8 days', wp_timezone()))->format('Y-m-d');")
 r=$(act kh $KN verified_else -F "lock=$LID" -F "day=$D8")
-ok "more than 6 days back is refused" $(echo "$r" | grep -q 'cl_invalid' && echo 1 || echo 0)
+ok "a day before the lock started is refused" $(echo "$r" | grep -q 'cl_invalid' && echo 1 || echo 0)
 r=$(act kh $KN review -F "lock=$LID" -F "event=$(q "SELECT MAX(id) FROM $E_T WHERE lock_id=$LID AND type='verified_else'")" -F "verdict=accepted")
 ok "a 'verified elsewhere' mark isn't a photo to review" $(echo "$r" | grep -q 'cl_invalid' && echo 1 || echo 0)
 ev "global \$wpdb; \$wpdb->delete(CMP_Install::table('lock_events'),array('lock_id'=>$LID,'code'=>'TEST22')); \$wpdb->update(CMP_Install::table('locks'),array('started_at'=>'$OLDSTART'),array('id'=>$LID));" >/dev/null
+
+echo "== Correcting any day, the star calendar, milestone stars (CMP 0.35.0)"
+ev "global \$wpdb; \$wpdb->update(CMP_Install::table('locks'),array('started_at'=>gmdate('Y-m-d H:i:s',time()-20*DAY_IN_SECONDS-3600)),array('id'=>$LID));" >/dev/null
+dago(){ ev "echo (new DateTime('-$1 days', wp_timezone()))->format('Y-m-d');"; }
+D14=$(dago 14); D10=$(dago 10); D25=$(dago 25); TOMORROW=$(ev "echo (new DateTime('tomorrow', wp_timezone()))->format('Y-m-d');")
+get kh kc1 "$PAGE&cmp_tab=chastity&lock=$LID"
+ok "keyholder: calendar beside Verification, missed days link to the correction (two weeks back too)" $([ "$(has $T/kc1.html 'class="cmp-cl-verify-cal"')$(has $T/kc1.html "vday=$D14")$(has $T/kc1.html "min=\"$(dago 20)\"")" = 111 ] && echo 1 || echo 0)
+get kh kc2 "$PAGE&cmp_tab=chastity&lock=$LID&vday=$D10"
+ok "tapping a day opens 'Mark a day verified' with that date filled in" $([ "$(has $T/kc2.html 'id="cmp-cl-elsewhere" open')$(has $T/kc2.html "name=\"day\" value=\"$D10\"")" = 11 ] && echo 1 || echo 0)
+r=$(act kh $KN verified_else -F "lock=$LID" -F "day=$D14" -F "note=Signal")
+ok "a day two weeks back can be marked verified, recorded on that day" $(echo "$r" | grep -q 'cl_saved' && [ "$(ev "global \$wpdb; echo wp_date('Y-m-d', strtotime(\$wpdb->get_var(\"SELECT created_at FROM $E_T WHERE lock_id=$LID AND type='verified_else' AND note='Signal'\").' UTC'));")" = "$D14" ] && echo 1 || echo 0)
+r=$(act kh $KN verified_else -F "lock=$LID" -F "day=$D25")
+ok "before the lock started: refused" $(echo "$r" | grep -q 'cl_invalid' && echo 1 || echo 0)
+r=$(act kh $KN verified_else -F "lock=$LID" -F "day=$TOMORROW")
+ok "a future day: refused" $(echo "$r" | grep -q 'cl_invalid' && echo 1 || echo 0)
+r=$(act pup $PN verified_else -F "lock=$LID" -F "day=$D10")
+ok "the wearer can't mark days" $(echo "$r" | grep -q 'cl_gone' && [ "$(q "SELECT COUNT(*) FROM $E_T WHERE lock_id=$LID AND type='verified_else' AND created_at < '$(ev "echo gmdate('Y-m-d H:i:s', time()-9*DAY_IN_SECONDS);")' AND created_at > '$(ev "echo gmdate('Y-m-d H:i:s', time()-11*DAY_IN_SECONDS);")'")" = 0 ] && echo 1 || echo 0)
+ok "history is in date order: the back-dated correction sits below newer days, not on top" $(ev "\$e=CMP_Chastity::events($LID,100); \$c=array_map(function(\$x){return \$x->created_at;},\$e); \$s=\$c; rsort(\$s); echo \$c===\$s && 'Signal'!==\$e[0]->note?1:0;")
+D14L=$(ev "echo wp_date('l, F j', strtotime('$D14 12:00:00 '.wp_timezone_string()));")
+get kh kc3 "$PAGE&cmp_tab=chastity&lock=$LID&cmp_cm=${D14:0:7}"
+ok "the corrected day now has a gold star; the month shows how many days count" $([ "$(grep -c "title=\"$D14L: verified\"" $T/kc3.html)$(has $T/kc3.html 'days verified')" = 11 ] && echo 1 || echo 0)
+get kh kc4 "$PAGE&cmp_tab=chastity&lock=$LID&cmp_cm=1999-01"
+ok "months outside the lock aren't offered (clamped to the lock)" $(hasnt $T/kc4.html '1999')
+get pup kc5 "$PAGE&cmp_tab=chastity"
+ok "the wearer sees the star calendar but can't mark days from it" $([ "$(has $T/kc5.html 'class="cmp-cl-verify-cal"')$(hasnt $T/kc5.html 'vday=')" = 11 ] && echo 1 || echo 0)
+ms(){ ev "\$l=(object)array('started_at'=>gmdate('Y-m-d H:i:s',time()-$1),'status'=>'ended','ended_at'=>gmdate('Y-m-d H:i:s')); echo implode(',',CMP_Chastity::milestones(\$l)),'|',CMP_Chastity::milestone_label(CMP_Chastity::milestones(\$l));"; }
+ok "stars: 5 days none; 8 days 1 bronze; 22 days 3 bronze" $([ "$(ms '5*DAY_IN_SECONDS')/$(ms '8*DAY_IN_SECONDS')/$(ms '22*DAY_IN_SECONDS')" = "0,0,0,0|/0,0,0,1|1 week/0,0,0,3|3 weeks" ] && echo 1 || echo 0)
+ok "stars: 35 days 1 gold; 75 days 2 gold" $([ "$(ms '35*DAY_IN_SECONDS')/$(ms '75*DAY_IN_SECONDS')" = "0,0,1,0|1 month/0,0,2,0|2 months" ] && echo 1 || echo 0)
+ok "stars: 400 days 1 platinum + 1 gold; 3 years 40 days 1 diamond + 1 gold; 7 years 2 diamonds + 1 platinum" $([ "$(ms '400*DAY_IN_SECONDS')/$(ms '(3*365+1+40)*DAY_IN_SECONDS')/$(ms '(7*365+2+5)*DAY_IN_SECONDS')" = "0,1,1,0|1 year, 1 month/1,0,1,0|3 years, 1 month/2,1,0,0|7 years" ] && echo 1 || echo 0)
+ok "the timer shows 2 bronze stars at 20 days and when the next comes (3 weeks)" $([ "$(grep -o 'cmp-star is-bronze' $T/kc1.html | wc -l | tr -d ' ')" -ge 2 ] && grep -q 'Next: a bronze star at 3 weeks' $T/kc1.html && grep -q 'aria-label="Stars: 2 weeks locked"' $T/kc1.html && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->delete(CMP_Install::table('lock_events'),array('lock_id'=>$LID,'note'=>'Signal')); \$wpdb->update(CMP_Install::table('locks'),array('started_at'=>'$OLDSTART'),array('id'=>$LID));" >/dev/null
 
 echo "== Hygiene and release"
 r=$(act pup $PN hygiene_open -F "lock=$LID")
