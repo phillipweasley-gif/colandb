@@ -4,6 +4,19 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.35.1
+
+**Gem stars for the first weeks, and a sapphire at 6 months** (owner, 2026-10-22: "Would it make sense to do week 1 bronze, 2 emerald, 3 ruby, and 4 gold? Also what about a 6 month mark? Can we make that something between gold and platinum?").
+
+- The first weeks of a lock now show one star that changes: **bronze** at 1 week, **emerald** at 2 weeks, **ruby** at 3 weeks. Before this there were 1–3 bronze stars.
+- **Gold** stays at 1 month rather than exactly 4 weeks, so every later gold star still lands on the same day of each month.
+- **Sapphire** at 6 months sits between gold and platinum: 6 months = 1 sapphire; 7 months = sapphire + 1 gold; 1 year = platinum.
+- Platinum (each year) and diamond (every 3 years) are unchanged.
+- "Next: …" names the coming star, for example "Next: a ruby star at 3 weeks".
+- **Verification** (local WordPress test kit, PHP 8.3): `tests/chastity-e2e.sh` 190/190. The star checks now cover 5 days (none), 8 days (bronze), 15 days (emerald), 22 days (ruby), 35 and 75 days (1 and 2 gold), 186 days (sapphire), 216 days (sapphire + gold), 400 days, 3 years 40 days and 7 years, plus the timer showing an emerald at 20 days with "Next: a ruby star at 3 weeks". I also rendered the colours to check they're distinct on the dark background. `php -l`.
+
+---
+
 ## 0.35.0
 
 **Chastity: correct any day of a lock, a star calendar beside Verification, and milestone stars** (owner, 2026-10-22: "When going back to correct a date it only seems to go back a week … It is vital that Keyholders have access to a calendar to select a specific date for correction. Also, under verification it does not organize them by date … Even better a visual guide on the right hand side such as a calendar with gold stars … We should also allow someone to earn stars based on how long they have been in chastity").

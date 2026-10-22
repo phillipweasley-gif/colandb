@@ -844,3 +844,7 @@
 .cmp-member-area .cmp-cl-timer .cmp-cl-stars { display: flex; justify-content: center; margin-top: 6px; }
 .cmp-member-area .cmp-cl-timer .cmp-cl-stars .cmp-star { width: 22px; height: 22px; }
 .cmp-member-area .cmp-cl-next { margin: 4px 0 0; font-size: 13px; color: var(--cmp-muted); }
+/* 0.35.1: gem stars. */
+.cmp-star.is-emerald path { fill: #2ECC71; stroke: #13703b; stroke-width: 1; }
+.cmp-star.is-ruby path { fill: #E0115F; stroke: #7d0934; stroke-width: 1; }
+.cmp-star.is-sapphire path { fill: #3B7DDD; stroke: #163f80; stroke-width: 1; }
