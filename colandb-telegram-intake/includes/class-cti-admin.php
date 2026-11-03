@@ -160,7 +160,7 @@ final class CTI_Admin {
 		);
 		$photos = json_decode( (string) $post['photos'], true );
 		if ( $photos ) {
-			echo '<p>' . esc_html( count( $photos ) . ' image(s) attached. View them in Telegram; images are not copied unless the channel allows reuse.' ) . '</p>';
+			echo '<p>' . esc_html( count( $photos ) . ' image(s) attached. The first becomes the event image unless the channel is set not to share flyers.' ) . '</p>';
 		}
 		echo '<pre style="white-space:pre-wrap;background:#f6f7f7;padding:8px;max-height:320px;overflow:auto;">' . esc_html( (string) $post['body'] ) . '</pre>';
 		printf( '<p>Status: <code>%s</code>%s</p>', esc_html( $post['status'] ), $post['reason'] ? ' — ' . esc_html( $post['reason'] ) : '' );
@@ -284,7 +284,7 @@ final class CTI_Admin {
 		wp_nonce_field( 'cti_action' );
 		echo '<input type="hidden" name="action" value="cti_action"><input type="hidden" name="do" value="settings"><table class="form-table">';
 		echo '<tr><th>Approved channels</th><td><textarea name="channels" rows="6" class="large-text code">' . esc_textarea( CTI_Config::channels_text( $s['channels'] ) ) . '</textarea>';
-		echo '<p class="description">One channel per line: <code>channel ID or @username | reuse images (yes/no) | label</code>, e.g. <code>-1001234567890 | no | Kink 101</code>. Prefer the numeric ID (it never changes). Posts from any other chat are ignored. Say "yes" to reuse images only when the channel has given permission to copy its flyers.</p>';
+		echo '<p class="description">One channel per line: <code>channel ID or @username | use flyers (yes/no) | label</code>, e.g. <code>-1001234567890 | yes | Kink 101</code>. Prefer the numeric ID (it never changes). Posts from any other chat are ignored. A post\'s flyer becomes the event image unless the line says "no" (use "no" for a channel that hasn\'t agreed to share its flyers).</p>';
 		$unknown = get_option( 'cti_unknown_chats', array() );
 		if ( $unknown ) {
 			echo '<p class="description"><strong>Recently ignored (not on the list):</strong> ';

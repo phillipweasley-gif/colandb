@@ -48,12 +48,15 @@ mkdir -p wp-content/mu-plugins
 cat > wp-content/mu-plugins/cti-test.php <<'PHP'
 <?php
 add_filter( 'cti_album_wait', function () { return 0; } );
+// The test runs the queue itself; WP-Cron firing on page loads would race it.
+if ( ! defined( 'DISABLE_WP_CRON' ) ) { define( 'DISABLE_WP_CRON', true ); }
 PHP
 for t in Social Themed Educational; do $W term create cec_event_type $t >/dev/null 2>&1; done
 ev 'CTI_Install::create_tables(); global $wpdb; foreach (array("posts","entries","updates","log") as $t) $wpdb->query("DELETE FROM ".CTI_Install::table($t)); delete_option("cti_unknown_chats"); $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE \"cti_lock_%\" OR option_name LIKE \"_transient_cti_alert_%\"");' >/dev/null
-ev 'foreach (get_posts(array("post_type"=>"cec_event","post_status"=>"any","numberposts"=>-1,"fields"=>"ids")) as $id) wp_delete_post($id,true);' >/dev/null
-ev 'update_option("cti_settings", array_merge(CTI_Config::defaults(), array("channels"=>CTI_Config::parse_channels("-1001111111111 | no | Test Channel\n@flyerchan | yes | Flyer Channel\n-1002222222222 | no"), "dry_run"=>false, "notify_emails"=>"editor@example.com", "max_attempts"=>3)));' >/dev/null
-ev 'CEC_Admin_Settings::update(array("auto_publish"=>1));' >/dev/null 2>&1 || ev '$s=get_option("cec_settings",array()); $s["auto_publish"]=1; update_option("cec_settings",$s);' >/dev/null
+ev 'foreach (get_posts(array("post_type"=>"cec_event","post_status"=>"any","numberposts"=>-1,"fields"=>"ids","meta_key"=>"_cec_intake_source_url")) as $id) wp_delete_post($id,true);' >/dev/null
+ev 'update_option("cti_settings", array_merge(CTI_Config::defaults(), array("channels"=>CTI_Config::parse_channels("-1001111111111 | no | Test Channel\n@flyerchan | | Flyer Channel\n-1002222222222 | no"), "dry_run"=>false, "notify_emails"=>"editor@example.com", "max_attempts"=>3)));' >/dev/null
+ev '$s=get_option("cec_settings",array()); $s["auto_publish"]=1; update_option("cec_settings",$s);' >/dev/null
+ok "test setup: the calendar's auto-publish setting is on (intake must ignore it)" $(ev 'echo CEC_Admin_Settings::get("auto_publish") ? 1 : 0;')
 
 # Test images.
 php -r '$i=imagecreatetruecolor(400,300); imagefill($i,0,0,imagecolorallocate($i,200,30,90)); imagejpeg($i,$argv[1]."/files/flyer1.jpg",85); imagejpeg($i,$argv[1]."/files/flyer2.jpg",60);' $T
@@ -104,10 +107,14 @@ ok "the largest photo was sent to the reader as image/jpeg, bytes intact" $(echo
 ok "flyer event pending, free (FREE ENTRY on the flyer)" $([ "$(ev "echo get_post_status($E2);")" = pending ] && [ "$(meta $E2 _cec_admission_status)" = free_confirmed ] && echo 1 || echo 0)
 ok "public link from the channel username" $([ "$(meta $E2 _cec_source_url)" = "https://t.me/flyerchan/20" ] && echo 1 || echo 0)
 ok "link read from the image kept but flagged; year assumed is flagged" $([ "$(meta $E2 _cec_official_website_url)" = "https://pupmosh.example.org" ] && ev "echo implode('|',get_post_meta($E2,'_cec_intake_notes',true));" | grep -q 'read from the flyer image' && ev "echo implode('|',get_post_meta($E2,'_cec_intake_notes',true));" | grep -q 'does not give the year' && echo 1 || echo 0)
-ok "channel allows reuse: flyer copied as the event image" $([ "$(ev "echo (int) get_post_thumbnail_id($E2);")" -gt 0 ] && echo 1 || echo 0)
+ok "channel with no flag (the default): flyer used as the event image" $([ "$(ev "echo (int) get_post_thumbnail_id($E2);")" -gt 0 ] && echo 1 || echo 0)
 r=$(deliver channel_post $C1 - 21 "Pup Mosh again but private FX:flyer" '{"photo":[{"file_id":"flyer2","file_unique_id":"f2","file_size":4000,"width":400,"height":300}]}')
 run; E3=$(entry event_id $C1 21); S3=$(entry e.status $C1 21)
-ok "same event from another channel without reuse permission: flagged as a duplicate (same title and date)" $([ "$S3" = possible_duplicate ] && echo 1 || echo 0)
+ok "same event from another channel: flagged as a duplicate (same title and date)" $([ "$S3" = possible_duplicate ] && echo 1 || echo 0)
+ok "a channel marked no: settings keep it, flyers not used" $(ev 'echo CTI_Config::channel_for(array("id"=>"-1001111111111"))["reuse_images"] ? 0 : 1;')
+SE=$(entry e.id $C1 21)
+ev "CTI_Processor::editor_create($SE, array(), 1);" >/dev/null; E21=$(entry event_id $C1 21)
+ok "editor confirms it is separate: pending event, no flyer copied for a 'no' channel" $([ "$(ev "echo get_post_status($E21);")" = pending ] && [ "$(ev "echo (int) get_post_thumbnail_id($E21);")" = 0 ] && ev "echo implode('|',get_post_meta($E21,'_cec_intake_notes',true));" | grep -q 'set not to share' && echo 1 || echo 0)
 
 echo "== Field rules"
 deliver channel_post $C1 - 30 "Bootblack clinic, \$0 FX:free_noword" >/dev/null; run; E=$(entry event_id $C1 30)
@@ -146,6 +153,7 @@ ev "var_export( CTI_Processor::editor_link($DE, $E1, 1) );" >/dev/null
 ok "editor links it: both sources on the event, details unchanged" $([ "$(entry e.status $C2 50)" = linked ] && [ "$(ev "echo count(get_post_meta($E1,'_cec_intake_source_url'));")" = 2 ] && [ "$(ev "echo get_the_title($E1);")" = "Leather Social Night" ] && echo 1 || echo 0)
 # Cancelled and published events still match.
 ev "wp_update_post(array('ID'=>$E2,'post_status'=>'publish')); update_post_meta($E2,'_cec_event_status','cancelled');" >/dev/null
+ev "wp_delete_post($E21, true);" >/dev/null
 ev 'global $wpdb; $wpdb->query("DELETE FROM '${P}'cti_entries WHERE post_id IN (SELECT id FROM '${P}'cti_posts WHERE message_id=21)");' >/dev/null
 deliver channel_post $C2 - 53 "Pup Mosh is back FX:flyer" '{"photo":[{"file_id":"flyer1","file_unique_id":"f1x","file_size":5000,"width":400,"height":300}]}' >/dev/null; run
 R=$(entry e.candidates $C2 53)
@@ -215,7 +223,7 @@ ok "no token, secret or API key in the log, entries or emails" $( (q "SELECT GRO
 ok "the review screen lists what needs a decision" $(ev 'wp_set_current_user(1); ob_start(); CTI_Admin::render(); echo ob_get_clean();' | grep -q 'Possible duplicate' && echo 1 || echo 0)
 ok "WP-CLI dry-run extraction prints proposed fields" $($W colandb-intake extract --text="Test FX:basic https://tickets.example.com/leather-social?utm_source=tg" 2>/dev/null | grep -q '"cec_admission_status": "paid"' && echo 1 || echo 0)
 
-ev 'foreach (get_posts(array("post_type"=>"cec_event","post_status"=>"any","numberposts"=>-1,"fields"=>"ids")) as $id) wp_delete_post($id,true);' >/dev/null
+ev 'foreach (get_posts(array("post_type"=>"cec_event","post_status"=>"any","numberposts"=>-1,"fields"=>"ids","meta_key"=>"_cec_intake_source_url")) as $id) wp_delete_post($id,true);' >/dev/null
 rm -f wp-content/mu-plugins/cti-test.php
 ev '$s=get_option("cec_settings",array()); $s["auto_publish"]=0; update_option("cec_settings",$s);' >/dev/null
 pkill -f "php -S 127.0.0.1:8898" 2>/dev/null

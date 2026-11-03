@@ -88,8 +88,10 @@ final class CTI_Config {
 
 	/**
 	 * The allowlist. Each line of the settings box is
-	 *   <channel id or @username> [| reuse-images] [| label]
-	 * e.g. "-1001234567890 | no | Kink 101" or "@capcitypets".
+	 *   <channel id or @username> [| use flyers: yes/no] [| label]
+	 * e.g. "-1001234567890 | yes | Kink 101" or "@capcitypets".
+	 * Flyers are used as the event image unless the line says "no"
+	 * (owner's decision, 2026-11-03).
 	 */
 	public static function parse_channels( $text ) {
 		$out = array();
@@ -108,7 +110,7 @@ final class CTI_Config {
 			} else {
 				continue;
 			}
-			$row['reuse_images'] = isset( $parts[1] ) && in_array( strtolower( $parts[1] ), array( 'yes', 'reuse-images', 'reuse', 'y' ), true );
+			$row['reuse_images'] = ! ( isset( $parts[1] ) && in_array( strtolower( $parts[1] ), array( 'no', 'n', 'off', 'false' ), true ) );
 			$row['label']        = isset( $parts[2] ) ? sanitize_text_field( $parts[2] ) : '';
 			$out[]               = $row;
 		}

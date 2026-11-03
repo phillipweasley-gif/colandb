@@ -32,6 +32,7 @@ bash tests/series-e2e.sh             # a series saved in wp-admin keeps its date
 bash tests/ends-e2e.sh               # event ends: past midnight is the next day, earlier dates refused, the 1.45.3 repair: 18 checks
 bash tests/fundraisers-e2e.sh        # public fundraising tracker: wp-admin entry, totals-only cards, private donations: 21 checks
 bash tests/meetings-e2e.sh           # meeting notes: Secretary portal, drafts/approval, motions, files, public page: 27 checks
+bash tests/telegram-intake-e2e.sh    # Telegram event intake + calendar intake API (CEC 1.47.0): webhook secret, allowlist, text and flyer posts, field rules, duplicates, edits, failures and retries, dry run, never publishes: 63 checks against a fake Telegram and Claude (tests/mock-intake.php)
 bash tests/form-cache-e2e.sh         # form pages never cached (host CDN header copied by a test mu-plugin), expired nonces accepted when signed out, guest edit links: 36 checks
 ```
 

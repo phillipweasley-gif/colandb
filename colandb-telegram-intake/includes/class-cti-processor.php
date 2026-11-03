@@ -258,14 +258,23 @@ final class CTI_Processor {
 
 		$photos = json_decode( (string) $post['photos'], true );
 		if ( $photos ) {
-			if ( $channel && ! empty( $channel['reuse_images'] ) && self::$images && ! $by_user ) {
-				$image_id = self::copy_image( $post, $norm['title'] );
+			if ( $channel && ! empty( $channel['reuse_images'] ) ) {
+				if ( ! self::$images ) {
+					// An editor's decision from the queue: fetch the flyer now.
+					$img = self::read_image( $photos[0] );
+					if ( ! is_wp_error( $img ) ) {
+						self::$images[] = $img;
+					}
+				}
+				$image_id = self::$images ? self::copy_image( $post, $norm['title'] ) : 0;
 				if ( $image_id ) {
 					$fields['image_id'] = $image_id;
-					$fields['notes'][]  = 'Flyer image copied from the source channel (that channel is marked as allowing reuse).';
+					$fields['notes'][]  = 'The flyer from the source post is the event image. Check it suits the calendar before approving.';
+				} else {
+					$fields['notes'][] = 'The flyer could not be copied; see the source post.';
 				}
 			} else {
-				$fields['notes'][] = 'Flyer image not copied: no permission to reuse it is recorded for this channel. See the source post.';
+				$fields['notes'][] = 'Flyer not used: this channel is set not to share its flyers. See the source post.';
 			}
 		}
 
