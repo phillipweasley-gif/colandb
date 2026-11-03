@@ -11,6 +11,9 @@ defined( 'ABSPATH' ) || exit;
 final class CTI_Receiver {
 
 	const NAMESPACE_ = 'colandb-intake/v1';
+
+	/** Channel posts, and (0.3.0) group messages, new and edited. */
+	const UPDATE_TYPES = array( 'channel_post', 'edited_channel_post', 'message', 'edited_message' );
 	const MAX_BODY   = 1048576;
 
 	public static function init() {
@@ -76,20 +79,115 @@ final class CTI_Receiver {
 			return 'duplicate';
 		}
 
-		$is_edit = isset( $update['edited_channel_post'] );
-		$msg     = $is_edit ? $update['edited_channel_post'] : ( isset( $update['channel_post'] ) ? $update['channel_post'] : null );
-		if ( ! is_array( $msg ) || ! isset( $msg['chat']['type'], $msg['message_id'] ) || 'channel' !== $msg['chat']['type'] ) {
+		$kind = '';
+		foreach ( self::UPDATE_TYPES as $type ) {
+			if ( isset( $update[ $type ] ) && is_array( $update[ $type ] ) ) {
+				$kind = $type;
+				break;
+			}
+		}
+		$msg     = $kind ? $update[ $kind ] : null;
+		$is_edit = 0 === strpos( $kind, 'edited_' );
+		if ( ! is_array( $msg ) || ! isset( $msg['chat']['type'], $msg['message_id'] ) ) {
 			return 'ignored';
+		}
+		$type = (string) $msg['chat']['type'];
+		if ( 'channel' === $type ) {
+			if ( false === strpos( $kind, 'channel_post' ) ) {
+				return 'ignored';
+			}
+		} elseif ( in_array( $type, array( 'group', 'supergroup' ), true ) ) {
+			if ( false !== strpos( $kind, 'channel_post' ) ) {
+				return 'ignored';
+			}
+		} else {
+			return 'ignored'; // Private chats with the bot are never read.
 		}
 		$chat    = $msg['chat'];
 		$channel = CTI_Config::channel_for( $chat );
 		if ( ! $channel ) {
-			self::remember_unknown_chat( $chat );
+			self::remember_unknown_chat( $chat, $msg );
 			return 'not_allowed';
+		}
+		if ( 'channel' !== $type ) {
+			$why = self::group_filter( $msg, $channel );
+			if ( '' !== $why ) {
+				return $why;
+			}
 		}
 
 		$row = self::row_from_message( $msg, $channel, $update_id );
 		return self::store( $row, $is_edit );
+	}
+
+	/**
+	 * Group messages (0.3.0): only real posts in the allowed topics (and,
+	 * with "admins", only from administrators) are kept. Nothing is stored
+	 * for a message that doesn't pass, and the sender is never stored.
+	 *
+	 * @return string '' to keep it, or why it was skipped.
+	 */
+	private static function group_filter( $msg, $channel ) {
+		if ( ! empty( $msg['from']['is_bot'] ) && empty( $msg['sender_chat'] ) ) {
+			return 'filtered_bot';
+		}
+		$has_content = isset( $msg['text'] ) || isset( $msg['caption'] ) || isset( $msg['photo'] ) || isset( $msg['document'] );
+		if ( ! $has_content ) {
+			return 'filtered_service';
+		}
+		if ( ! empty( $channel['topics'] ) ) {
+			$topic = ! empty( $msg['is_topic_message'] ) && isset( $msg['message_thread_id'] ) ? (int) $msg['message_thread_id'] : 0;
+			if ( ! $topic || ! in_array( $topic, array_map( 'intval', $channel['topics'] ), true ) ) {
+				self::remember_topic( $msg );
+				return 'filtered_topic';
+			}
+		}
+		if ( ! empty( $channel['admins_only'] ) ) {
+			$sent_as_group = isset( $msg['sender_chat']['id'] ) && (string) $msg['sender_chat']['id'] === (string) $msg['chat']['id'];
+			$from          = isset( $msg['from']['id'] ) ? (int) $msg['from']['id'] : 0;
+			if ( ! $sent_as_group && ! in_array( $from, self::admin_ids( (string) $msg['chat']['id'] ), true ) ) {
+				return 'filtered_not_admin';
+			}
+		}
+		return '';
+	}
+
+	/** The group's administrators' user IDs, asked of Telegram at most once an hour. */
+	private static function admin_ids( $chat_id ) {
+		$key = 'cti_admins_' . md5( $chat_id );
+		$ids = get_transient( $key );
+		if ( is_array( $ids ) ) {
+			return $ids;
+		}
+		$admins = CTI_Telegram::call( 'getChatAdministrators', array( 'chat_id' => $chat_id ) );
+		$ids    = array();
+		if ( ! is_wp_error( $admins ) ) {
+			foreach ( (array) $admins as $a ) {
+				if ( isset( $a['user']['id'] ) ) {
+					$ids[] = (int) $a['user']['id'];
+				}
+			}
+		}
+		set_transient( $key, $ids, is_wp_error( $admins ) ? 5 * MINUTE_IN_SECONDS : HOUR_IN_SECONDS );
+		return $ids;
+	}
+
+	/**
+	 * Topic numbers seen in an allowed group (not their messages), so an
+	 * administrator can check which topic is which. Last 20.
+	 */
+	private static function remember_topic( $msg ) {
+		$topic = ! empty( $msg['is_topic_message'] ) && isset( $msg['message_thread_id'] ) ? (int) $msg['message_thread_id'] : 0;
+		$seen  = get_option( 'cti_seen_topics', array() );
+		$seen  = is_array( $seen ) ? $seen : array();
+		$key   = (string) $msg['chat']['id'] . ':' . $topic;
+		$seen[ $key ] = array(
+			'chat'  => (string) $msg['chat']['id'],
+			'topic' => $topic ? $topic : 'General (no topic)',
+			'name'  => isset( $msg['reply_to_message']['forum_topic_created']['name'] ) ? sanitize_text_field( $msg['reply_to_message']['forum_topic_created']['name'] ) : '',
+			'seen'  => current_time( 'mysql', true ),
+		);
+		update_option( 'cti_seen_topics', array_slice( $seen, -20, 20, true ), false );
 	}
 
 	/**
@@ -123,10 +221,11 @@ final class CTI_Receiver {
 			);
 		}
 
+		$topic = ! empty( $msg['is_topic_message'] ) && isset( $msg['message_thread_id'] ) ? (int) $msg['message_thread_id'] . '/' : '';
 		if ( $username ) {
-			$url = 'https://t.me/' . rawurlencode( $username ) . '/' . (int) $msg['message_id'];
+			$url = 'https://t.me/' . rawurlencode( $username ) . '/' . $topic . (int) $msg['message_id'];
 		} elseif ( 0 === strpos( $chat_id, '-100' ) ) {
-			$url = 'https://t.me/c/' . substr( $chat_id, 4 ) . '/' . (int) $msg['message_id'];
+			$url = 'https://t.me/c/' . substr( $chat_id, 4 ) . '/' . $topic . (int) $msg['message_id'];
 		} else {
 			$url = '';
 		}
@@ -303,7 +402,7 @@ final class CTI_Receiver {
 	 * A chat that sent a post but isn't on the allowlist: only its ID and
 	 * title are remembered (last 10), so an administrator can add it.
 	 */
-	private static function remember_unknown_chat( $chat ) {
+	private static function remember_unknown_chat( $chat, $msg = array() ) {
 		$seen = get_option( 'cti_unknown_chats', array() );
 		$seen = is_array( $seen ) ? $seen : array();
 		$id   = (string) $chat['id'];
@@ -311,6 +410,8 @@ final class CTI_Receiver {
 			'id'       => $id,
 			'username' => isset( $chat['username'] ) ? sanitize_text_field( $chat['username'] ) : '',
 			'title'    => isset( $chat['title'] ) ? sanitize_text_field( $chat['title'] ) : '',
+			'type'     => isset( $chat['type'] ) ? sanitize_key( $chat['type'] ) : '',
+			'topic'    => ! empty( $msg['is_topic_message'] ) && isset( $msg['message_thread_id'] ) ? (int) $msg['message_thread_id'] : 0,
 			'seen'     => current_time( 'mysql', true ),
 		);
 		update_option( 'cti_unknown_chats', array_slice( $seen, -10, 10, true ), false );

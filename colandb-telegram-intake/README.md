@@ -1,6 +1,6 @@
 # COL&B Telegram Event Intake
 
-Reads event announcements from an **approved list of Telegram channels**, pulls the details out of the post text and any flyer image, and puts each event in the Community Events Calendar's **review queue**. It never publishes: every event waits for a person to approve it in the usual places (Events list, Calendar Manager dashboard).
+Reads event announcements from an **approved list of Telegram channels and groups** (in a group, optionally only certain topics), pulls the details out of the post text and any flyer image, and puts each event in the Community Events Calendar's **review queue**. It never publishes: every event waits for a person to approve it in the usual places (Events list, Calendar Manager dashboard).
 
 - Runs inside WordPress on colandb.com, since the host only runs WordPress. Telegram calls the site's webhook; WP-Cron does the work.
 - Needs **Community Events Calendar 1.47.0** or later. That release adds the intake API this plugin uses: `cec_intake_create_event()` and related functions in `community-events-calendar/includes/class-cec-intake-api.php`.
@@ -44,6 +44,30 @@ For each channel on the approved list, a **channel administrator**:
 The bot sees new posts and edits from that point on. It does not see older posts, comments in the channel's discussion group, or private chats.
 
 Then add the channel to the **allowlist** (section 4). Posts from a channel the bot is in but which isn't on the list are ignored. Its ID shows under Settings → "Recently ignored", so you can copy it.
+
+## 2b. Groups (0.3.0)
+
+In a group, members post events among other chat, so the bot reads **only the topics you list**.
+
+**In @BotFather:**
+1. Send `/setjoingroups`, choose the bot, then tap **Enable**. Otherwise the bot leaves any group it's added to.
+2. Send `/setprivacy`, choose the bot, then tap **Disable**. Otherwise a bot that isn't an admin sees only commands, not posts.
+
+**In the group:**
+1. Add the bot as a member. It doesn't need to be an admin.
+2. If the group has topics, find the topic numbers. In a topic's link `t.me/c/3923571403/275`, the topic is `275`.
+3. Settings also lists "Topics skipped in listed groups" once messages arrive, which helps match a number to a topic.
+
+**On the allowlist:**
+
+```
+-1003923571403 | yes | COL&B group | topics: 129, 275, 573
+```
+
+- The group ID is `-100` followed by the number in its links.
+- Add `| admins` to read only the group's administrators.
+- **Skipped and not stored:** messages in other topics or in General, service messages and other bots.
+- **Never stored:** the sender's name or account.
 
 ## 3. Secrets
 
@@ -91,7 +115,7 @@ Environment variables with the same names also work (see `.env.example`). The se
 ## 5. Connect the webhook
 
 1. Events → Telegram Intake → **Connection**. Check the secrets show "set" and the calendar shows "ready".
-2. Click **Connect webhook**. Telegram is told to send `channel_post` and `edited_channel_post` updates to `https://colandb.com/wp-json/colandb-intake/v1/telegram`, with the secret.
+2. Click **Connect webhook**. Telegram is told to send `channel_post`, `edited_channel_post`, `message` and `edited_message` updates (channel posts and group messages) to `https://colandb.com/wp-json/colandb-intake/v1/telegram`, with the secret.
 3. Post a test in an approved channel. Within a minute, "Waiting at Telegram" should be 0 and **Last delivery error** empty. A firewall or CDN block would show there.
 
 **If the host can't take webhooks** (Telegram's requests blocked), there is no supported fallback on the live site. Long polling needs a process that keeps running, which WordPress hosting doesn't offer; WP-Cron runs too briefly and too irregularly. Polling is for local development only (next section).

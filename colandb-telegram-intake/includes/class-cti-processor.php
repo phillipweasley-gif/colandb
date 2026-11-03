@@ -580,7 +580,7 @@ final class CTI_Processor {
 	}
 
 	private static function channel_for_post( $post ) {
-		$username = preg_match( '#^https://t\.me/([A-Za-z0-9_]+)/\d+$#', (string) $post['post_url'], $m ) && 'c' !== $m[1] ? $m[1] : '';
+		$username = preg_match( '#^https://t\.me/([A-Za-z0-9_]+)/(\d+/)?\d+$#', (string) $post['post_url'], $m ) && 'c' !== $m[1] ? $m[1] : '';
 		return CTI_Config::channel_for( array( 'id' => $post['chat_id'], 'username' => $username ) );
 	}
 
