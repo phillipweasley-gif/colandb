@@ -6,6 +6,26 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.47.1
+
+**Fix: events with no end time were missing from the calendar** (owner, 2026-11-03: "I published the events but they're not showing in the calendar"; "If there's no end time there needs to be a filler or placeholder for it as TBD so it shows. Or however we can make that happen.").
+
+- **Cause.** An event saved with an empty end (`_cec_end` = `''`) instead of no end at all matched neither branch of the month-view and upcoming-list queries ("ends on or after …" / "no end, starts on or after …"). It still had its own page and showed under /events/, but not on the calendar or in the upcoming lists.
+  - The forms save an empty end when the field is left blank, and so did the 1.47.0 intake API.
+  - On colandb.com five published events were hidden: The Lotus Underground third Friday, Monsterfucker Ball, Poker & Cigars For A Cause, NEO's Step Down Party, and the Mr. & Ms. Cleveland Leather 2027 Contest. Their empty ends were removed by hand on 2026-11-03 so they showed at once.
+- **Fix.** `CEC_Event_Helper::filter_end_meta()` (already on every save of `_cec_end`) now deletes the end instead of saving an empty one. This covers all five forms, imports, repeating dates and the intake API. No placeholder value is needed: an event with no end time is treated as ending when it starts, as before.
+- **One-time repair** on upgrade (`cec_migrated_1471_empty_ends`) removes any empty ends left and records which events it fixed.
+- No change to the month view's markup, so no snapshot comparison was needed.
+
+**Verified** in the local WordPress kit:
+- `tests/ends-e2e.sh` 24/24, 6 of them new:
+  - an empty end is not saved;
+  - a start-only event shows in its month and in the upcoming list;
+  - old data with an empty end is hidden, as it was on colandb.com;
+  - the upgrade repair removes it and lists the event;
+  - a real end is still saved.
+- Regression suites: import 30/30, series 13/13, recurrence 5/5, telegram-intake 100/100, form-cache 36/36.
+
 ## 1.47.0
 
 **Intake API for the Telegram event intake** (owner, 2026-11-03: a Telegram-to-calendar intake bot that submits events "for editorial review. Do not publish events publicly without human approval"). The calendar had no way for code to add an event except its five forms, so this is the smallest addition that lets the new `colandb-telegram-intake` plugin use the calendar's own rules. New `includes/class-cec-intake-api.php`:

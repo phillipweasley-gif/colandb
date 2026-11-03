@@ -1125,6 +1125,16 @@ class CEC_Event_Helper {
 			return $check;
 		}
 		$value = is_string( $meta_value ) ? $meta_value : '';
+		// 1.47.1: "no end time" is stored as no _cec_end at all. Every list
+		// and calendar query reads a missing end as "ends when it starts";
+		// an empty string matched neither branch, so the event vanished
+		// from the month view and upcoming lists (it still had its own page).
+		if ( '' === trim( $value ) ) {
+			$busy = true;
+			delete_post_meta( $object_id, '_cec_end' );
+			$busy = false;
+			return true;
+		}
 		$fixed = self::normalize_end( get_post_meta( $object_id, '_cec_start', true ), $value );
 		if ( $fixed === $value ) {
 			return $check;
