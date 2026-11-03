@@ -223,6 +223,28 @@ ok "no token, secret or API key in the log, entries or emails" $( (q "SELECT GRO
 ok "the review screen lists what needs a decision" $(ev 'wp_set_current_user(1); ob_start(); CTI_Admin::render(); echo ob_get_clean();' | grep -q 'Possible duplicate' && echo 1 || echo 0)
 ok "WP-CLI dry-run extraction prints proposed fields" $($W colandb-intake extract --text="Test FX:basic https://tickets.example.com/leather-social?utm_source=tg" 2>/dev/null | grep -q '"cec_admission_status": "paid"' && echo 1 || echo 0)
 
+echo "== Secrets in Settings (0.2.0) and diagnostics"
+NE="env -u COLANDB_TG_BOT_TOKEN -u COLANDB_TG_WEBHOOK_SECRET -u COLANDB_INTAKE_ANTHROPIC_KEY"
+nev() { $NE php $S/wp-cli.phar --allow-root eval "$1" 2>&1; }
+nev 'delete_option("cti_secrets");' >/dev/null
+ok "with nothing configured, secrets are missing" $([ "$(nev 'echo CTI_Config::bot_token()==="" && CTI_Config::secret_source("COLANDB_TG_BOT_TOKEN")==="" ? 1 : 0;')" = 1 ] && echo 1 || echo 0)
+ok "the webhook secret is made automatically (64 characters, not autoloaded)" $([ "$(nev 'echo strlen(CTI_Config::ensure_webhook_secret());')" = 64 ] && [ "$(q "SELECT autoload FROM ${P}options WHERE option_name='cti_secrets'")" != yes ] && [ "$(q "SELECT autoload FROM ${P}options WHERE option_name='cti_secrets'")" != on ] && echo 1 || echo 0)
+W1=$(nev 'echo CTI_Config::webhook_secret();'); nev 'CTI_Config::ensure_webhook_secret();' >/dev/null
+ok "made once: asking again keeps the same secret" $([ "$(nev 'echo CTI_Config::webhook_secret();')" = "$W1" ] && echo 1 || echo 0)
+nev 'wp_set_current_user(1); $_POST=array("secret"=>array("COLANDB_TG_BOT_TOKEN"=>"not-a-token","COLANDB_INTAKE_ANTHROPIC_KEY"=>"sk-ant-pastedkey0123456789"),"channels"=>CTI_Config::channels_text(CTI_Config::get("channels"))); $p=CTI_Admin::save_settings(); echo implode(" ",$p);' > $T/save1
+ok "a wrong-looking bot token is refused with a clear message; a good Claude key is saved" $(grep -q 'does not look right' $T/save1 && [ "$(nev 'echo CTI_Config::bot_token()==="" ? 1 : 0;')" = 1 ] && [ "$(nev 'echo CTI_Config::anthropic_key();')" = sk-ant-pastedkey0123456789 ] && [ "$(nev 'echo CTI_Config::secret_source("COLANDB_INTAKE_ANTHROPIC_KEY");')" = settings ] && echo 1 || echo 0)
+nev 'wp_set_current_user(1); $_POST=array("secret"=>array("COLANDB_TG_BOT_TOKEN"=>"9876543210:AAtesttokenvaluefromsettings0123456789"),"channels"=>CTI_Config::channels_text(CTI_Config::get("channels"))); CTI_Admin::save_settings();' >/dev/null
+ok "a pasted bot token is saved and used" $([ "$(nev 'echo CTI_Config::bot_token();')" = "9876543210:AAtesttokenvaluefromsettings0123456789" ] && echo 1 || echo 0)
+nev 'wp_set_current_user(1); $_POST=array("secret"=>array("COLANDB_TG_BOT_TOKEN"=>""),"channels"=>CTI_Config::channels_text(CTI_Config::get("channels"))); CTI_Admin::save_settings();' >/dev/null
+ok "saving with an empty box keeps the saved value" $([ "$(nev 'echo CTI_Config::bot_token();')" = "9876543210:AAtesttokenvaluefromsettings0123456789" ] && echo 1 || echo 0)
+nev 'wp_set_current_user(1); $_GET["tab"]="settings"; ob_start(); CTI_Admin::render(); echo ob_get_clean();' > $T/settings.html
+ok "the Settings page shows 'Saved' but never the values" $(grep -q 'Saved ✓' $T/settings.html && ! grep -q -e 'AAtesttokenvalue' -e 'sk-ant-pastedkey' -e "$W1" $T/settings.html && echo 1 || echo 0)
+nev 'echo wp_json_encode(cti_diagnostics(false));' > $T/diag.json
+ok "diagnostics report sources and queue counts, never secret values" $(grep -q '"bot_token":"settings"' $T/diag.json && grep -q '"posts":{' $T/diag.json && ! grep -q -e 'AAtesttokenvalue' -e 'sk-ant-pastedkey' -e "$W1" $T/diag.json && echo 1 || echo 0)
+ok "wp-config or environment values win over Settings" $([ "$(ev 'echo CTI_Config::secret_source("COLANDB_TG_BOT_TOKEN");')" = environment ] && echo 1 || echo 0)
+nev 'wp_set_current_user(1); $_POST=array("clear_secret"=>array("COLANDB_TG_BOT_TOKEN"=>"1"),"channels"=>CTI_Config::channels_text(CTI_Config::get("channels"))); CTI_Admin::save_settings();' >/dev/null
+ok "Remove clears a saved secret" $([ "$(nev 'echo CTI_Config::bot_token()==="" ? 1 : 0;')" = 1 ] && echo 1 || echo 0)
+nev 'delete_option("cti_secrets");' >/dev/null
 ev 'foreach (get_posts(array("post_type"=>"cec_event","post_status"=>"any","numberposts"=>-1,"fields"=>"ids","meta_key"=>"_cec_intake_source_url")) as $id) wp_delete_post($id,true);' >/dev/null
 rm -f wp-content/mu-plugins/cti-test.php
 ev '$s=get_option("cec_settings",array()); $s["auto_publish"]=0; update_option("cec_settings",$s);' >/dev/null

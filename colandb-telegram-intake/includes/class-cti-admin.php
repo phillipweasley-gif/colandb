@@ -282,7 +282,30 @@ final class CTI_Admin {
 		$s = CTI_Config::all();
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		wp_nonce_field( 'cti_action' );
-		echo '<input type="hidden" name="action" value="cti_action"><input type="hidden" name="do" value="settings"><table class="form-table">';
+		echo '<input type="hidden" name="action" value="cti_action"><input type="hidden" name="do" value="settings">';
+		echo '<h2>Secrets</h2><p>Paste a value and save. Saved values are never shown again; paste a new one to replace it.</p><table class="form-table">';
+		$secret_rows = array(
+			'COLANDB_TG_BOT_TOKEN'         => array( 'Telegram bot token', 'From @BotFather (looks like 123456789:AAE…).' ),
+			'COLANDB_INTAKE_ANTHROPIC_KEY' => array( 'Claude API key', 'From console.anthropic.com (starts with sk-ant-).' ),
+		);
+		foreach ( $secret_rows as $name => $row ) {
+			$src = CTI_Config::secret_source( $name );
+			echo '<tr><th><label for="' . esc_attr( $name ) . '">' . esc_html( $row[0] ) . '</label></th><td>';
+			if ( in_array( $src, array( 'wp-config', 'environment' ), true ) ) {
+				echo '<p><strong>Set in ' . esc_html( 'wp-config' === $src ? 'wp-config.php' : 'the server environment' ) . '.</strong> Change it there.</p>';
+			} else {
+				echo '<p>' . ( $src ? '<strong style="color:#008a20;">Saved ✓</strong>' : '<strong style="color:#b32d2e;">Not set</strong>' ) . '</p>';
+				echo '<input type="password" class="regular-text" id="' . esc_attr( $name ) . '" name="secret[' . esc_attr( $name ) . ']" value="" autocomplete="new-password" spellcheck="false" placeholder="' . esc_attr( $src ? 'Paste a new value to replace it' : 'Paste it here' ) . '">';
+				if ( $src ) {
+					echo ' <label><input type="checkbox" name="clear_secret[' . esc_attr( $name ) . ']" value="1"> Remove</label>';
+				}
+				echo '<p class="description">' . esc_html( $row[1] ) . '</p>';
+			}
+			echo '</td></tr>';
+		}
+		$wsrc = CTI_Config::secret_source( 'COLANDB_TG_WEBHOOK_SECRET' );
+		echo '<tr><th>Webhook secret</th><td><p>' . ( $wsrc ? '<strong style="color:#008a20;">Set ✓</strong> (' . esc_html( 'settings' === $wsrc ? 'made by this site' : ( 'wp-config' === $wsrc ? 'in wp-config.php' : 'in the server environment' ) ) . ')' : 'Made automatically when you connect the webhook.' ) . '</p><p class="description">Nobody needs to type this one. Only Telegram and this site use it.</p></td></tr>';
+		echo '</table><h2>Channels and reading</h2><table class="form-table">';
 		echo '<tr><th>Approved channels</th><td><textarea name="channels" rows="6" class="large-text code">' . esc_textarea( CTI_Config::channels_text( $s['channels'] ) ) . '</textarea>';
 		echo '<p class="description">One channel per line: <code>channel ID or @username | use flyers (yes/no) | label</code>, e.g. <code>-1001234567890 | yes | Kink 101</code>. Prefer the numeric ID (it never changes). Posts from any other chat are ignored. A post\'s flyer becomes the event image unless the line says "no" (use "no" for a channel that hasn\'t agreed to share its flyers).</p>';
 		$unknown = get_option( 'cti_unknown_chats', array() );
@@ -329,9 +352,9 @@ final class CTI_Admin {
 
 	private static function render_status() {
 		$rows = array(
-			'Bot token (COLANDB_TG_BOT_TOKEN)'               => CTI_Config::bot_token() ? 'set' : 'missing',
-			'Webhook secret (COLANDB_TG_WEBHOOK_SECRET)'     => strlen( CTI_Config::webhook_secret() ) >= 32 ? 'set' : 'missing or shorter than 32 characters',
-			'Claude API key (COLANDB_INTAKE_ANTHROPIC_KEY)'  => CTI_Config::anthropic_key() ? 'set' : 'missing',
+			'Bot token'                                      => CTI_Config::bot_token() ? 'set (' . CTI_Config::secret_source( 'COLANDB_TG_BOT_TOKEN' ) . ')' : 'missing: add it under Settings',
+			'Webhook secret'                                 => strlen( CTI_Config::webhook_secret() ) >= 32 ? 'set (' . CTI_Config::secret_source( 'COLANDB_TG_WEBHOOK_SECRET' ) . ')' : 'made when you connect the webhook',
+			'Claude API key'                                 => CTI_Config::anthropic_key() ? 'set (' . CTI_Config::secret_source( 'COLANDB_INTAKE_ANTHROPIC_KEY' ) . ')' : 'missing: add it under Settings',
 			'Calendar plugin'                                => cti_calendar_ready() ? 'ready (' . CEC_VERSION . ')' : 'needs Community Events Calendar ' . CTI_MIN_CEC_VERSION . '+',
 			'Webhook address'                                => CTI_Receiver::webhook_url(),
 			'Next scheduled run'                             => wp_next_scheduled( CTI_Processor::HOOK ) ? gmdate( 'Y-m-d H:i:s', wp_next_scheduled( CTI_Processor::HOOK ) ) . ' UTC' : 'not scheduled',
@@ -404,9 +427,12 @@ final class CTI_Admin {
 				$msg  = 'Queued. It will be processed within a few minutes.';
 				break;
 			case 'settings':
-				self::save_settings();
-				$back = self::url( array( 'tab' => 'settings' ) );
-				$msg  = 'Settings saved.';
+				$problems = self::save_settings();
+				$back     = self::url( array( 'tab' => 'settings' ) );
+				$msg      = 'Settings saved.';
+				if ( $problems ) {
+					$r = new WP_Error( 'cti_secret', 'Settings saved, except: ' . implode( ' ', $problems ) );
+				}
 				break;
 			case 'set_webhook':
 				$r    = CTI_Telegram::set_webhook( CTI_Receiver::webhook_url() );
@@ -429,8 +455,30 @@ final class CTI_Admin {
 		exit;
 	}
 
-	private static function save_settings() {
+	/** Public for the test kit; handle() checks the capability and nonce first. */
+	public static function save_settings() {
 		// phpcs:disable WordPress.Security.NonceVerification.Missing -- checked in handle().
+		$problems = array();
+		foreach ( array( 'COLANDB_TG_BOT_TOKEN', 'COLANDB_INTAKE_ANTHROPIC_KEY' ) as $name ) {
+			if ( in_array( CTI_Config::secret_source( $name ), array( 'wp-config', 'environment' ), true ) ) {
+				continue;
+			}
+			if ( ! empty( $_POST['clear_secret'][ $name ] ) ) {
+				CTI_Config::save_secret( $name, '' );
+				CTI_Log::add( 0, 0, 'secret_removed', $name . ' removed by user #' . get_current_user_id() );
+				continue;
+			}
+			$value = isset( $_POST['secret'][ $name ] ) ? trim( (string) wp_unslash( $_POST['secret'][ $name ] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- checked by valid_secret(), never output.
+			if ( '' === $value ) {
+				continue;
+			}
+			if ( CTI_Config::valid_secret( $name, $value ) ) {
+				CTI_Config::save_secret( $name, $value );
+				CTI_Log::add( 0, 0, 'secret_saved', $name . ' saved by user #' . get_current_user_id() );
+			} else {
+				$problems[] = 'COLANDB_TG_BOT_TOKEN' === $name ? 'That bot token does not look right (it should look like 123456789:AAE…). It was not saved.' : 'That Claude API key does not look right (it should start with sk-ant-). It was not saved.';
+			}
+		}
 		$s                  = CTI_Config::all();
 		$s['channels']      = CTI_Config::parse_channels( isset( $_POST['channels'] ) ? sanitize_textarea_field( wp_unslash( $_POST['channels'] ) ) : '' );
 		$s['dry_run']       = ! empty( $_POST['dry_run'] );
@@ -457,5 +505,6 @@ final class CTI_Admin {
 		$s['image_types']              = array_values( array_intersect( $types, array( 'image/jpeg', 'image/png', 'image/webp' ) ) );
 		// phpcs:enable
 		update_option( CTI_Config::OPTION, $s, false );
+		return $problems;
 	}
 }

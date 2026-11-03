@@ -35,6 +35,11 @@ final class CTI_CLI {
 		}
 	}
 
+	/** Everything cti_diagnostics() reports, as JSON. */
+	public function diagnose() {
+		WP_CLI::line( wp_json_encode( cti_diagnostics(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
+	}
+
 	/** @subcommand set-webhook */
 	public function set_webhook( $args, $assoc ) {
 		$url = isset( $assoc['url'] ) ? $assoc['url'] : CTI_Receiver::webhook_url();

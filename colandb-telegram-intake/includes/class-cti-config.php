@@ -2,9 +2,10 @@
 /**
  * Settings and secrets.
  *
- * Secrets never live in the database or the repository. They are read
- * from wp-config.php constants or, failing that, environment variables
- * with the same names (the host's secret manager):
+ * Secrets never live in the repository. They are read, in this order,
+ * from wp-config.php constants, environment variables with the same names
+ * (the host's secret manager), or the Secrets boxes in Settings (0.2.0,
+ * option cti_secrets, not autoloaded, never shown again after saving):
  *
  *   COLANDB_TG_BOT_TOKEN          Telegram bot token from @BotFather
  *   COLANDB_TG_WEBHOOK_SECRET     random 32+ characters, A-Z a-z 0-9 _ -
@@ -22,12 +23,79 @@ final class CTI_Config {
 
 	const OPTION = 'cti_settings';
 
+	const SECRETS = 'cti_secrets';
+
+	/** Secrets that may be typed into the Settings page. */
+	const SETTABLE = array( 'COLANDB_TG_BOT_TOKEN', 'COLANDB_TG_WEBHOOK_SECRET', 'COLANDB_INTAKE_ANTHROPIC_KEY' );
+
 	public static function secret( $name ) {
 		if ( defined( $name ) ) {
 			return (string) constant( $name );
 		}
 		$value = getenv( $name );
-		return false === $value ? '' : trim( (string) $value );
+		if ( false !== $value && '' !== trim( (string) $value ) ) {
+			return trim( (string) $value );
+		}
+		if ( in_array( $name, self::SETTABLE, true ) ) {
+			$saved = get_option( self::SECRETS, array() );
+			return is_array( $saved ) && isset( $saved[ $name ] ) ? (string) $saved[ $name ] : '';
+		}
+		return '';
+	}
+
+	/** Where a secret comes from: wp-config, environment, settings, or '' (not set). */
+	public static function secret_source( $name ) {
+		if ( defined( $name ) ) {
+			return 'wp-config';
+		}
+		$value = getenv( $name );
+		if ( false !== $value && '' !== trim( (string) $value ) ) {
+			return 'environment';
+		}
+		$saved = get_option( self::SECRETS, array() );
+		return is_array( $saved ) && ! empty( $saved[ $name ] ) ? 'settings' : '';
+	}
+
+	/** Saves (or, with '', clears) a secret typed into Settings. */
+	public static function save_secret( $name, $value ) {
+		if ( ! in_array( $name, self::SETTABLE, true ) ) {
+			return;
+		}
+		$saved = get_option( self::SECRETS, array() );
+		$saved = is_array( $saved ) ? $saved : array();
+		if ( '' === $value ) {
+			unset( $saved[ $name ] );
+		} else {
+			$saved[ $name ] = $value;
+		}
+		if ( false === get_option( self::SECRETS, false ) ) {
+			add_option( self::SECRETS, $saved, '', 'no' );
+		} else {
+			update_option( self::SECRETS, $saved, false );
+		}
+	}
+
+	/**
+	 * The webhook secret only has to match between this site and Telegram,
+	 * so nobody needs to type it: one is made the first time it's needed.
+	 */
+	public static function ensure_webhook_secret() {
+		if ( strlen( self::webhook_secret() ) < 32 && ! self::secret_source( 'COLANDB_TG_WEBHOOK_SECRET' ) ) {
+			self::save_secret( 'COLANDB_TG_WEBHOOK_SECRET', wp_generate_password( 64, false, false ) );
+		}
+		return self::webhook_secret();
+	}
+
+	public static function valid_secret( $name, $value ) {
+		switch ( $name ) {
+			case 'COLANDB_TG_BOT_TOKEN':
+				return (bool) preg_match( '/^\d{6,12}:[A-Za-z0-9_-]{30,64}$/', $value );
+			case 'COLANDB_INTAKE_ANTHROPIC_KEY':
+				return (bool) preg_match( '/^sk-ant-[A-Za-z0-9_-]{10,200}$/', $value );
+			case 'COLANDB_TG_WEBHOOK_SECRET':
+				return (bool) preg_match( '/^[A-Za-z0-9_-]{32,256}$/', $value );
+		}
+		return false;
 	}
 
 	public static function bot_token() {
