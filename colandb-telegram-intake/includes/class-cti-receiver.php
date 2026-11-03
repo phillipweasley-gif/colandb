@@ -27,6 +27,15 @@ final class CTI_Receiver {
 	public static function routes() {
 		register_rest_route(
 			self::NAMESPACE_,
+			'/run',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( __CLASS__, 'run_now' ),
+				'permission_callback' => array( __CLASS__, 'check_run_key' ),
+			)
+		);
+		register_rest_route(
+			self::NAMESPACE_,
 			'/telegram',
 			array(
 				'methods'             => 'POST',
@@ -34,6 +43,70 @@ final class CTI_Receiver {
 				'permission_callback' => array( __CLASS__, 'check_secret' ),
 			)
 		);
+	}
+
+	/* ------------------------------------------------------------------
+	 * Processing right away (0.3.2), without waiting for WP-Cron
+	 * ---------------------------------------------------------------- */
+
+	/** Key for the internal /run call: derived from the webhook secret, never stored. */
+	private static function run_key() {
+		return hash_hmac( 'sha256', 'cti-run', CTI_Config::webhook_secret() );
+	}
+
+	public static function check_run_key( $request ) {
+		$given = (string) $request->get_header( 'X-CTI-Run-Key' );
+		return strlen( CTI_Config::webhook_secret() ) >= 32 && '' !== $given && hash_equals( self::run_key(), $given )
+			? true
+			: new WP_Error( 'cti_forbidden', 'Forbidden.', array( 'status' => 401 ) );
+	}
+
+	/**
+	 * After a new or edited post is stored, the site calls itself (without
+	 * waiting for the answer) to process it once the album wait has passed.
+	 * WP-Cron stays as the backup. Only one of these waits at a time.
+	 */
+	public static function kick() {
+		if ( ! apply_filters( 'cti_process_on_arrival', true ) || get_transient( 'cti_kick_waiting' ) ) {
+			return;
+		}
+		set_transient( 'cti_kick_waiting', 1, 5 * MINUTE_IN_SECONDS );
+		wp_remote_post(
+			rest_url( self::NAMESPACE_ . '/run' ),
+			array(
+				'blocking'  => false,
+				'timeout'   => 1,
+				'headers'   => array( 'X-CTI-Run-Key' => self::run_key() ),
+				'sslverify' => apply_filters( 'https_local_ssl_verify', false ),
+			)
+		);
+	}
+
+	public static function run_now() {
+		ignore_user_abort( true );
+		if ( function_exists( 'set_time_limit' ) ) {
+			@set_time_limit( 600 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		}
+		nocache_headers();
+		$done = 0;
+		// Up to 4 rounds, so posts that arrive while this one waits are
+		// picked up too.
+		for ( $round = 0; $round < 4; $round++ ) {
+			$due = CTI_Processor::next_due_in();
+			if ( $due < 0 ) {
+				break;
+			}
+			if ( $due > 0 ) {
+				sleep( min( $due + 2, 120 ) );
+			}
+			$done += CTI_Processor::run( 0, 120 );
+		}
+		delete_transient( 'cti_kick_waiting' );
+		// Something arrived during the last round: start another.
+		if ( CTI_Processor::next_due_in() >= 0 ) {
+			self::kick();
+		}
+		return rest_ensure_response( array( 'ok' => true, 'processed' => $done ) );
 	}
 
 	/** Telegram sends the secret in X-Telegram-Bot-Api-Secret-Token. */
@@ -56,6 +129,9 @@ final class CTI_Receiver {
 		}
 		$update = $request->get_json_params();
 		$result = is_array( $update ) ? self::receive( $update ) : 'invalid';
+		if ( in_array( $result, array( 'stored', 'edited' ), true ) ) {
+			self::kick();
+		}
 		// Always 200 once the secret matched: anything else makes Telegram
 		// re-send the same update, which helps nobody.
 		return rest_ensure_response( array( 'ok' => true, 'result' => $result ) );

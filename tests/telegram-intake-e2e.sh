@@ -53,6 +53,8 @@ mkdir -p wp-content/mu-plugins
 cat > wp-content/mu-plugins/cti-test.php <<'PHP'
 <?php
 add_filter( 'cti_album_wait', function () { return 0; } );
+// The test runs the queue itself, except in the "right away" checks.
+add_filter( 'cti_process_on_arrival', function () { return (bool) get_option( 'cti_test_on_arrival' ); } );
 // The test runs the queue itself; WP-Cron firing on page loads would race it.
 if ( ! defined( 'DISABLE_WP_CRON' ) ) { define( 'DISABLE_WP_CRON', true ); }
 PHP
@@ -279,6 +281,17 @@ ok "the same member's flyer in another topic is a separate post" $([ "$(pstat $G
 run
 ok "the joined post is read once, with its flyer" $([ "$(q "SELECT COUNT(*) FROM ${P}cti_entries e JOIN ${P}cti_posts p ON p.id=e.post_id WHERE p.chat_id='$G' AND p.message_id IN (330,331)")" = 1 ] && grep 'grpcomp' $T/anthropic.log | grep -v grpcomp2 | tail -1 | grep -q '"images":1' && echo 1 || echo 0)
 
+echo "== 0.3.2: processed right away, without WP-Cron"
+ev 'update_option("cti_test_on_arrival", 1); delete_transient("cti_kick_waiting");' >/dev/null
+deliver channel_post $C1 - 500 "Right away FX:arrival1" >/dev/null
+for i in $(seq 1 20); do [ "$(pstat $C1 500)" = done ] && break; sleep 1; done
+ok "a new post is processed within seconds, with WP-Cron off" $([ "$(pstat $C1 500)" = done ] && [ "$(entry e.status $C1 500)" = submitted ] && echo 1 || echo 0)
+deliver channel_post $C1 - 501 "Second one FX:arrival2" >/dev/null
+for i in $(seq 1 20); do [ "$(pstat $C1 501)" = done ] && break; sleep 1; done
+ok "the next post is processed right away too" $([ "$(pstat $C1 501)" = done ] && echo 1 || echo 0)
+ok "the internal run address refuses calls without its key" $([ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$H/?rest_route=/colandb-intake/v1/run")" = 401 ] && [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-CTI-Run-Key: wrong' "$H/?rest_route=/colandb-intake/v1/run")" = 401 ] && echo 1 || echo 0)
+ev 'delete_option("cti_test_on_arrival"); delete_transient("cti_kick_waiting");' >/dev/null
+
 echo "== Secrets in Settings (0.2.0) and diagnostics"
 NE="env -u COLANDB_TG_BOT_TOKEN -u COLANDB_TG_WEBHOOK_SECRET -u COLANDB_INTAKE_ANTHROPIC_KEY"
 nev() { $NE php $S/wp-cli.phar --allow-root eval "$1" 2>&1; }
@@ -302,7 +315,7 @@ nev 'wp_set_current_user(1); $_POST=array("clear_secret"=>array("COLANDB_TG_BOT_
 ok "Remove clears a saved secret" $([ "$(nev 'echo CTI_Config::bot_token()==="" ? 1 : 0;')" = 1 ] && echo 1 || echo 0)
 nev 'delete_option("cti_secrets");' >/dev/null
 ev 'foreach (get_posts(array("post_type"=>"cec_event","post_status"=>"any","numberposts"=>-1,"fields"=>"ids","meta_key"=>"_cec_intake_source_url")) as $id) wp_delete_post($id,true);' >/dev/null
-rm -f wp-content/mu-plugins/cti-test.php
+rm -f wp-content/mu-plugins/cti-test.php; ev 'delete_option("cti_test_on_arrival");' >/dev/null
 ev '$s=get_option("cec_settings",array()); $s["auto_publish"]=0; update_option("cec_settings",$s);' >/dev/null
 pkill -f "php -S 127.0.0.1:8898" 2>/dev/null
 echo "== $PASS passed, $FAIL failed"

@@ -2,6 +2,20 @@
 
 Versions follow semver: PATCH = fixes, MINOR = features.
 
+## 0.3.2
+
+**Posts are processed as soon as they arrive** (owner, 2026-11-03: "Yes", to making the bot independent of the site's background timer). On colandb.com, WP-Cron is switched off (`DISABLE_WP_CRON`) and the host's server cron had stopped: every scheduled job was over an hour late, so new posts waited in the queue.
+
+- After the webhook stores a new or edited post, the site calls itself (`POST /wp-json/colandb-intake/v1/run`, without waiting for the answer). That call waits out the album wait (90 seconds) and then processes the queue. Posts that arrive meanwhile are picked up in up to 4 rounds; only one such call waits at a time.
+- The internal call needs a key derived from the webhook secret (`X-CTI-Run-Key`, an HMAC; never stored) and only starts processing.
+- WP-Cron stays as the backup, and still handles timed retries.
+- Filter `cti_process_on_arrival` (default true) turns this off.
+
+**Verified** in the local WordPress kit with WP-Cron off: `tests/telegram-intake-e2e.sh` 100/100. The 3 new checks:
+- a new post is processed within seconds;
+- so is the next one;
+- the run address refuses calls without the key.
+
 ## 0.3.1
 
 **Fix: the real Claude API refused the reading request** (found on colandb.com, 2026-11-03, with the first real test post: "Claude API 400: The compiled grammar is too large"). The strict structured-output schema (26 fields, each with value, confidence, evidence and source) is too large for the API to compile. The test kit's fake Claude didn't check this.
