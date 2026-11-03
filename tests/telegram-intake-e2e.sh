@@ -59,6 +59,9 @@ add_filter( 'cti_process_on_arrival', function () { return (bool) get_option( 'c
 if ( ! defined( 'DISABLE_WP_CRON' ) ) { define( 'DISABLE_WP_CRON', true ); }
 PHP
 for t in Social Themed Educational; do $W term create cec_event_type $t >/dev/null 2>&1; done
+VENUES_CLEAN='foreach (get_terms(array("taxonomy"=>"cec_venue","hide_empty"=>false)) as $t) { if (get_term_meta($t->term_id,"cec_created_by_intake",true) || in_array($t->name, array("Leather Stallion Saloon"), true)) wp_delete_term($t->term_id,"cec_venue"); }'
+ev "$VENUES_CLEAN" >/dev/null
+ev '$t=wp_insert_term("Leather Stallion Saloon","cec_venue"); update_term_meta($t["term_id"],"cec_address","2205 St Clair Ave NE, Cleveland, OH 44114");' >/dev/null
 ev 'CTI_Install::create_tables(); global $wpdb; foreach (array("posts","entries","updates","log") as $t) $wpdb->query("DELETE FROM ".CTI_Install::table($t)); delete_option("cti_unknown_chats"); $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE \"cti_lock_%\" OR option_name LIKE \"_transient_cti_alert_%\"");' >/dev/null
 ev 'foreach (get_posts(array("post_type"=>"cec_event","post_status"=>"any","numberposts"=>-1,"fields"=>"ids","meta_key"=>"_cec_intake_source_url")) as $id) wp_delete_post($id,true);' >/dev/null
 ev 'update_option("cti_settings", array_merge(CTI_Config::defaults(), array("channels"=>CTI_Config::parse_channels("-1001111111111 | no | Test Channel\n@flyerchan | | Flyer Channel\n-1002222222222 | no\n-1005555555555 | yes | Test Group | topics: 275, 573\n-1006666666666 | no | Admin Group | admins"), "dry_run"=>false, "notify_emails"=>"editor@example.com", "max_attempts"=>3, "max_submissions_per_hour"=>500)));' >/dev/null
@@ -96,7 +99,8 @@ E1=$(entry event_id $C1 10)
 ok "entry submitted and linked to an event" $([ "$(entry e.status $C1 10)" = submitted ] && [ "$E1" -gt 0 ] && echo 1 || echo 0)
 ok "the event is pending (auto-publish is on and still ignored)" $([ "$(ev "echo get_post_status($E1);")" = pending ] && echo 1 || echo 0)
 ok "start, end and time mode" $([ "$(meta $E1 _cec_start)|$(meta $E1 _cec_end)|$(meta $E1 _cec_time_mode)" = "$(date -u -d '+30 days' +%F)T20:00|$(date -u -d '+30 days' +%F)T23:00|exact" ] && echo 1 || echo 0)
-ok "paid \$15, in person, venue text, organizer, ticket link (external RSVP)" $([ "$(meta $E1 _cec_admission_status)|$(meta $E1 _cec_price_amount)|$(meta $E1 _cec_location_mode)|$(meta $E1 _cec_venue_custom_city)|$(meta $E1 _cec_host_org_name)|$(meta $E1 _cec_rsvp_mode)" = "paid|15|in_person|Columbus|Columbus Leather Collective|external" ] && echo 1 || echo 0)
+ok "paid \$15, in person, organizer, ticket link (external RSVP)" $([ "$(meta $E1 _cec_admission_status)|$(meta $E1 _cec_price_amount)|$(meta $E1 _cec_location_mode)|$(meta $E1 _cec_host_org_name)|$(meta $E1 _cec_rsvp_mode)" = "paid|15|in_person|Columbus Leather Collective|external" ] && echo 1 || echo 0)
+ok "a new venue is created from the post (name, address, city) and linked" $([ "$(ev "\$t=wp_get_post_terms($E1,'cec_venue'); echo \$t ? \$t[0]->name.'|'.get_term_meta(\$t[0]->term_id,'cec_address',true).'|'.get_term_meta(\$t[0]->term_id,'cec_city',true) : 'none';")" = "The Toolbox Saloon|744 N High St|Columbus" ] && [ -z "$(meta $E1 _cec_venue_custom_address)" ] && ev "echo implode('|',get_post_meta($E1,'_cec_intake_notes',true));" | grep -q 'New venue "The Toolbox Saloon" was created' && echo 1 || echo 0)
 ok "event type set from an existing term only" $(ev "echo implode(',', wp_get_post_terms($E1,'cec_event_type',array('fields'=>'names')));" | grep -qx Social && echo 1 || echo 0)
 ok "source post kept: _cec_source_url and the description's Source link" $([ "$(meta $E1 _cec_source_url)" = "https://t.me/c/1111111111/10" ] && ev "echo get_post_field('post_content',$E1);" | grep -q 'Source: <a href="https://t.me/c/1111111111/10">Telegram: Test Channel</a>' && echo 1 || echo 0)
 ok "editor notes stored and shown in the event preview" $(ev "echo CEC_Event_Helper::render_editor_preview($E1);" | grep -q 'Imported automatically from a Telegram post' && echo 1 || echo 0)
@@ -292,6 +296,25 @@ ok "the next post is processed right away too" $([ "$(pstat $C1 501)" = done ] &
 ok "the internal run address refuses calls without its key" $([ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$H/?rest_route=/colandb-intake/v1/run")" = 401 ] && [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-CTI-Run-Key: wrong' "$H/?rest_route=/colandb-intake/v1/run")" = 401 ] && echo 1 || echo 0)
 ev 'delete_option("cti_test_on_arrival"); delete_transient("cti_kick_waiting");' >/dev/null
 
+echo "== 0.4.0: saved venues"
+vname() { ev "\$t=wp_get_post_terms($1,'cec_venue'); echo \$t ? \$t[0]->name : 'none';"; }
+vcount() { ev "echo count(get_terms(array('taxonomy'=>'cec_venue','hide_empty'=>false,'name'=>'$1')));"; }
+deliver channel_post $C1 - 700 "Stallion social FX:stallion" >/dev/null; run; EV=$(entry event_id $C1 700)
+ok "'The Leather Stallion' links to the saved 'Leather Stallion Saloon' (no new venue)" $([ "$(vname $EV)" = "Leather Stallion Saloon" ] && [ "$(vcount 'The Leather Stallion')" = 0 ] && ev "echo implode('|',get_post_meta($EV,'_cec_intake_notes',true));" | grep -q 'Linked to the saved venue "Leather Stallion Saloon" (same name)' && echo 1 || echo 0)
+ok "the event shows the venue's address and is listed as 'Venue — City'" $(ev "\$d=CEC_Event_Helper::data($EV); echo \$d['address'];" | grep -q '2205 St Clair Ave NE' && echo 1 || echo 0)
+deliver channel_post $C1 - 701 "Different name, same address FX:stallion_addr" >/dev/null; run; EV=$(entry event_id $C1 701)
+ok "a different name at the same street address links to the same venue" $([ "$(vname $EV)" = "Leather Stallion Saloon" ] && ev "echo implode('|',get_post_meta($EV,'_cec_intake_notes',true));" | grep -q 'same street address' && echo 1 || echo 0)
+deliver channel_post $C1 - 702 "Same name, other city FX:toolbox_cleveland" >/dev/null; run; EV=$(entry event_id $C1 702)
+ok "the same name in another city is a new venue, named with its city" $([ "$(vname $EV)" = "The Toolbox Saloon (Cleveland)" ] && [ "$(vcount 'The Toolbox Saloon')" = 1 ] && echo 1 || echo 0)
+EB=$(entry event_id $C1 52)
+ok "a later post at a venue the bot created links to it (no second copy)" $([ "$(vname $EB)" = "The Toolbox Saloon" ] && [ "$(vcount 'The Toolbox Saloon')" = 1 ] && echo 1 || echo 0)
+deliver channel_post $C1 - 703 "Moving night FX:venuea" >/dev/null; run; EV=$(entry event_id $C1 703)
+deliver edited_channel_post $C1 - 703 "Moving night, new place FX:venueb" >/dev/null; run
+ok "an edit that changes the venue (still pending) links the new venue" $([ "$(vname $EV)" = "Venue Beta" ] && [ "$(ev "echo get_post_status($EV);")" = pending ] && echo 1 || echo 0)
+EO=$(entry event_id $C1 32)
+ok "an online event gets no venue" $([ "$(vname $EO)" = none ] && echo 1 || echo 0)
+ok "dry run created no venue" $([ "$(vcount 'Hall race6')" = 0 ] && echo 1 || echo 0)
+
 echo "== Secrets in Settings (0.2.0) and diagnostics"
 NE="env -u COLANDB_TG_BOT_TOKEN -u COLANDB_TG_WEBHOOK_SECRET -u COLANDB_INTAKE_ANTHROPIC_KEY"
 nev() { $NE php $S/wp-cli.phar --allow-root eval "$1" 2>&1; }
@@ -315,6 +338,7 @@ nev 'wp_set_current_user(1); $_POST=array("clear_secret"=>array("COLANDB_TG_BOT_
 ok "Remove clears a saved secret" $([ "$(nev 'echo CTI_Config::bot_token()==="" ? 1 : 0;')" = 1 ] && echo 1 || echo 0)
 nev 'delete_option("cti_secrets");' >/dev/null
 ev 'foreach (get_posts(array("post_type"=>"cec_event","post_status"=>"any","numberposts"=>-1,"fields"=>"ids","meta_key"=>"_cec_intake_source_url")) as $id) wp_delete_post($id,true);' >/dev/null
+ev "$VENUES_CLEAN" >/dev/null
 rm -f wp-content/mu-plugins/cti-test.php; ev 'delete_option("cti_test_on_arrival");' >/dev/null
 ev '$s=get_option("cec_settings",array()); $s["auto_publish"]=0; update_option("cec_settings",$s);' >/dev/null
 pkill -f "php -S 127.0.0.1:8898" 2>/dev/null

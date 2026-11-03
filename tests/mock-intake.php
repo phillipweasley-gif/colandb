@@ -167,6 +167,16 @@ function fixture( $name ) {
 			return $one( ev( basic( array( 'title' => 'Leather Social Night (new time)', 'start_time' => '21:00' ) ) ) );
 		case 'basic_edited2':
 			return $one( ev( basic( array( 'title' => 'Leather Social Night (new time)', 'start_time' => '21:30', 'admission' => array( 'paid', '$20' ), 'price_amount' => array( '20', '$20' ) ) ) ) );
+		case 'stallion':
+			return $one( ev( array( 'title' => 'Stallion Social', 'start_date' => d( 75 ), 'start_time' => '20:00', 'location_mode' => 'in_person', 'venue_name' => 'The Leather Stallion', 'city' => 'Cleveland', 'region' => 'OH' ) ) );
+		case 'stallion_addr':
+			return $one( ev( array( 'title' => 'Address Match Night', 'start_date' => d( 76 ), 'start_time' => '20:00', 'location_mode' => 'in_person', 'venue_name' => 'Stallion Bar & Grill', 'address' => '2205 Saint Clair Avenue', 'city' => 'Cleveland' ) ) );
+		case 'toolbox_cleveland':
+			return $one( ev( array( 'title' => 'Toolbox North', 'start_date' => d( 77 ), 'start_time' => '20:00', 'location_mode' => 'in_person', 'venue_name' => 'The Toolbox Saloon', 'address' => '100 Lake Ave', 'city' => 'Cleveland', 'region' => 'OH' ) ) );
+		case 'venuea':
+			return $one( ev( array( 'title' => 'Venue Move Night', 'start_date' => d( 78 ), 'start_time' => '20:00', 'location_mode' => 'in_person', 'venue_name' => 'Venue Alpha', 'address' => '1 Alpha St', 'city' => 'Columbus', 'region' => 'OH' ) ) );
+		case 'venueb':
+			return $one( ev( array( 'title' => 'Venue Move Night', 'start_date' => d( 78 ), 'start_time' => '20:00', 'location_mode' => 'in_person', 'venue_name' => 'Venue Beta', 'address' => '2 Beta St', 'city' => 'Columbus', 'region' => 'OH' ) ) );
 		case 'nodate':
 			return $one( ev( array( 'title' => 'Gear Swap', 'short_description' => 'Bring gear to swap.' ) ) );
 		case 'flyer':

@@ -6,6 +6,20 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.48.0
+
+**Saved venues for the intake API** (owner, 2026-11-03: the Telegram bot should use saved venues "if they're present and if it doesn't exist check for it and then create it").
+
+- **`cec_intake_find_venue( $args )`** (name, address, city, region) returns a saved venue that is the same place, with the reason:
+  - **Same name** apart from generic words: "The Leather Stallion" = "Leather Stallion Saloon", "AWOL" = "AWOL Bar". Ignored words are *the*, *saloon*, *bar*, *pub*, *club*, *lounge*, *hall* and similar.
+  - **Same street address** (house number and street, "Saint" = "St").
+  - **Ruled out:** a known, different city. If two venues fit equally, none is chosen.
+- **`cec_intake_create_venue( $args )`** saves a new venue with its address, city, region and country, marked `cec_created_by_intake`. A name already in use gets the city added: "The Toolbox Saloon (Cleveland)".
+- **Linking.** `cec_intake_create_event()` and `cec_intake_update_event()` accept `venue_term_id`. They link the venue and clear the event's typed-in address and city, so the venue's own details show ("Venue — City, State").
+- `cec_intake_event_fields()` now includes `venue_term_id`.
+
+**Verified** in the local WordPress kit through the intake plugin: `tests/telegram-intake-e2e.sh` 109/109, including 9 venue checks.
+
 ## 1.47.1
 
 **Fix: events with no end time were missing from the calendar** (owner, 2026-11-03: "I published the events but they're not showing in the calendar"; "If there's no end time there needs to be a filler or placeholder for it as TBD so it shows. Or however we can make that happen.").

@@ -2,6 +2,29 @@
 
 Versions follow semver: PATCH = fixes, MINOR = features.
 
+## 0.4.0
+
+**Events are linked to saved venues, and new venues are created** (owner, 2026-11-03: "It should if they're present and if it doesn't exist check for it and then create it").
+
+- **Linking.** When an in-person or hybrid event is submitted, its venue is looked up among the site's saved venues with `cec_intake_find_venue()` (Community Events Calendar 1.48.0). Matches are by name (allowing "The", "Saloon", "Bar" and so on) or by street address; a different city rules a match out. The event is linked, so it shows "Venue — City, State" with the venue's address and map, and the note says "Linked to the saved venue … (same name)".
+- **Creating.** If there's no match, a new venue is created from the post (name, address, city, state, country) and linked. The note says "New venue … was created from this post. Check its address under Events → Venues", and the log records it. A name already in use in another city becomes "Name (City)".
+- **Not linked or created:**
+  - online events;
+  - an uncertain venue name (noted);
+  - two equally likely venues (noted);
+  - dry run, and entries waiting in the review queue. Editors' "Create pending event" does link venues.
+- **Edits.** A source edit that changes the venue of a still-pending event links the new venue, unless an editor has already picked a different one (noted instead).
+- Without Community Events Calendar 1.48.0, the typed-in venue text is kept, as before.
+
+**Verified** in the local WordPress kit: `tests/telegram-intake-e2e.sh` 109/109. The 9 new venue checks:
+- a new venue created with its address and city;
+- "The Leather Stallion" linked to the saved "Leather Stallion Saloon";
+- a different name at the same street address linked;
+- the same name in another city made a new "(City)" venue;
+- a later post at a created venue reuses it;
+- a venue change in an edit relinks;
+- online events get none, and dry run creates none.
+
 ## 0.3.2
 
 **Posts are processed as soon as they arrive** (owner, 2026-11-03: "Yes", to making the bot independent of the site's background timer). On colandb.com, WP-Cron is switched off (`DISABLE_WP_CRON`) and the host's server cron had stopped: every scheduled job was over an hour late, so new posts waited in the queue.
