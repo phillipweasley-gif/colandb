@@ -242,6 +242,11 @@ final class CTI_Receiver {
 			'body'           => wp_check_invalid_utf8( mb_substr( $text, 0, 10000 ) ),
 			'links'          => self::links( $text, $entities ),
 			'photo'          => $photo,
+			// Kept for a few minutes only (a transient), to join a flyer and
+			// its text sent as two messages by the same person. A salted hash:
+			// the sender's Telegram ID is never stored.
+			'sender'         => hash_hmac( 'sha256', (string) ( isset( $msg['from']['id'] ) ? $msg['from']['id'] : ( isset( $msg['sender_chat']['id'] ) ? $msg['sender_chat']['id'] : $chat_id ) ), wp_salt( 'auth' ) ),
+			'thread'         => ! empty( $msg['is_topic_message'] ) && isset( $msg['message_thread_id'] ) ? (int) $msg['message_thread_id'] : 0,
 		);
 	}
 
@@ -289,10 +294,13 @@ final class CTI_Receiver {
 		if ( $existing && $existing['group_parent'] ) {
 			$parent = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $t WHERE id = %d", (int) $existing['group_parent'] ), ARRAY_A );
 		}
+		if ( ! $existing && ! $parent && ! $is_edit && ! $row['media_group'] ) {
+			$parent = self::companion( $row );
+		}
 
 		if ( $parent ) {
 			if ( ! $existing ) {
-				$wpdb->insert( $t, self::db_row( $row, array( 'group_parent' => (int) $parent['id'], 'status' => 'merged', 'reason' => 'Part of an album; processed with post #' . (int) $parent['id'], 'created_at' => $now ) ) );
+				$wpdb->insert( $t, self::db_row( $row, array( 'group_parent' => (int) $parent['id'], 'status' => 'merged', 'reason' => ( $row['media_group'] ? 'Part of an album' : 'Sent with post #' . (int) $parent['id'] . ' (flyer and text as two messages)' ) . '; processed with post #' . (int) $parent['id'], 'created_at' => $now ) ) );
 			} else {
 				$wpdb->update( $t, array( 'body' => $row['body'], 'edit_date' => $row['edit_date'], 'updated_at' => $now, 'last_update_id' => $row['last_update_id'] ), array( 'id' => (int) $existing['id'] ) );
 			}
@@ -314,6 +322,7 @@ final class CTI_Receiver {
 			if ( ! $ok ) {
 				return 'duplicate';
 			}
+			set_transient( 'cti_sender_' . (int) $wpdb->insert_id, $row['sender'] . '|' . $row['thread'], 5 * MINUTE_IN_SECONDS );
 			CTI_Log::add( (int) $wpdb->insert_id, 0, 'received', $is_edit ? 'First seen as an edit.' : '' );
 			CTI_Processor::schedule_soon();
 			return 'stored';
@@ -321,6 +330,34 @@ final class CTI_Receiver {
 
 		$photos = self::merge_photo( json_decode( (string) $existing['photos'], true ), $row['photo'], $row['message_id'] );
 		return self::save_changes( $existing, $row['body'], $row['links'], $photos, $row, true );
+	}
+
+	/**
+	 * A flyer and its text often arrive as two messages: a photo with no
+	 * caption, then the text, or the other way round. When the same sender
+	 * posts the other half in the same chat and topic within 90 seconds,
+	 * they are treated as one post (like an album).
+	 */
+	private static function companion( $row ) {
+		global $wpdb;
+		$has_text  = '' !== trim( (string) $row['body'] );
+		$has_photo = (bool) $row['photo'];
+		if ( $has_text === $has_photo ) {
+			return null; // Already complete (text and photo), or neither.
+		}
+		$t    = CTI_Install::table( 'posts' );
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $t WHERE chat_id = %s AND group_parent = 0 AND media_group = '' AND created_at >= %s ORDER BY id DESC LIMIT 5", $row['chat_id'], gmdate( 'Y-m-d H:i:s', time() - 90 ) ), ARRAY_A );
+		foreach ( $rows as $cand ) {
+			if ( get_transient( 'cti_sender_' . (int) $cand['id'] ) !== $row['sender'] . '|' . $row['thread'] ) {
+				continue;
+			}
+			$cand_text  = '' !== trim( (string) $cand['body'] );
+			$cand_photo = (bool) json_decode( (string) $cand['photos'], true );
+			if ( ( $has_photo && $cand_text && ! $cand_photo ) || ( $has_text && $cand_photo && ! $cand_text ) ) {
+				return $cand;
+			}
+		}
+		return null;
 	}
 
 	private static function save_changes( $post, $body, $links, $photos, $row, $is_edit ) {

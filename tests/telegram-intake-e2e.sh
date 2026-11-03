@@ -59,7 +59,7 @@ PHP
 for t in Social Themed Educational; do $W term create cec_event_type $t >/dev/null 2>&1; done
 ev 'CTI_Install::create_tables(); global $wpdb; foreach (array("posts","entries","updates","log") as $t) $wpdb->query("DELETE FROM ".CTI_Install::table($t)); delete_option("cti_unknown_chats"); $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE \"cti_lock_%\" OR option_name LIKE \"_transient_cti_alert_%\"");' >/dev/null
 ev 'foreach (get_posts(array("post_type"=>"cec_event","post_status"=>"any","numberposts"=>-1,"fields"=>"ids","meta_key"=>"_cec_intake_source_url")) as $id) wp_delete_post($id,true);' >/dev/null
-ev 'update_option("cti_settings", array_merge(CTI_Config::defaults(), array("channels"=>CTI_Config::parse_channels("-1001111111111 | no | Test Channel\n@flyerchan | | Flyer Channel\n-1002222222222 | no\n-1005555555555 | yes | Test Group | topics: 275, 573\n-1006666666666 | no | Admin Group | admins"), "dry_run"=>false, "notify_emails"=>"editor@example.com", "max_attempts"=>3)));' >/dev/null
+ev 'update_option("cti_settings", array_merge(CTI_Config::defaults(), array("channels"=>CTI_Config::parse_channels("-1001111111111 | no | Test Channel\n@flyerchan | | Flyer Channel\n-1002222222222 | no\n-1005555555555 | yes | Test Group | topics: 275, 573\n-1006666666666 | no | Admin Group | admins"), "dry_run"=>false, "notify_emails"=>"editor@example.com", "max_attempts"=>3, "max_submissions_per_hour"=>500)));' >/dev/null
 ev '$s=get_option("cec_settings",array()); $s["auto_publish"]=1; update_option("cec_settings",$s);' >/dev/null
 ok "test setup: the calendar's auto-publish setting is on (intake must ignore it)" $(ev 'echo CEC_Admin_Settings::get("auto_publish") ? 1 : 0;')
 
@@ -101,7 +101,7 @@ ok "editor notes stored and shown in the event preview" $(ev "echo CEC_Event_Hel
 ok "the calendar's audit log records the intake" $([ "$(q "SELECT COUNT(*) FROM ${P}cec_event_log WHERE event_id=$E1 AND action='event_intake_created'")" = 1 ] && echo 1 || echo 0)
 ok "one email to the configured editor, with the event link" $([ $(( $(mails) - M0 )) = 1 ] && tail -1 wp-content/mail.log | grep -q 'editor@example.com' && tail -1 wp-content/mail.log | grep -q "post=$E1" && echo 1 || echo 0)
 A=$(tail -1 $T/anthropic.log)
-ok "Claude request: key header, API version, structured output, fallbacks, effort set" $(echo "$A" | grep -q '"HTTP_X_API_KEY":"sk-ant-test-key-0123456789"' && echo "$A" | grep -q '"HTTP_ANTHROPIC_VERSION":"2026-10-21"' && echo "$A" | grep -q '"format":"json_schema"' && echo "$A" | grep -q '"fallbacks":"default"' && echo "$A" | grep -q '"effort":"medium"' && echo 1 || echo 0)
+ok "Claude request: key header, API version, fallbacks, effort set" $(echo "$A" | grep -q '"HTTP_X_API_KEY":"sk-ant-test-key-0123456789"' && echo "$A" | grep -q '"HTTP_ANTHROPIC_VERSION":"2026-10-21"' && echo "$A" | grep -q '"fallbacks":"default"' && echo "$A" | grep -q '"effort":"medium"' && echo 1 || echo 0)
 ok "the post text is wrapped as untrusted data" $(echo "$A" | grep -q 'telegram_post' && echo 1 || echo 0)
 
 echo "== A flyer (image only) is read; image reuse follows the channel setting"
@@ -259,6 +259,25 @@ r=$(gdeliver message -1007777777777 320 0 42 "Not listed FX:grpeight")
 ok "a group not on the list is ignored; its ID and type are listed" $(echo "$r" | grep -q not_allowed && ev 'echo wp_json_encode(get_option("cti_unknown_chats"));' | grep -q '"type":"supergroup"' && echo 1 || echo 0)
 ok "the allowlist line with topics and admins reads back the same" $([ "$(ev 'echo CTI_Config::channels_text(CTI_Config::parse_channels("-1003923571403 | yes | COL&B group | topics: 129, 275, 573\n-1000000001 | no | x | admins"));')" = "$(printf -- '-1003923571403 | yes | COL&B group | topics: 129, 275, 573\n-1000000001 | no | x | admins')" ] && echo 1 || echo 0)
 ok "the webhook asks Telegram for group messages too" $(ev 'echo implode(",", CTI_Receiver::UPDATE_TYPES);' | grep -q 'channel_post,edited_channel_post,message,edited_message' && echo 1 || echo 0)
+
+echo "== 0.3.1: reply format and a flyer sent apart from its text"
+A=$(tail -1 $T/anthropic.log)
+ok "the request asks for JSON in the instructions (no structured-output schema)" $(echo "$A" | grep -q '"format":""' && echo 1 || echo 0)
+deliver channel_post $C1 - 400 "Fenced reply FX:race7_fenced" >/dev/null; run
+ok "a reply wrapped in a sentence and code fences is still read" $([ "$(entry e.status $C1 400)" = submitted ] && echo 1 || echo 0)
+gdeliver message $G 330 275 42 "Bootcamp night details FX:grpcomp" >/dev/null
+r=$(gdeliver message $G 331 275 42 "" '{"photo":[{"file_id":"flyer2","file_unique_id":"c1","file_size":4000,"width":400,"height":300}]}')
+ok "a flyer sent right after its text by the same member joins that post" $([ "$(pstat $G 331)" = merged ] && [ "$(q "SELECT photos FROM ${P}cti_posts WHERE chat_id='$G' AND message_id=330" | grep -o file_id | wc -l)" = 1 ] && echo 1 || echo 0)
+r=$(gdeliver message $G 332 275 43 "" '{"photo":[{"file_id":"flyer1","file_unique_id":"c2","file_size":5000,"width":400,"height":300}]}')
+ok "a photo from someone else is not joined to it" $([ "$(pstat $G 332)" = received ] && echo 1 || echo 0)
+gdeliver message $G 333 573 42 "" '{"photo":[{"file_id":"flyer1","file_unique_id":"c3","file_size":5000,"width":400,"height":300}]}' >/dev/null
+gdeliver message $G 334 573 42 "Text after the flyer FX:grpcomp2" >/dev/null
+ok "text sent right after a flyer joins the flyer's post" $([ "$(pstat $G 334)" = merged ] && [ "$(q "SELECT body FROM ${P}cti_posts WHERE chat_id='$G' AND message_id=333")" = "Text after the flyer FX:grpcomp2" ] && echo 1 || echo 0)
+gdeliver message $G 336 573 44 "Only text here FX:grpsep" >/dev/null
+gdeliver message $G 337 275 44 "" '{"photo":[{"file_id":"flyer1","file_unique_id":"c4","file_size":5000,"width":400,"height":300}]}' >/dev/null
+ok "the same member's flyer in another topic is a separate post" $([ "$(pstat $G 336)" = received ] && [ "$(pstat $G 337)" = received ] && echo 1 || echo 0)
+run
+ok "the joined post is read once, with its flyer" $([ "$(q "SELECT COUNT(*) FROM ${P}cti_entries e JOIN ${P}cti_posts p ON p.id=e.post_id WHERE p.chat_id='$G' AND p.message_id IN (330,331)")" = 1 ] && grep 'grpcomp' $T/anthropic.log | grep -v grpcomp2 | tail -1 | grep -q '"images":1' && echo 1 || echo 0)
 
 echo "== Secrets in Settings (0.2.0) and diagnostics"
 NE="env -u COLANDB_TG_BOT_TOKEN -u COLANDB_TG_WEBHOOK_SECRET -u COLANDB_INTAKE_ANTHROPIC_KEY"
