@@ -792,6 +792,30 @@ class CEC_Event_Helper {
 		ob_start();
 		?>
 		<div class="cec-editor-preview">
+			<?php
+			// 1.47.0: notes from the Telegram intake (CEC_Intake_API).
+			$intake_notes   = array_filter( (array) get_post_meta( $post_id, '_cec_intake_notes', true ) );
+			$intake_sources = array_filter( (array) get_post_meta( $post_id, '_cec_intake_source_url' ) );
+			if ( $intake_notes || $intake_sources ) :
+				?>
+				<div class="cec-notice cec-notice-error cec-intake-notes">
+					<p><strong><?php esc_html_e( 'Imported automatically from a Telegram post. Check everything before approving, especially:', 'cec' ); ?></strong></p>
+					<?php if ( $intake_notes ) : ?>
+						<ul style="margin:0;">
+							<?php foreach ( $intake_notes as $intake_note ) : ?>
+								<li><?php echo esc_html( $intake_note ); ?></li>
+							<?php endforeach; ?>
+						</ul>
+					<?php endif; ?>
+					<?php if ( $intake_sources ) : ?>
+						<p><?php esc_html_e( 'Source posts:', 'cec' ); ?>
+							<?php foreach ( $intake_sources as $intake_source ) : ?>
+								<a href="<?php echo esc_url( $intake_source ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( $intake_source ); ?></a>
+							<?php endforeach; ?>
+						</p>
+					<?php endif; ?>
+				</div>
+			<?php endif; ?>
 			<?php if ( ! empty( $duplicates ) ) : ?>
 				<div class="cec-notice cec-notice-error">
 					<p><strong><?php esc_html_e( 'Possible duplicate events found nearby in time:', 'cec' ); ?></strong></p>
@@ -854,52 +878,55 @@ class CEC_Event_Helper {
 	 * legacy fields (title/excerpt/venue/etc.) exactly as before; this only
 	 * covers the new Phase 1a meta.
 	 */
-	public static function save_phase1a_fields( $post_id ) {
-		$time_mode = isset( $_POST['cec_time_mode'] ) ? sanitize_key( wp_unslash( $_POST['cec_time_mode'] ) ) : 'exact';
+	public static function save_phase1a_fields( $post_id, $source = null ) {
+		// 1.47.0: $source lets code (the intake API) save through the same
+		// checks as the forms. It is read like $_POST, so pass it slashed.
+		$in = null === $source ? $_POST : (array) $source; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$time_mode = isset( $in['cec_time_mode'] ) ? sanitize_key( wp_unslash( $in['cec_time_mode'] ) ) : 'exact';
 		update_post_meta( $post_id, '_cec_time_mode', in_array( $time_mode, self::TIME_MODES, true ) ? $time_mode : 'exact' );
 
-		if ( isset( $_POST['cec_timezone'] ) ) {
-			$tz = sanitize_text_field( wp_unslash( $_POST['cec_timezone'] ) );
+		if ( isset( $in['cec_timezone'] ) ) {
+			$tz = sanitize_text_field( wp_unslash( $in['cec_timezone'] ) );
 			update_post_meta( $post_id, '_cec_timezone', self::is_valid_timezone( $tz ) ? $tz : '' );
 		}
 
-		$admission     = isset( $_POST['cec_admission_status'] ) ? sanitize_key( wp_unslash( $_POST['cec_admission_status'] ) ) : 'not_posted';
+		$admission     = isset( $in['cec_admission_status'] ) ? sanitize_key( wp_unslash( $in['cec_admission_status'] ) ) : 'not_posted';
 		$admission     = in_array( $admission, self::ADMISSION_STATES, true ) ? $admission : 'not_posted';
 		$old_admission = self::admission_status( $post_id );
 		update_post_meta( $post_id, '_cec_admission_status', $admission );
 		update_post_meta( $post_id, '_cec_is_free', 'free_confirmed' === $admission ? '1' : '0' );
-		update_post_meta( $post_id, '_cec_price_amount', isset( $_POST['cec_price_amount'] ) ? sanitize_text_field( wp_unslash( $_POST['cec_price_amount'] ) ) : '' );
-		update_post_meta( $post_id, '_cec_price_min', isset( $_POST['cec_price_min'] ) ? sanitize_text_field( wp_unslash( $_POST['cec_price_min'] ) ) : '' );
-		update_post_meta( $post_id, '_cec_price_max', isset( $_POST['cec_price_max'] ) ? sanitize_text_field( wp_unslash( $_POST['cec_price_max'] ) ) : '' );
-		$currency = ! empty( $_POST['cec_price_currency'] ) ? strtoupper( sanitize_text_field( wp_unslash( $_POST['cec_price_currency'] ) ) ) : 'USD';
+		update_post_meta( $post_id, '_cec_price_amount', isset( $in['cec_price_amount'] ) ? sanitize_text_field( wp_unslash( $in['cec_price_amount'] ) ) : '' );
+		update_post_meta( $post_id, '_cec_price_min', isset( $in['cec_price_min'] ) ? sanitize_text_field( wp_unslash( $in['cec_price_min'] ) ) : '' );
+		update_post_meta( $post_id, '_cec_price_max', isset( $in['cec_price_max'] ) ? sanitize_text_field( wp_unslash( $in['cec_price_max'] ) ) : '' );
+		$currency = ! empty( $in['cec_price_currency'] ) ? strtoupper( sanitize_text_field( wp_unslash( $in['cec_price_currency'] ) ) ) : 'USD';
 		update_post_meta( $post_id, '_cec_price_currency', $currency );
-		if ( isset( $_POST['cec_price_source_url'] ) ) {
-			update_post_meta( $post_id, '_cec_price_source_url', esc_url_raw( wp_unslash( $_POST['cec_price_source_url'] ) ) );
+		if ( isset( $in['cec_price_source_url'] ) ) {
+			update_post_meta( $post_id, '_cec_price_source_url', esc_url_raw( wp_unslash( $in['cec_price_source_url'] ) ) );
 		}
 		delete_post_meta( $post_id, '_cec_price_needs_review' );
 		if ( $old_admission !== $admission ) {
 			CEC_Audit_Log::log( $post_id, 'admission_changed', $old_admission . ' → ' . $admission );
 		}
 
-		$location_mode = isset( $_POST['cec_location_mode'] ) ? sanitize_key( wp_unslash( $_POST['cec_location_mode'] ) ) : 'in_person';
+		$location_mode = isset( $in['cec_location_mode'] ) ? sanitize_key( wp_unslash( $in['cec_location_mode'] ) ) : 'in_person';
 		update_post_meta( $post_id, '_cec_location_mode', in_array( $location_mode, self::LOCATION_MODES, true ) ? $location_mode : 'in_person' );
-		if ( isset( $_POST['cec_online_url'] ) ) {
-			update_post_meta( $post_id, '_cec_online_url', esc_url_raw( wp_unslash( $_POST['cec_online_url'] ) ) );
+		if ( isset( $in['cec_online_url'] ) ) {
+			update_post_meta( $post_id, '_cec_online_url', esc_url_raw( wp_unslash( $in['cec_online_url'] ) ) );
 		}
 		foreach ( array( 'cec_venue_custom_city' => '_cec_venue_custom_city', 'cec_venue_custom_region' => '_cec_venue_custom_region', 'cec_venue_custom_country' => '_cec_venue_custom_country' ) as $post_key => $meta_key ) {
-			if ( isset( $_POST[ $post_key ] ) ) {
-				update_post_meta( $post_id, $meta_key, sanitize_text_field( wp_unslash( $_POST[ $post_key ] ) ) );
+			if ( isset( $in[ $post_key ] ) ) {
+				update_post_meta( $post_id, $meta_key, sanitize_text_field( wp_unslash( $in[ $post_key ] ) ) );
 			}
 		}
 
-		if ( isset( $_POST['cec_official_website_url'] ) ) {
-			update_post_meta( $post_id, '_cec_official_website_url', esc_url_raw( wp_unslash( $_POST['cec_official_website_url'] ) ) );
+		if ( isset( $in['cec_official_website_url'] ) ) {
+			update_post_meta( $post_id, '_cec_official_website_url', esc_url_raw( wp_unslash( $in['cec_official_website_url'] ) ) );
 		}
-		if ( isset( $_POST['cec_source_url'] ) ) {
-			update_post_meta( $post_id, '_cec_source_url', esc_url_raw( wp_unslash( $_POST['cec_source_url'] ) ) );
+		if ( isset( $in['cec_source_url'] ) ) {
+			update_post_meta( $post_id, '_cec_source_url', esc_url_raw( wp_unslash( $in['cec_source_url'] ) ) );
 		}
-		if ( isset( $_POST['cec_photo_alt'] ) ) {
-			$alt = sanitize_text_field( wp_unslash( $_POST['cec_photo_alt'] ) );
+		if ( isset( $in['cec_photo_alt'] ) ) {
+			$alt = sanitize_text_field( wp_unslash( $in['cec_photo_alt'] ) );
 			update_post_meta( $post_id, '_cec_photo_alt', $alt );
 			$thumb_id = get_post_thumbnail_id( $post_id );
 			if ( $thumb_id ) {

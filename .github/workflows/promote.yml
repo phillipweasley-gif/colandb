@@ -14,6 +14,7 @@ on:
           - community-member-planning
           - colandb-updater
           - cmp-hosting-check
+          - colandb-telegram-intake
       version:
         description: Version (e.g. 1.26.1)
         required: true

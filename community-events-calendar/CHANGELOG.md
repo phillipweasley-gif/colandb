@@ -6,6 +6,30 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.47.0
+
+**Intake API for the Telegram event intake** (owner, 2026-11-03: a Telegram-to-calendar intake bot that submits events "for editorial review. Do not publish events publicly without human approval"). The calendar had no way for code to add an event except its five forms, so this is the smallest addition that lets the new `colandb-telegram-intake` plugin use the calendar's own rules. New `includes/class-cec-intake-api.php`:
+
+- **`cec_intake_create_event( $fields )`** creates a **pending** event only. Nothing it does can publish, whatever the auto-publish setting says: it checks the status again before returning. It applies the same checks as the forms:
+  - the allowed admission, location and time values;
+  - IANA timezones;
+  - existing Event Type terms only;
+  - plain price amounts, and "paid" can't be 0;
+  - http(s) links only, checked by format without a DNS lookup;
+  - `Y-m-d\TH:i` dates.
+- **`cec_intake_update_event( $id, $fields )`** changes only the fields given, and only while the event is pending or in review. Once it's published, scheduled, private or rejected (draft), the update is refused and the caller must send it to an editor.
+- **`cec_intake_add_source( $id, $url, $note )`** records another source post on an event (`_cec_intake_source_url`, one row per source; `_cec_source_url` keeps the first). It changes nothing else.
+- **`cec_intake_event_fields()`** and **`cec_intake_candidates()`** let the intake's duplicate check see every event except trashed ones (published, pending, rejected, past, cancelled), by date window or by any link on file.
+- **Editor notes.** `_cec_intake_notes` and the source links show above the event preview in wp-admin and on the dashboard edit screen ("Imported automatically from a Telegram post. Check everything before approving…").
+- **Shared save routine.** `CEC_Event_Helper::save_phase1a_fields( $post_id, $source = null )` now accepts the fields as an array (read like `$_POST`, so slashed), so the API saves through exactly the forms' code. With no second argument it behaves as before.
+- **Audit log.** New entries "Submitted by the Telegram intake", "Updated from an edited source post" and "Another source post linked". Action labels are now filterable (`cec_audit_action_labels`).
+
+**Verified** in the local WordPress kit:
+- `tests/telegram-intake-e2e.sh`: 63/63, exercising the API through the intake plugin, including pending-only with auto-publish on, refused updates after publishing, and several sources on one event;
+- regression suites: import 30/30, ends 18/18, series 13/13, recurrence 5/5, form-cache 36/36.
+
+No month-view change, so no snapshot comparison was needed.
+
 ## 1.46.1
 
 **Pages with forms are never cached, and an expired form still works for signed-out visitors** (found on colandb.com, 2026-10-21: the host's CDN, Elementor Hosting, sends `cache-control: public, max-age=300, s-maxage=604800` and served `/log-in-3/`, `/create-an-account-3/`, `/volunteer/` and `/submit-organization/` from its cache, `ec-cdn-status: hit`, query strings included).

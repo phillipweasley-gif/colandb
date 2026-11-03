@@ -91,6 +91,7 @@ class CEC_Audit_Log {
 			'event_ics_resynced'  => __( 'Re-synced from a calendar file', 'cec' ),
 			'admission_changed'   => __( 'Admission/price changed', 'cec' ),
 		);
+		$labels = (array) apply_filters( 'cec_audit_action_labels', $labels );
 		return isset( $labels[ $action ] ) ? $labels[ $action ] : $action;
 	}
 

@@ -99,6 +99,7 @@ As of 1.22.0, the *logic* for saving and displaying the newer Phase 1a fields (a
 The separate member-planning plugin (Phase 2/3) reads events only through these, and this plugin never reads member data:
 
 - `cec_get_public_event( $id )` / `cec_get_public_events( $ids )` (`CEC_Public_API`): allow-listed public fields for a **published** event, `null` otherwise. Do not add editorial or RSVP fields to `CEC_Public_API::FIELDS`. Bump `CEC_PUBLIC_API_VERSION` if a key is removed or changes meaning.
+- **Intake API (1.47.0, `CEC_Intake_API`):** `cec_intake_create_event()` (pending only), `cec_intake_update_event()` (pending/in review only), `cec_intake_add_source()`, `cec_intake_event_fields()`, `cec_intake_candidates()`. Used by the separate `colandb-telegram-intake` plugin. It saves through `CEC_Event_Helper::save_phase1a_fields( $post_id, $source )`, the forms' own code. Editor notes live in `_cec_intake_notes`, extra sources in `_cec_intake_source_url`.
 - `CEC_Month_Grid::render( $month, $year, $items, $options )`: the month-view layout with no query of its own. The public calendar feeds it from `CEC_Shortcodes::render_month_html()`. Any change to the month view's markup now goes in `CEC_Month_Grid`, and affects the member plugin's calendars too.
 
 ## 3. Full feature / shortcode reference
