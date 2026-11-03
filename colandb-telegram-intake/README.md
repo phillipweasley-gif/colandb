@@ -45,19 +45,27 @@ The bot sees new posts and edits from that point on. It does not see older posts
 
 Then add the channel to the **allowlist** (section 4). Posts from a channel the bot is in but which isn't on the list are ignored. Its ID shows under Settings → "Recently ignored", so you can copy it.
 
-## 3. Secrets and environment variables
+## 3. Secrets
 
-Secrets are read from `wp-config.php` constants or, if not defined there, from environment variables with the same names. They are never stored in the database or this repository. See `.env.example` for the list.
+The plugin needs a **bot token** and a **Claude API key**. It also uses a **webhook secret**, which it makes itself.
 
-On Elementor Hosting, add them to `wp-config.php` above `/* That's all, stop editing! */`:
+**Easiest: paste them in wp-admin.**
+1. Go to Events → Telegram Intake → **Settings**.
+2. Paste the bot token in **Telegram bot token**.
+3. Paste the Claude key in **Claude API key**.
+4. Click **Save settings**. Each box then says "Saved ✓". The values are never shown again.
+
+**Or in wp-config.php** (these win over Settings). Add above `/* That's all, stop editing! */`:
 
 ```php
 define( 'COLANDB_TG_BOT_TOKEN', '123456789:AA…' );                  // from BotFather
-define( 'COLANDB_TG_WEBHOOK_SECRET', '…' );                         // openssl rand -hex 32
+define( 'COLANDB_TG_WEBHOOK_SECRET', '…' );                         // optional: openssl rand -hex 32
 define( 'COLANDB_INTAKE_ANTHROPIC_KEY', 'sk-ant-…' );               // Claude API key (console.anthropic.com)
 ```
 
-- **Webhook secret:** 32–256 characters of `A-Z a-z 0-9 _ -` (the output of `openssl rand -hex 32` is fine). Telegram sends it with every delivery in the `X-Telegram-Bot-Api-Secret-Token` header, and the site refuses any request without it.
+Environment variables with the same names also work (see `.env.example`). The secrets are never stored in this repository.
+
+**Webhook secret:** 32–256 characters of `A-Z a-z 0-9 _ -` (the output of `openssl rand -hex 32` is fine). Telegram sends it with every delivery in the `X-Telegram-Bot-Api-Secret-Token` header, and the site refuses any request without it.
 - **Claude API key:** create one under a workspace with a spend limit, used only for this. If it's missing, use the "Text patterns only" reader: no images, and everything waits for an editor.
 
 **WordPress account:** no application password or extra account is needed, because the plugin runs inside WordPress and calls the calendar's PHP functions directly. Nothing can create events over HTTP: the only public route is the webhook, which only stores posts in the queue, and only with the secret. Optionally create a plain **Subscriber** user ("Telegram intake") and enter its ID as "Author for submitted events" so imported events are easy to filter. It needs no capabilities.
@@ -216,6 +224,7 @@ Telegram's own IDs are unique too: one queue row per channel + message, and an u
 | Nothing arrives | Connection tab: "Last delivery error". Is the bot an admin of the channel? Is the channel on the allowlist (see "Recently ignored")? Is the webhook connected? |
 | 401 in the delivery error | The webhook secret in `wp-config.php` changed; click **Connect webhook** again. |
 | Posts stay "received" | WP-Cron: "Next scheduled run" on the Connection tab; **Process the queue now**. |
+| Not sure what's wrong | `cti_diagnostics()` (or `wp colandb-intake diagnose`): versions, secret sources, Telegram's view of the webhook, queue counts, recent problems. |
 | Posts go to "retry" | The reason column: Claude overloaded (retries by itself), bad API key (fix, then **Process this post again**), calendar plugin inactive. |
 | Everything is "Needs details" | The Text patterns reader is selected, or the API key is missing. |
 | Duplicates not caught / too many | Duplicate threshold in Settings (higher = fewer flags). |

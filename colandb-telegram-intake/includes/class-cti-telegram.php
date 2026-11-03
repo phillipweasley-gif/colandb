@@ -74,7 +74,7 @@ final class CTI_Telegram {
 	}
 
 	public static function set_webhook( $url, $drop_pending = false ) {
-		$secret = CTI_Config::webhook_secret();
+		$secret = CTI_Config::ensure_webhook_secret();
 		if ( ! preg_match( '/^[A-Za-z0-9_-]{32,256}$/', $secret ) ) {
 			return new WP_Error( 'cti_secret', __( 'COLANDB_TG_WEBHOOK_SECRET must be 32-256 characters of A-Z, a-z, 0-9, _ and -.', 'cti' ) );
 		}

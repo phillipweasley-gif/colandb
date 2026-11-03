@@ -2,6 +2,34 @@
 
 Versions follow semver: PATCH = fixes, MINOR = features.
 
+## 0.2.0
+
+**Secrets can be pasted in Settings, and one call reports the bot's health** (owner, 2026-11-03: "Do settings boxes and fill them on this initial setup"; "I need you to be able to control and troubleshoot the bot").
+
+- **Secrets boxes.**
+  - Settings now has boxes for the **Telegram bot token** and the **Claude API key**. A saved value is never shown again: the page says "Saved ✓", and a new paste replaces it. **Remove** clears it.
+  - A value that doesn't look right (a token not shaped like `123456789:AAE…`, a key not starting `sk-ant-`) is refused with a clear message.
+  - Stored in the `cti_secrets` option, not autoloaded.
+  - wp-config.php constants and environment variables still win; Settings then shows "Set in wp-config.php".
+- **Webhook secret made automatically.** It's created when the plugin is activated, or on first connect: 64 random characters, made once. Nobody has to type it.
+- **`cti_diagnostics()`** (and `wp colandb-intake diagnose`) reports, read-only:
+  - the plugin and calendar versions;
+  - where each secret comes from (never the value);
+  - the settings;
+  - what Telegram says about the bot and webhook: address, pending updates, last delivery error;
+  - queue counts, the last 10 problems and log entries, and ignored channels.
+
+  This is what a Claude session uses through the site connection to troubleshoot without ever seeing the token.
+- The Connection tab shows where each secret comes from.
+
+**Verified** in the local WordPress kit: `tests/telegram-intake-e2e.sh` 73/73. The 10 new checks:
+- missing secrets reported;
+- webhook secret made once, not autoloaded;
+- a wrong token refused;
+- token and key saved and used, an empty box keeping the saved value, Remove clearing it;
+- the Settings page and diagnostics never containing a value;
+- wp-config and environment values winning over Settings.
+
 ## 0.1.0
 
 **First version** (owner, 2026-11-03: "a Telegram-to-calendar event intake bot … monitor a specific, administrator-approved list of Telegram channels … submit the results to the COL&B WordPress event calendar for editorial review. Do not publish events publicly without human approval.").

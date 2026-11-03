@@ -22,6 +22,7 @@ final class CTI_Install {
 	public static function activate() {
 		self::create_tables();
 		CTI_Processor::schedule();
+		CTI_Config::ensure_webhook_secret();
 	}
 
 	public static function deactivate() {
