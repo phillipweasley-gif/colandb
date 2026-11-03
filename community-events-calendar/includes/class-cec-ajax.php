@@ -13,7 +13,8 @@ class CEC_Ajax {
 		check_ajax_referer( 'cec_frontend', 'nonce' );
 		$month = isset( $_POST['month'] ) ? absint( $_POST['month'] ) : (int) date_i18n( 'n' );
 		$year  = isset( $_POST['year'] ) ? absint( $_POST['year'] ) : (int) date_i18n( 'Y' );
-		wp_send_json_success( array( 'html' => CEC_Shortcodes::render_month_html( $month, $year ) ) );
+		$location = CEC_Locations::filter_from( $_POST );
+		wp_send_json_success( array( 'html' => CEC_Shortcodes::render_month_html( $month, $year, 0, $location ) ) );
 	}
 
 	public static function filter_events() {

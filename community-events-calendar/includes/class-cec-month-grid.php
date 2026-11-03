@@ -210,6 +210,16 @@ class CEC_Month_Grid {
 			<button type="button" class="cec-cal-nav cec-cal-next" data-month="<?php echo esc_attr( date( 'n', $next_ts ) ); ?>" data-year="<?php echo esc_attr( date( 'Y', $next_ts ) ); ?>" aria-label="<?php echo esc_attr( sprintf( __( 'Next month, %s', 'cec' ), date_i18n( 'F Y', $next_ts ) ) ); ?>">&rarr;</button>
 			<button type="button" class="cec-cal-today-btn" data-month="<?php echo esc_attr( date_i18n( 'n' ) ); ?>" data-year="<?php echo esc_attr( date_i18n( 'Y' ) ); ?>" data-date="<?php echo esc_attr( date_i18n( 'Y-m-d' ) ); ?>"<?php echo $is_current_month ? '' : ' data-jump="1"'; ?>><?php esc_html_e( 'Today', 'cec' ); ?></button>
 		</div>
+		<?php
+		// 1.49.0: the grid and the selected day's list sit side by side
+		// when the calendar is wide enough (a container query in
+		// frontend.css), with the list on the right; narrower, the list
+		// stays below the grid as before.
+		ksort( $events_by_date );
+		$selected_date = $is_current_month ? date_i18n( 'Y-m-d' ) : ( $events_by_date ? key( $events_by_date ) : date_i18n( 'Y-m-d', $first_of_month ) );
+		?>
+		<div class="cec-cal-layout" data-selected="<?php echo esc_attr( $selected_date ); ?>">
+		<div class="cec-cal-layout-inner">
 		<div class="cec-cal-grid-wrap">
 		<div class="cec-cal-grid cec-cal-dow">
 			<?php
@@ -373,20 +383,20 @@ class CEC_Month_Grid {
 			</div>
 		<?php endforeach; ?>
 		</div>
+		<div class="cec-cal-day-detail" hidden>
+			<h3 class="cec-cal-day-detail-heading"></h3>
+			<ul class="cec-cal-day-detail-list"></ul>
+		</div>
+		</div>
+		</div>
 		<?php
 		// Small screens (below 700px, CSS only) get a compact month grid
 		// with a tapped-day list instead of the grid above: the whole month
 		// on one screen, rather than the 1.24.0 day-by-day agenda, which ran
 		// to ~22 phone screens for October 2026's overlapping weekends.
-		ksort( $events_by_date );
-		$selected_date = $is_current_month ? date_i18n( 'Y-m-d' ) : ( $events_by_date ? key( $events_by_date ) : date_i18n( 'Y-m-d', $first_of_month ) );
 		echo self::render_phone( $weeks, $month, $year, $multi_day_events, $events_by_date, $selected_date, $is_current_month ? date_i18n( 'Y-m-d' ) : '', $first_weekday ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside.
 		?>
 		<script type="application/json" class="cec-cal-data"><?php echo wp_json_encode( self::plain_payload( $events_by_date ) ); // phpcs:ignore ?></script>
-		<div class="cec-cal-day-detail" hidden>
-			<h3 class="cec-cal-day-detail-heading"></h3>
-			<ul class="cec-cal-day-detail-list"></ul>
-		</div>
 		<?php
 		return ob_get_clean();
 	}
