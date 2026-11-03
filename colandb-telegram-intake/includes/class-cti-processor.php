@@ -23,7 +23,7 @@ final class CTI_Processor {
 	const HOOK         = 'cti_process';
 	const CLEANUP_HOOK = 'cti_cleanup';
 	const BACKOFF      = array( 300, 900, 3600, 10800, 43200 );
-	const DEBOUNCE     = 45; // Seconds to wait for the rest of an album.
+	const DEBOUNCE     = 90; // Seconds to wait for the rest of an album, or a flyer's text sent separately.
 	const REOPEN       = array( 'new', 'needs_info', 'possible_duplicate', 'dry_run', 'waiting' );
 
 	/** Images read for the post being processed: [ bytes, mime ][] */
@@ -527,7 +527,7 @@ final class CTI_Processor {
 		if ( function_exists( 'finfo_open' ) ) {
 			$fi   = finfo_open( FILEINFO_MIME_TYPE );
 			$mime = (string) finfo_buffer( $fi, $bytes );
-			finfo_close( $fi );
+			unset( $fi ); // Freed automatically (finfo_close() is deprecated in PHP 8.5).
 		}
 		$size = function_exists( 'getimagesizefromstring' ) ? @getimagesizefromstring( $bytes ) : false; // phpcs:ignore WordPress.PHP.NoSilencedErrors
 		if ( ! $size || ! in_array( $mime, (array) CTI_Config::get( 'image_types' ), true ) || $size['mime'] !== $mime ) {

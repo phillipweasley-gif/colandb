@@ -94,8 +94,12 @@ if ( '/v1/messages' === $path ) {
 		echo json_encode( array( 'type' => 'message', 'stop_reason' => 'refusal', 'content' => array() ) );
 		exit;
 	}
-	$out = fixture( $name );
-	echo json_encode( array( 'type' => 'message', 'model' => $req['model'], 'stop_reason' => 'end_turn', 'content' => array( array( 'type' => 'text', 'text' => json_encode( $out ) ) ) ) );
+	$fenced = '_fenced' === substr( $name, -7 );
+	$out    = json_encode( fixture( $fenced ? substr( $name, 0, -7 ) : $name ) );
+	if ( $fenced ) {
+		$out = "Here is the JSON:\n```json\n" . $out . "\n```";
+	}
+	echo json_encode( array( 'type' => 'message', 'model' => $req['model'], 'stop_reason' => 'end_turn', 'content' => array( array( 'type' => 'text', 'text' => $out ) ) ) );
 	exit;
 }
 

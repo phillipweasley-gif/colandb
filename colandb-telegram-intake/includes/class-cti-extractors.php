@@ -153,8 +153,11 @@ final class CTI_Extractors {
  *
  * Raw HTTP through wp_remote_post rather than the PHP SDK: the plugins in
  * this repository ship as plain zips with no Composer dependencies.
- * Structured output (output_config.format) guarantees parseable JSON; the
- * server-side refusal fallback is on.
+ * The reply format is described in the instructions and checked here,
+ * not enforced with structured output: the API refused this schema as too
+ * large to compile (0.3.1). CTI_Extractors::clean() then coerces every
+ * field, and unreadable output goes to an editor. The server-side refusal
+ * fallback is on.
  */
 final class CTI_Extractor_Anthropic implements CTI_Extractor {
 
@@ -185,10 +188,6 @@ final class CTI_Extractor_Anthropic implements CTI_Extractor {
 			'system'        => self::system_prompt(),
 			'output_config' => array(
 				'effort' => (string) CTI_Config::get( 'effort' ),
-				'format' => array(
-					'type'   => 'json_schema',
-					'schema' => CTI_Extractors::schema(),
-				),
 			),
 			'messages'      => array(
 				array( 'role' => 'user', 'content' => $content ),
@@ -238,11 +237,40 @@ final class CTI_Extractor_Anthropic implements CTI_Extractor {
 				$text .= $block['text'];
 			}
 		}
-		$out = json_decode( $text, true );
+		$out = self::parse_json( $text );
 		if ( ! is_array( $out ) ) {
 			return new WP_Error( 'cti_extract', 'The extractor did not return readable JSON.' );
 		}
 		return $out;
+	}
+
+	/** The JSON object in a reply, tolerating code fences or a sentence around it. */
+	public static function parse_json( $text ) {
+		$text = trim( (string) $text );
+		$out  = json_decode( $text, true );
+		if ( is_array( $out ) ) {
+			return $out;
+		}
+		$start = strpos( $text, '{' );
+		$end   = strrpos( $text, '}' );
+		if ( false === $start || false === $end || $end <= $start ) {
+			return null;
+		}
+		$out = json_decode( substr( $text, $start, $end - $start + 1 ), true );
+		return is_array( $out ) ? $out : null;
+	}
+
+	/** The reply format, as instructions (one example event). */
+	private static function format_text() {
+		$fields = array();
+		foreach ( CTI_Extractors::FIELDS as $key => $desc ) {
+			$fields[] = '    "' . $key . '": {"value": "", "confidence": 0, "evidence": "", "source": "none"}  // ' . $desc;
+		}
+		return "Reply with only one JSON object, no other text and no code fences, in exactly this shape:\n"
+			. "{\n  \"is_event\": true or false,\n  \"is_event_confidence\": 0 to 1,\n  \"not_event_reason\": \"\" or a short reason,\n  \"events\": [ {\n"
+			. implode( ",\n", $fields )
+			. "\n  } ]\n}\n"
+			. 'Every event object has all of these keys. Each field is {"value": string ("" if not stated), "confidence": number 0-1, "evidence": the exact supporting words, "source": "text", "image", "both" or "none"}. Do not include the // comments.';
 	}
 
 	private static function system_prompt() {
@@ -256,6 +284,7 @@ final class CTI_Extractor_Anthropic implements CTI_Extractor {
 				'Dates: if the year is not written, use the next occurrence on or after the post date and set year_stated to "no". An event that runs over several days is one event with a start_date and an end_date (inclusive); never split it into one event per day. Put separate session times, prices or booking links inside it in schedule_notes.',
 				'Set is_event to false for posts that are not announcing a specific event (general news, photos from a past event, a request for volunteers without a date). A post listing several separate events (a weekly roundup) gives one entry per event, at most five.',
 				'Links: copy links exactly as they appear. Do not make up or complete links.',
+				self::format_text(),
 			)
 		);
 	}
