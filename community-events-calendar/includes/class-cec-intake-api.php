@@ -22,7 +22,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   in wp-admin and on the dashboard edit screen.
  *
  * Public functions: cec_intake_create_event(), cec_intake_update_event(),
- * cec_intake_add_source(), cec_intake_event_fields(), cec_intake_candidates().
+ * cec_intake_add_source(), cec_intake_event_fields(), cec_intake_candidates(),
+ * and (1.48.0) cec_intake_find_venue(), cec_intake_create_venue().
  */
 class CEC_Intake_API {
 
@@ -111,6 +112,7 @@ class CEC_Intake_API {
 		if ( ! empty( $f['image_id'] ) && 'attachment' === get_post_type( (int) $f['image_id'] ) ) {
 			set_post_thumbnail( $post_id, (int) $f['image_id'] );
 		}
+		self::set_venue( $post_id, $f );
 
 		// Belt and braces: whatever happened above (another plugin's hook,
 		// a future setting), an intake event leaves here unpublished.
@@ -170,6 +172,7 @@ class CEC_Intake_API {
 		if ( isset( $f['notes'] ) ) {
 			self::set_notes( $post_id, $f['notes'] );
 		}
+		self::set_venue( $post_id, $f );
 		CEC_Audit_Log::log( $post_id, 'event_intake_updated' );
 		return true;
 	}
@@ -213,10 +216,12 @@ class CEC_Intake_API {
 		$out['cec_excerpt']  = $post->post_excerpt;
 		$out['cec_start']    = (string) get_post_meta( $post_id, '_cec_start', true );
 		$out['cec_end']      = (string) get_post_meta( $post_id, '_cec_end', true );
-		$out['venue_name']   = '';
-		$venues              = wp_get_post_terms( $post_id, 'cec_venue', array( 'fields' => 'names' ) );
+		$out['venue_name']    = '';
+		$out['venue_term_id'] = 0;
+		$venues               = wp_get_post_terms( $post_id, 'cec_venue' );
 		if ( $venues && ! is_wp_error( $venues ) ) {
-			$out['venue_name'] = (string) $venues[0];
+			$out['venue_name']    = (string) $venues[0]->name;
+			$out['venue_term_id'] = (int) $venues[0]->term_id;
 		}
 		$orgs              = wp_get_post_terms( $post_id, 'cec_partner_org', array( 'fields' => 'names' ) );
 		$out['org_names']  = $orgs && ! is_wp_error( $orgs ) ? array_values( $orgs ) : array();
@@ -294,6 +299,128 @@ class CEC_Intake_API {
 			}
 		}
 		return $out;
+	}
+
+	/* ------------------------------------------------------------------
+	 * Venues (1.48.0)
+	 * ---------------------------------------------------------------- */
+
+	/** Words that don't tell two places apart ("The Toolbox Saloon" = "Toolbox"). */
+	const VENUE_GENERIC = array( 'the', 'a', 'an', 'at', 'of', 'and', 'saloon', 'bar', 'pub', 'tavern', 'lounge', 'club', 'nightclub', 'inn', 'grill', 'cafe', 'café', 'restaurant', 'venue', 'hall', 'center', 'centre', 'inc', 'llc', 'co', 'company' );
+
+	/**
+	 * Links the event to a saved venue when $f['venue_term_id'] is given.
+	 * The event's typed-in address and city are then cleared, because the
+	 * calendar shows those instead of the venue's own.
+	 */
+	private static function set_venue( $post_id, $f ) {
+		if ( empty( $f['venue_term_id'] ) ) {
+			return;
+		}
+		$term = get_term( (int) $f['venue_term_id'], 'cec_venue' );
+		if ( ! $term || is_wp_error( $term ) ) {
+			return;
+		}
+		wp_set_object_terms( $post_id, array( (int) $term->term_id ), 'cec_venue', false );
+		foreach ( array( '_cec_venue_custom_address', '_cec_venue_custom_city', '_cec_venue_custom_region', '_cec_venue_custom_country' ) as $key ) {
+			delete_post_meta( $post_id, $key );
+		}
+	}
+
+	/**
+	 * A saved venue that is the same place, or 0. Matches when the names are
+	 * the same apart from generic words ("The Leather Stallion" = "Leather
+	 * Stallion Saloon"), or when the street address (number and street) is
+	 * the same. A known, different city rules a match out. If more than one
+	 * venue fits equally, none is chosen (an editor decides).
+	 *
+	 * @param array $a name, address, city, region.
+	 * @return array{id:int,reason:string}
+	 */
+	public static function find_venue( $a ) {
+		$a     = wp_parse_args( $a, array( 'name' => '', 'address' => '', 'city' => '', 'region' => '' ) );
+		$name  = self::venue_words( $a['name'] );
+		$street = self::street_key( $a['address'] );
+		if ( ! $name && ! $street ) {
+			return array( 'id' => 0, 'reason' => '' );
+		}
+		$best  = array();
+		$terms = get_terms( array( 'taxonomy' => 'cec_venue', 'hide_empty' => false ) );
+		foreach ( is_wp_error( $terms ) ? array() : $terms as $t ) {
+			$t_address = (string) get_term_meta( $t->term_id, 'cec_address', true );
+			$t_city    = (string) get_term_meta( $t->term_id, 'cec_city', true );
+			$place     = strtolower( $t_address . ' ' . $t_city );
+			if ( '' !== trim( $a['city'] ) && '' !== trim( $place ) && false === strpos( $place, strtolower( trim( $a['city'] ) ) ) ) {
+				continue; // Known to be in another city.
+			}
+			$t_words = self::venue_words( $t->name );
+			if ( $street && $street === self::street_key( $t_address ) ) {
+				$best[] = array( 'id' => (int) $t->term_id, 'score' => 2, 'reason' => 'same street address' );
+			} elseif ( $name && $t_words && $name === $t_words ) {
+				$best[] = array( 'id' => (int) $t->term_id, 'score' => 1, 'reason' => 'same name' );
+			}
+		}
+		if ( ! $best ) {
+			return array( 'id' => 0, 'reason' => '' );
+		}
+		usort( $best, static function ( $x, $y ) {
+			return $y['score'] <=> $x['score'];
+		} );
+		if ( isset( $best[1] ) && $best[1]['score'] === $best[0]['score'] ) {
+			return array( 'id' => 0, 'reason' => 'ambiguous' );
+		}
+		return array( 'id' => $best[0]['id'], 'reason' => $best[0]['reason'] );
+	}
+
+	/**
+	 * Saves a new venue (name, address, city, region, country). A name
+	 * already used by another venue gets the city added: "Name (City)".
+	 *
+	 * @return int|WP_Error The venue's term ID.
+	 */
+	public static function create_venue( $a ) {
+		$a    = wp_parse_args( $a, array( 'name' => '', 'address' => '', 'city' => '', 'region' => '', 'country' => '' ) );
+		$name = trim( sanitize_text_field( $a['name'] ) );
+		if ( '' === $name ) {
+			return new WP_Error( 'cec_intake_venue', __( 'A venue needs a name.', 'cec' ) );
+		}
+		if ( term_exists( $name, 'cec_venue' ) ) {
+			$name .= $a['city'] ? ' (' . sanitize_text_field( $a['city'] ) . ')' : '';
+		}
+		if ( term_exists( $name, 'cec_venue' ) ) {
+			return new WP_Error( 'cec_intake_venue', __( 'A venue with that name already exists.', 'cec' ) );
+		}
+		$t = wp_insert_term( $name, 'cec_venue' );
+		if ( is_wp_error( $t ) ) {
+			return $t;
+		}
+		$id = (int) $t['term_id'];
+		foreach ( array( 'address' => 'cec_address', 'city' => 'cec_city', 'region' => 'cec_region', 'country' => 'cec_country' ) as $key => $meta ) {
+			if ( '' !== trim( (string) $a[ $key ] ) ) {
+				update_term_meta( $id, $meta, sanitize_text_field( $a[ $key ] ) );
+			}
+		}
+		update_term_meta( $id, 'cec_created_by_intake', current_time( 'mysql', true ) );
+		return $id;
+	}
+
+	private static function venue_words( $name ) {
+		$name  = strtolower( remove_accents( html_entity_decode( (string) $name, ENT_QUOTES, 'UTF-8' ) ) );
+		$name  = str_replace( array( '&', "'", '’' ), array( ' and ', '', '' ), $name );
+		$words = preg_split( '/[^a-z0-9]+/', $name, -1, PREG_SPLIT_NO_EMPTY );
+		$words = array_values( array_unique( array_diff( $words, self::VENUE_GENERIC ) ) );
+		sort( $words );
+		return $words;
+	}
+
+	/** "2205 st clair": the house number and the first word of the street. */
+	private static function street_key( $address ) {
+		if ( ! preg_match( '/\b(\d{1,6})\s+(?:(?:n|s|e|w|north|south|east|west)\.?\s+)?([a-z]+)/i', (string) $address, $m ) ) {
+			return '';
+		}
+		$street = strtolower( $m[2] );
+		$street = 'saint' === $street ? 'st' : $street;
+		return $m[1] . ' ' . $street;
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -462,4 +589,12 @@ function cec_intake_event_fields( $event_id ) {
 
 function cec_intake_candidates( $args ) {
 	return CEC_Intake_API::candidates( $args );
+}
+
+function cec_intake_find_venue( $args ) {
+	return CEC_Intake_API::find_venue( $args );
+}
+
+function cec_intake_create_venue( $args ) {
+	return CEC_Intake_API::create_venue( $args );
 }

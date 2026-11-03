@@ -293,9 +293,18 @@ final class CTI_Processor {
 			}
 		}
 
+		$venue_id = self::resolve_venue( $norm, $fields, $post );
+		if ( $venue_id ) {
+			$fields['venue_term_id'] = $venue_id;
+		}
+
 		$event_id = cec_intake_create_event( $fields );
 		if ( is_wp_error( $event_id ) ) {
 			return $event_id;
+		}
+		if ( $venue_id ) {
+			$norm['venue_term_id'] = $venue_id;
+			self::set_entry( $entry_id, array( 'proposed' => $norm ) );
 		}
 		self::set_entry(
 			$entry_id,
@@ -312,6 +321,47 @@ final class CTI_Processor {
 		return $event_id;
 	}
 
+	/**
+	 * 0.4.0: the saved venue for this entry: an existing one that is the
+	 * same place, or a new one made from the post. Adds a note either way.
+	 * Needs Community Events Calendar 1.48.0 (otherwise the typed-in venue
+	 * text is kept, as before).
+	 *
+	 * @return int Venue term ID, or 0.
+	 */
+	private static function resolve_venue( $norm, &$fields, $post ) {
+		$v = isset( $norm['venue'] ) ? $norm['venue'] : null;
+		if ( ! $v || '' === $v['name'] || ! function_exists( 'cec_intake_find_venue' ) ) {
+			return 0;
+		}
+		if ( ! in_array( isset( $fields['cec_location_mode'] ) ? $fields['cec_location_mode'] : '', array( 'in_person', 'hybrid' ), true ) ) {
+			return 0;
+		}
+		if ( empty( $v['confident'] ) ) {
+			$fields['notes'][] = 'The venue name is uncertain, so it was not linked to a saved venue.';
+			return 0;
+		}
+		$found = cec_intake_find_venue( $v );
+		if ( ! empty( $found['id'] ) ) {
+			$term              = get_term( (int) $found['id'], 'cec_venue' );
+			$fields['notes'][] = 'Linked to the saved venue "' . ( $term && ! is_wp_error( $term ) ? $term->name : '#' . $found['id'] ) . '" (' . $found['reason'] . ').';
+			return (int) $found['id'];
+		}
+		if ( 'ambiguous' === $found['reason'] ) {
+			$fields['notes'][] = 'More than one saved venue could be "' . $v['name'] . '", so none was chosen. Pick the venue when you approve.';
+			return 0;
+		}
+		$new = cec_intake_create_venue( $v );
+		if ( is_wp_error( $new ) ) {
+			$fields['notes'][] = 'The venue "' . $v['name'] . '" could not be saved (' . $new->get_error_message() . '); the typed-in venue was kept.';
+			return 0;
+		}
+		$term              = get_term( (int) $new, 'cec_venue' );
+		$fields['notes'][] = 'New venue "' . ( $term && ! is_wp_error( $term ) ? $term->name : $v['name'] ) . '" was created from this post. Check its address under Events → Venues.';
+		CTI_Log::add( $post ? $post['id'] : 0, 0, 'venue_created', ( $term && ! is_wp_error( $term ) ? $term->name : $v['name'] ) . ' (#' . (int) $new . ')' );
+		return (int) $new;
+	}
+
 	/* ------------------------------------------------------------------
 	 * Edited source posts
 	 * ---------------------------------------------------------------- */
@@ -319,6 +369,9 @@ final class CTI_Processor {
 	private static function handle_edit( $post, $channel, $norm, $entry ) {
 		$old     = json_decode( (string) $entry['proposed'], true );
 		$old_f   = isset( $old['fields'] ) ? $old['fields'] : array();
+		if ( ! empty( $old['venue_term_id'] ) && empty( $norm['venue_term_id'] ) ) {
+			$norm['venue_term_id'] = (int) $old['venue_term_id']; // Remember the linked venue.
+		}
 		$changed = array();
 		foreach ( CTI_Normalizer::compared_keys() as $key ) {
 			$a = isset( $old_f[ $key ] ) ? $old_f[ $key ] : ( 'event_type_ids' === $key ? array() : '' );
@@ -343,6 +396,23 @@ final class CTI_Processor {
 		if ( in_array( $entry['status'], array( 'submitted', 'updated' ), true ) && $event && in_array( $event['post_status'], array( 'pending', 'cec_in_review' ), true ) ) {
 			$apply     = array();
 			$conflicts = array();
+			// 0.4.0: a changed venue is looked up (or created) again, unless
+			// an editor has already picked a different venue.
+			$venue_keys = array( 'cec_venue_custom_address', 'cec_venue_custom_city', 'cec_venue_custom_region', 'cec_venue_custom_country' );
+			if ( array_intersect( array_keys( $changed ), $venue_keys ) && ! empty( $old['venue_term_id'] ) ) {
+				if ( (int) $event['venue_term_id'] === (int) $old['venue_term_id'] ) {
+					$vf       = array( 'cec_location_mode' => isset( $norm['fields']['cec_location_mode'] ) ? $norm['fields']['cec_location_mode'] : '', 'notes' => array() );
+					$venue_id = self::resolve_venue( $norm, $vf, $post );
+					if ( $venue_id ) {
+						$apply['venue_term_id'] = $venue_id;
+						$norm['venue_term_id']  = $venue_id;
+						$conflicts             = array_merge( $conflicts, $vf['notes'] );
+					}
+				} else {
+					$conflicts[] = 'The source post was edited and now gives the venue as "' . $norm['venue']['name'] . '"; the editor\'s venue was kept.';
+				}
+				$changed = array_diff_key( $changed, array_flip( $venue_keys ) );
+			}
 			foreach ( $changed as $key => $pair ) {
 				$current = isset( $event[ $key ] ) ? $event[ $key ] : ( 'event_type_ids' === $key ? array() : '' );
 				if ( in_array( $key, array( 'cec_title' ), true ) ) {
@@ -362,7 +432,7 @@ final class CTI_Processor {
 			$apply['notes'] = $notes;
 			$result         = cec_intake_update_event( (int) $entry['event_id'], $apply );
 			if ( ! is_wp_error( $result ) ) {
-				self::set_entry( $entry_id, array( 'status' => 'updated', 'reason' => 'Changed: ' . $labels ) );
+				self::set_entry( $entry_id, array( 'status' => 'updated', 'reason' => 'Changed: ' . $labels, 'proposed' => $norm ) );
 				CTI_Log::add( $post['id'], $entry_id, 'updated', array( 'applied' => array_keys( $apply ), 'conflicts' => $conflicts ) );
 				CTI_Notify::add( 'updated', self::label( $norm ), 'changed ' . $labels, admin_url( 'post.php?post=' . (int) $entry['event_id'] . '&action=edit' ) );
 				return 'updated';

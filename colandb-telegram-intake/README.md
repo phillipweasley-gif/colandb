@@ -233,7 +233,7 @@ Telegram's own IDs are unique too: one queue row per channel + message, and an u
   - admission: `free_confirmed`, `paid`, `price_varies`, `not_posted`;
   - location: `in_person`, `online`, `hybrid`, `not_posted`;
   - existing Event Type terms only;
-  - venues and organizers are text (the editor links Venue and Partner Organization terms).
+  - venues are linked to the site's saved venues when the name or street address matches, or created as new venues (0.4.0, with Community Events Calendar 1.48.0); organizers are text (the editor links Partner Organization terms).
 - **Never free by default:** "free" needs words like *free*, *no cover* or *no charge* in the evidence. A missing or `$0` price becomes "Price not posted".
 - **No made-up links:** a link must appear in the post's text or links. A link read from the flyer is kept but flagged.
 - **No guessed times or timezones:** with no time, the time shows as "varies" and is flagged. The timezone is set only if stated; otherwise the calendar uses the venue's or the site's.

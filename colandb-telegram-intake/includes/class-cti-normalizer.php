@@ -264,8 +264,19 @@ final class CTI_Normalizer {
 		}
 		$notes[] = 'Imported from ' . ( $post['post_url'] ? $post['post_url'] : $source_label ) . '.';
 
+		// 0.4.0: the venue's parts, for linking to (or creating) a saved venue.
+		$venue_parts = array(
+			'name'      => $venue,
+			'address'   => $address,
+			'city'      => $fields['cec_venue_custom_city'],
+			'region'    => $fields['cec_venue_custom_region'],
+			'country'   => $fields['cec_venue_custom_country'],
+			'confident' => '' !== $venue && $c( 'venue_name' ) >= $min,
+		);
+
 		return array(
 			'ok'      => ! $missing,
+			'venue'   => $venue_parts,
 			'missing' => $missing,
 			'fields'  => $fields,
 			'notes'   => array_values( array_unique( $notes ) ),
