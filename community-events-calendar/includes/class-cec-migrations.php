@@ -23,6 +23,22 @@ class CEC_Migrations {
 		if ( ! get_option( 'cec_migrated_1453_event_ends' ) ) {
 			update_option( 'cec_migrated_1453_event_ends', array_merge( array( 'at' => gmdate( 'Y-m-d H:i:s' ) ), self::fix_event_ends() ) );
 		}
+		// 1.47.1: events saved with an empty end (instead of none) were left
+		// out of the month view and upcoming lists.
+		if ( ! get_option( 'cec_migrated_1471_empty_ends' ) ) {
+			update_option( 'cec_migrated_1471_empty_ends', array( 'at' => gmdate( 'Y-m-d H:i:s' ), 'fixed' => self::remove_empty_ends() ) );
+		}
+	}
+
+	/** 1.47.1: deletes empty _cec_end rows. @return int[] the events fixed. */
+	public static function remove_empty_ends() {
+		global $wpdb;
+		$ids = array_map( 'intval', $wpdb->get_col( "SELECT DISTINCT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_cec_end' AND TRIM(meta_value) = ''" ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		foreach ( $ids as $id ) {
+			$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_cec_end' AND TRIM(meta_value) = ''", $id ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			wp_cache_delete( $id, 'post_meta' );
+		}
+		return $ids;
 	}
 
 	/**

@@ -83,6 +83,16 @@ ok "a correct event isn't touched" $([ "$(endof $E5)" = 2026-10-30T22:00 ] && ! 
 ok "the upgrade runs it once and remembers what it did" $([ "$(ev "delete_option('cec_migrated_1453_event_ends'); CEC_Migrations::maybe_run_all(); \$o=get_option('cec_migrated_1453_event_ends'); echo (is_array(\$o) && isset(\$o['at'],\$o['fixed'],\$o['left']) && in_array($E4,\$o['left'])) ? 1 : 0;")" = 1 ] && echo 1 || echo 0)
 ok "the calendar feed has no event ending before it starts" $(curl -s "$H/wp-admin/admin-post.php?action=cec_ical&feed=all" | php -r '$s=str_replace(array("\r\n ","\r"),array("",""),stream_get_contents(STDIN)); $bad=0; foreach(array_slice(explode("BEGIN:VEVENT",$s),1) as $e){ if(strpos($e,"ZZE ")===false || strpos($e,"Zoo")!==false){continue;} preg_match("~\nDTSTART[^:]*:(\S+)~",$e,$a); preg_match("~\nDTEND[^:]*:(\S+)~",$e,$b); if($a && $b && $b[1] < $a[1]){ $bad++; } } echo $bad ? 0 : 1;')
 
+echo "== No end time (1.47.1)"
+E6=$(ev '$id=wp_insert_post(array("post_type"=>"cec_event","post_status"=>"publish","post_title"=>"ZZE Start Only Party")); update_post_meta($id,"_cec_start","2026-12-04T21:00"); update_post_meta($id,"_cec_time_mode","start_only"); update_post_meta($id,"_cec_end",""); echo $id;')
+ok "saving an empty end leaves no end at all" $([ "$(ev "echo count(get_post_meta($E6,'_cec_end'));")" = 0 ] && echo 1 || echo 0)
+ok "an event with no end time shows in its month" $(ev 'echo CEC_Shortcodes::render_month_html(12, 2026);' | grep -q 'ZZE Start Only Party' && echo 1 || echo 0)
+ok "...and in the upcoming list" $(ev 'echo do_shortcode("[cec_events view=\"list\" count=\"200\"]");' | grep -q 'ZZE Start Only Party' && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->insert(\$wpdb->postmeta, array('post_id'=>$E6,'meta_key'=>'_cec_end','meta_value'=>'')); wp_cache_delete($E6,'post_meta');" >/dev/null
+ok "old data: an empty end hides the event (as on colandb.com)" $(ev 'echo CEC_Shortcodes::render_month_html(12, 2026);' | grep -q 'ZZE Start Only Party' && echo 0 || echo 1)
+ok "the upgrade removes empty ends once and lists the events" $([ "$(ev "delete_option('cec_migrated_1471_empty_ends'); CEC_Migrations::maybe_run_all(); \$o=get_option('cec_migrated_1471_empty_ends'); echo (is_array(\$o) && in_array($E6,\$o['fixed'])) ? 1 : 0;")" = 1 ] && [ "$(ev "echo count(get_post_meta($E6,'_cec_end'));")" = 0 ] && ev 'echo CEC_Shortcodes::render_month_html(12, 2026);' | grep -q 'ZZE Start Only Party' && echo 1 || echo 0)
+ok "a real end is still saved" $(ev "update_post_meta($E6,'_cec_end','2026-12-04T23:00'); echo get_post_meta($E6,'_cec_end',true);" | grep -q '2026-12-04T23:00' && echo 1 || echo 0)
+
 echo "== PHP errors"
 ok "no plugin warnings in debug.log" $(grep -E "Warning|Fatal|Notice|Deprecated" wp-content/debug.log 2>/dev/null | grep -q "plugins/community-events-calendar" && echo 0 || echo 1)
 
