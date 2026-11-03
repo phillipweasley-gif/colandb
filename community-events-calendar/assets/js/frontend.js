@@ -122,22 +122,147 @@
 		copyLink( $( this ).data( 'url' ), $( this ) );
 	} );
 
-	function loadMonth( $wrap, month, year ) {
-		$.post( CEC.ajax_url, {
+	// The part of the calendar that month changes replace (1.49.0). The
+	// editor preview has no such part, so it falls back to the wrapper.
+	function monthArea( $wrap ) {
+		var $area = $wrap.children( '.cec-cal-month' );
+		return $area.length ? $area : $wrap;
+	}
+
+	// The Country / State / City choice (1.49.0), sent with every month load.
+	function locationFilter( $wrap ) {
+		var out = { cec_country: '', cec_region: '', cec_city: '' };
+		$wrap.find( '.cec-loc-select' ).each( function () {
+			out[ 'cec_' + $( this ).data( 'level' ) ] = $( this ).val() || '';
+		} );
+		return out;
+	}
+
+	// Loads a month into the calendar, then opens the day list for
+	// selectDate (or the month's own starting day: today, else its first
+	// event) so the list beside or below the grid is never empty.
+	function loadMonth( $wrap, month, year, selectDate ) {
+		var data = $.extend( {
 			action: 'cec_calendar_month',
 			nonce: CEC.nonce,
 			month: month,
 			year: year
-		} ).done( function ( res ) {
+		}, locationFilter( $wrap ) );
+		$wrap.addClass( 'cec-cal-loading' );
+		$.post( CEC.ajax_url, data ).done( function ( res ) {
 			if ( res.success ) {
-				$wrap.html( res.data.html ).attr( 'data-month', month ).attr( 'data-year', year );
+				monthArea( $wrap ).html( res.data.html );
+				$wrap.attr( 'data-month', month ).attr( 'data-year', year );
+				openStartDay( $wrap, selectDate );
 			}
+		} ).always( function () {
+			$wrap.removeClass( 'cec-cal-loading' );
 		} );
+	}
+
+	function openStartDay( $wrap, dateStr ) {
+		var date = dateStr || $wrap.find( '.cec-cal-layout' ).first().data( 'selected' );
+		if ( date ) {
+			selectCalendarDate( $wrap, String( date ) );
+		}
 	}
 
 	$( document ).on( 'click', '.cec-cal-nav', function () {
 		var $wrap = $( this ).closest( '.cec-calendar-wrap' );
 		loadMonth( $wrap, $( this ).data( 'month' ), $( this ).data( 'year' ) );
+	} );
+
+	// Country / State / City dropdowns. Picking a country narrows the
+	// state and city lists to places in it; picking a state narrows the
+	// cities. The choice goes into the page URL (cec_country, cec_region,
+	// cec_city) so the filtered calendar can be bookmarked or shared.
+	function locationMap( $wrap ) {
+		try {
+			return JSON.parse( $wrap.find( '.cec-loc-data' ).text() || '{}' ) || {};
+		} catch ( e ) {
+			return {};
+		}
+	}
+
+	function fillSelect( $select, names ) {
+		var current = $select.val() || '';
+		var $first = $select.find( 'option' ).first().detach();
+		$select.empty().append( $first );
+		names.forEach( function ( name ) {
+			$( '<option></option>' ).attr( 'value', name ).text( name ).appendTo( $select );
+		} );
+		$select.val( names.indexOf( current ) > -1 ? current : '' );
+	}
+
+	function refreshLocationChoices( $wrap ) {
+		var map = locationMap( $wrap );
+		var f = locationFilter( $wrap );
+		var regions = {};
+		var cities = {};
+		Object.keys( map ).forEach( function ( country ) {
+			if ( f.cec_country && country !== f.cec_country ) { return; }
+			Object.keys( map[ country ] ).forEach( function ( region ) {
+				if ( region ) { regions[ region ] = true; }
+				if ( f.cec_region && region !== f.cec_region ) { return; }
+				Object.keys( map[ country ][ region ] ).forEach( function ( city ) {
+					if ( city ) { cities[ city ] = true; }
+				} );
+			} );
+		} );
+		var sortNames = function ( obj ) {
+			return Object.keys( obj ).sort( function ( a, b ) { return a.localeCompare( b ); } );
+		};
+		fillSelect( $wrap.find( '.cec-loc-select[data-level="region"]' ), sortNames( regions ) );
+		// A state that isn't in the new country is cleared above, so
+		// work the cities out again from what is now chosen.
+		if ( f.cec_region && ! $wrap.find( '.cec-loc-select[data-level="region"]' ).val() ) {
+			refreshLocationChoices( $wrap );
+			return;
+		}
+		fillSelect( $wrap.find( '.cec-loc-select[data-level="city"]' ), sortNames( cities ) );
+	}
+
+	function locationUrl( f ) {
+		if ( ! window.history || ! window.history.replaceState || ! window.URL ) { return; }
+		var url = new URL( window.location.href );
+		[ 'cec_country', 'cec_region', 'cec_city' ].forEach( function ( key ) {
+			if ( f[ key ] ) {
+				url.searchParams.set( key, f[ key ] );
+			} else {
+				url.searchParams.delete( key );
+			}
+		} );
+		window.history.replaceState( null, '', url.toString() );
+	}
+
+	function applyLocation( $wrap ) {
+		var f = locationFilter( $wrap );
+		$wrap.find( '.cec-loc-clear' ).prop( 'hidden', ! ( f.cec_country || f.cec_region || f.cec_city ) );
+		locationUrl( f );
+		loadMonth( $wrap, $wrap.attr( 'data-month' ), $wrap.attr( 'data-year' ) );
+	}
+
+	$( document ).on( 'change', '.cec-loc-select', function () {
+		var $wrap = $( this ).closest( '.cec-calendar-wrap' );
+		if ( 'city' !== $( this ).data( 'level' ) ) {
+			refreshLocationChoices( $wrap );
+		}
+		applyLocation( $wrap );
+	} );
+
+	$( document ).on( 'click', '.cec-loc-clear', function () {
+		var $wrap = $( this ).closest( '.cec-calendar-wrap' );
+		$wrap.find( '.cec-loc-select' ).val( '' );
+		refreshLocationChoices( $wrap );
+		applyLocation( $wrap );
+	} );
+
+	// On page load, open the starting day's list (1.49.0) so the panel
+	// beside the grid shows something before anyone clicks.
+	$( function () {
+		$( '.cec-calendar-wrap' ).each( function () {
+			openStartDay( $( this ) );
+		} );
 	} );
 
 	// Reflects the current filter/sort/view state into the URL's own query
@@ -471,17 +596,7 @@
 			selectCalendarDate( $wrap, date );
 			return;
 		}
-		$.post( CEC.ajax_url, {
-			action: 'cec_calendar_month',
-			nonce: CEC.nonce,
-			month: $btn.data( 'month' ),
-			year: $btn.data( 'year' )
-		} ).done( function ( res ) {
-			if ( res.success ) {
-				$wrap.html( res.data.html ).attr( 'data-month', $btn.data( 'month' ) ).attr( 'data-year', $btn.data( 'year' ) );
-				selectCalendarDate( $wrap, date );
-			}
-		} );
+		loadMonth( $wrap, $btn.data( 'month' ), $btn.data( 'year' ), date );
 	} );
 
 	$( document ).on( 'click', '.cec-scroll-left', function () {

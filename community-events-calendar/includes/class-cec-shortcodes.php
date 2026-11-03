@@ -18,12 +18,83 @@ class CEC_Shortcodes {
 		$month = $atts['month'] ? absint( $atts['month'] ) : (int) date_i18n( 'n' );
 		$year  = $atts['year'] ? absint( $atts['year'] ) : (int) date_i18n( 'Y' );
 
+		// Country / state / city filter (1.49.0), read from the page URL
+		// so a filtered calendar can be bookmarked or shared.
+		$location = CEC_Locations::filter_from( $_GET ); // phpcs:ignore WordPress.Security.NonceVerification -- read-only view filter.
+
 		ob_start();
-		echo '<div class="cec-calendar-wrap" data-month="' . esc_attr( $month ) . '" data-year="' . esc_attr( $year ) . '" aria-live="polite" aria-atomic="true">';
+		echo '<div class="cec-calendar-wrap" data-month="' . esc_attr( $month ) . '" data-year="' . esc_attr( $year ) . '">';
 		echo CEC_Feeds::subscribe_links_html(); // phpcs:ignore
-		echo self::render_month_html( $month, $year ); // phpcs:ignore
-		echo '</div>';
+		echo self::location_filter_html( $location ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside.
+		// Month navigation replaces only this part, so the subscribe links
+		// and the filter stay put (before 1.49.0 the arrows replaced the
+		// whole wrapper and the subscribe links disappeared).
+		echo '<div class="cec-cal-month" aria-live="polite" aria-atomic="true">';
+		echo self::render_month_html( $month, $year, 0, $location ); // phpcs:ignore
+		echo '</div></div>';
 		return ob_get_clean();
+	}
+
+	/**
+	 * The calendar's Country / State / City dropdowns. Choices are the
+	 * places that have published events (CEC_Locations::options()); the
+	 * full list rides along as JSON so frontend.js can narrow the State
+	 * and City lists when a Country or State is picked.
+	 */
+	public static function location_filter_html( $location ) {
+		$map = CEC_Locations::options();
+		if ( ! $map ) {
+			return '';
+		}
+		$regions = array();
+		$cities  = array();
+		foreach ( $map as $country => $by_region ) {
+			if ( '' !== $location['country'] && $country !== $location['country'] ) {
+				continue;
+			}
+			foreach ( $by_region as $region => $by_city ) {
+				if ( '' !== $region ) {
+					$regions[ $region ] = true;
+				}
+				if ( '' !== $location['region'] && $region !== $location['region'] ) {
+					continue;
+				}
+				foreach ( $by_city as $city => $n ) {
+					if ( '' !== $city ) {
+						$cities[ $city ] = true;
+					}
+				}
+			}
+		}
+		ksort( $regions );
+		ksort( $cities );
+		$select = static function ( $name, $label, $all, $choices, $current ) {
+			$id   = 'cec-loc-' . $name . '-' . wp_unique_id();
+			$html = '<label class="cec-loc-field" for="' . esc_attr( $id ) . '"><span class="cec-loc-label">' . esc_html( $label ) . '</span>';
+			$html .= '<select id="' . esc_attr( $id ) . '" class="cec-loc-select" name="cec_' . esc_attr( $name ) . '" data-level="' . esc_attr( $name ) . '">';
+			$html .= '<option value="">' . esc_html( $all ) . '</option>';
+			$found = false;
+			foreach ( $choices as $choice ) {
+				$on     = 0 === strcasecmp( $choice, $current );
+				$found  = $found || $on;
+				$html  .= '<option value="' . esc_attr( $choice ) . '"' . selected( $on, true, false ) . '>' . esc_html( $choice ) . '</option>';
+			}
+			if ( '' !== $current && ! $found ) {
+				// A place from a shared link that has no events now.
+				$html .= '<option value="' . esc_attr( $current ) . '" selected>' . esc_html( $current ) . '</option>';
+			}
+			return $html . '</select></label>';
+		};
+
+		$out  = '<div class="cec-loc-filter" role="search" aria-label="' . esc_attr__( 'Filter the calendar by place', 'cec' ) . '">';
+		$out .= $select( 'country', __( 'Country', 'cec' ), __( 'All countries', 'cec' ), array_keys( $map ), $location['country'] );
+		$out .= $select( 'region', __( 'State / Province', 'cec' ), __( 'All states', 'cec' ), array_keys( $regions ), $location['region'] );
+		$out .= $select( 'city', __( 'City', 'cec' ), __( 'All cities', 'cec' ), array_keys( $cities ), $location['city'] );
+		$active = '' !== $location['country'] || '' !== $location['region'] || '' !== $location['city'];
+		$out .= '<button type="button" class="cec-loc-clear"' . ( $active ? '' : ' hidden' ) . '>' . esc_html__( 'Show all places', 'cec' ) . '</button>';
+		$out .= '<script type="application/json" class="cec-loc-data">' . wp_json_encode( $map ) . '</script>';
+		$out .= '</div>';
+		return $out;
 	}
 
 	/**
@@ -33,7 +104,8 @@ class CEC_Shortcodes {
 	 * preview all call this) so nothing outside this class changed when
 	 * the layout was split out in 1.26.0.
 	 */
-	public static function render_month_html( $month, $year, $preview_post_id = 0 ) {
+	public static function render_month_html( $month, $year, $preview_post_id = 0, $location = array() ) {
+		$location = wp_parse_args( $location, array( 'country' => '', 'region' => '', 'city' => '' ) );
 		$first_of_month = mktime( 0, 0, 0, $month, 1, $year );
 
 		$range_start = date( 'Y-m-01 00:00:00', $first_of_month );
@@ -105,6 +177,10 @@ class CEC_Shortcodes {
 		$items = array();
 		foreach ( $all_posts as $p ) {
 			$data = CEC_Event_Helper::data( $p->ID );
+			// The previewed post always shows, whatever the place filter.
+			if ( $p->ID !== $preview_post_id && ! CEC_Locations::matches( $data, $location ) ) {
+				continue;
+			}
 			if ( $p->ID === $preview_post_id ) {
 				// A pending/draft post's real permalink wouldn't resolve
 				// for anyone yet — WP's own preview link (capability- and

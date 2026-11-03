@@ -417,6 +417,94 @@ body.cec-plugin-page {
 a.cec-cal-day-detail-title { color: var(--cec-text) !important; text-decoration: none !important; font-weight: 700; }
 a.cec-cal-day-detail-title:hover, a.cec-cal-day-detail-title:focus-visible { color: var(--cec-primary) !important; }
 
+/* ---------- Grid + day list side by side (1.49.0) ----------
+   Owner, 2026-11-03: the list "below the calendar" is not user friendly,
+   show it "on the right hand side when a date is selected". A container
+   query (the calendar's own width, not the window's) puts the list in a
+   column beside the grid once there is room for both; narrower, it stays
+   below as before. Phones (below 700px) keep their own day list. */
+.cec-cal-layout { container-type: inline-size; container-name: cec-cal; }
+@container cec-cal (min-width: 960px) {
+	.cec-cal-layout-inner {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(280px, 30%);
+		gap: 20px;
+		align-items: start;
+	}
+	.cec-cal-layout-inner .cec-cal-day-detail {
+		margin-top: 0;
+		position: sticky;
+		top: 24px;
+		max-height: calc(100vh - 48px);
+		overflow-y: auto;
+	}
+	.cec-cal-layout-inner .cec-cal-day-detail-item { flex-wrap: wrap; }
+	.cec-cal-layout-inner .cec-cal-day-detail-body { flex-basis: 100%; }
+}
+/* overflow-x:hidden (above) makes the wrapper a scroll box, which stops
+   position:sticky; clip hides the same overflow without that. */
+@supports (overflow: clip) {
+	.cec-calendar-wrap { overflow-x: clip; }
+}
+.cec-calendar-wrap.cec-cal-loading .cec-cal-month { opacity: .55; transition: opacity .15s; }
+
+/* ---------- Country / State / City filter (1.49.0) ----------
+   Scoped under .cec-calendar-wrap with !important on the visual
+   properties: the theme's reset styles every select and button. */
+.cec-calendar-wrap .cec-loc-filter {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 10px 14px;
+	margin: 0 0 18px;
+	padding: 14px 16px;
+	background: var(--cec-card);
+	border: 1px solid var(--cec-border-soft);
+	border-radius: var(--cec-radius);
+}
+.cec-calendar-wrap .cec-loc-field { display: flex; flex-direction: column; gap: 4px; flex: 1 1 180px; min-width: 0; margin: 0; }
+.cec-calendar-wrap .cec-loc-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--cec-secondary); }
+.cec-calendar-wrap .cec-loc-select {
+	width: 100% !important;
+	min-height: 40px !important;
+	padding: 8px 12px !important;
+	background: var(--cec-bg, #0f0d16) !important;
+	color: var(--cec-text) !important;
+	border: 1px solid var(--cec-border-soft) !important;
+	border-radius: 8px !important;
+	font: inherit !important;
+	font-size: 14px !important;
+	box-shadow: none !important;
+}
+.cec-calendar-wrap .cec-loc-select:focus-visible { outline: 2px solid var(--cec-primary) !important; outline-offset: 1px; }
+.cec-calendar-wrap .cec-loc-select option { background: var(--cec-card); color: var(--cec-text); }
+.cec-calendar-wrap .cec-loc-clear {
+	min-height: 40px !important;
+	padding: 8px 16px !important;
+	background: transparent !important;
+	color: var(--cec-primary) !important;
+	border: 1px solid var(--cec-primary) !important;
+	border-radius: var(--cec-pill) !important;
+	font: inherit !important;
+	font-size: 12px !important;
+	font-weight: 700 !important;
+	text-transform: uppercase !important;
+	letter-spacing: .04em !important;
+	cursor: pointer;
+	box-shadow: none !important;
+}
+.cec-calendar-wrap .cec-loc-clear[hidden] { display: none !important; }
+.cec-calendar-wrap .cec-loc-clear:hover,
+.cec-calendar-wrap .cec-loc-clear:focus-visible {
+	background: var(--cec-primary) !important;
+	color: var(--cec-bg, #0f0d16) !important;
+}
+@media (max-width: 700px) {
+	.cec-calendar-wrap .cec-loc-filter { padding: 12px; }
+	.cec-calendar-wrap .cec-loc-field { flex-basis: 100%; }
+	.cec-calendar-wrap .cec-loc-clear { width: 100%; }
+}
+
 /* ---------- Phone month grid (replaces the desktop grid below 700px) ----------
    Every interactive element is scoped under .cec-calendar-wrap with
    !important on its visual identity: Hello Elementor's reset.css styles

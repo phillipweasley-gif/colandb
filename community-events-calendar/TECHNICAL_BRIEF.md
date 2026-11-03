@@ -102,6 +102,13 @@ The separate member-planning plugin (Phase 2/3) reads events only through these,
 - **Intake API (1.47.0, `CEC_Intake_API`):** `cec_intake_create_event()` (pending only), `cec_intake_update_event()` (pending/in review only), `cec_intake_add_source()`, `cec_intake_event_fields()`, `cec_intake_candidates()`. Used by the separate `colandb-telegram-intake` plugin. It saves through `CEC_Event_Helper::save_phase1a_fields( $post_id, $source )`, the forms' own code. Editor notes live in `_cec_intake_notes`, extra sources in `_cec_intake_source_url`.
 - `CEC_Month_Grid::render( $month, $year, $items, $options )`: the month-view layout with no query of its own. The public calendar feeds it from `CEC_Shortcodes::render_month_html()`. Any change to the month view's markup now goes in `CEC_Month_Grid`, and affects the member plugin's calendars too.
 
+## 2b. Place filter on the month view (1.49.0)
+
+- `CEC_Locations::for_event( $data )` gives `country` / `region` / `city` for one `CEC_Event_Helper::data()` array: the City / State / Country fields when set (normalised: "OH" → "Ohio", "USA" → "United States"), otherwise read from the one-line address. Online events have no place.
+- `CEC_Locations::options()` is the country → region → city → count map of published events, cached in the `cec_location_options` transient and cleared on event save, status change, delete, term changes and venue edits.
+- `CEC_Shortcodes::render_month_html( $month, $year, $preview_post_id, $location )` takes `array( 'country', 'region', 'city' )`; `[cec_calendar]` reads it from `?cec_country=&cec_region=&cec_city=` and the `cec_calendar_month` AJAX action from the same POST fields.
+- Markup: `[cec_calendar]` = `.cec-calendar-wrap` > subscribe links, `.cec-loc-filter`, `.cec-cal-month` (the part month navigation replaces). Inside the month, `.cec-cal-layout` (a CSS container) > `.cec-cal-layout-inner` > `.cec-cal-grid-wrap` + `.cec-cal-day-detail`; at 960 px of container width and up the two are side by side.
+
 ## 3. Full feature / shortcode reference
 
 | Shortcode | Handled by | Notes |

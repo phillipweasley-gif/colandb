@@ -6,6 +6,33 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.49.0
+
+**Calendar: filter by place, and the day's events on the right** (owner, 2026-11-03: "I need a city and state and country filter for the calendar and i would like it to show the list of events on the right hand side when a date is selected instead of being underneath it. It's not very user friendly below the calendar.").
+
+- **Country / State / City filter** above the `[cec_calendar]` month view.
+  - The choices are the places that have published events.
+  - Picking a country narrows the State list; picking a state narrows the City list.
+  - The calendar updates at once. The month arrows and the Today button keep the filter.
+  - The choice goes into the page address (`cec_country`, `cec_region`, `cec_city`), so a filtered calendar can be bookmarked or shared.
+  - A **Show all places** button clears it.
+  - Online-only events have no place, so they are hidden while a place is chosen.
+- **Where an event is** (new `CEC_Locations`):
+  - The event's (or its venue's) City, State and Country fields when filled in.
+  - Otherwise read from the one-line address, because most events on colandb.com only have that ("Chicago, Illinois, USA", "49 Parsons Ave, Columbus, OH 43215").
+  - Names are matched up: "OH" = "Ohio", "USA" = "United States". US states, Canadian provinces and the UK nations are known.
+  - Checked against the addresses of every published event on colandb.com (read-only). Each gets its country and state. A few loose ones get a nearby name as the city ("Gran Canaria" for "Maspalomas, Gran Canaria, Spain"). "TBD" gets no place.
+  - The place list is cached and rebuilt when an event or venue changes.
+- **The selected day's events now sit to the right of the grid** when the calendar is at least 960 px wide.
+  - The list stays in view while scrolling, where the page allows it.
+  - Narrower, the list stays under the grid as before. Phones (below 700 px) keep their own day list.
+  - The list now opens on load (today, or the month's first event) instead of waiting for a click.
+- **Fix:** the month arrows no longer remove the Subscribe buttons. Only the month itself is replaced now.
+
+**Verified** in the local WordPress kit:
+- `tests/locations-e2e.sh` 36/36: 25 real address styles, the filtered month (page, AJAX, shared link), the cache, and in real Chromium the dropdowns, arrows, Today, the URL, and the list beside / below / phone.
+- `tests/snap.php` before/after: the only differences are the intended ones (the new wrapper around the grid and day list, the list moved next to the grid, and the filter bar in the shortcode). The grid, bars, pills and phone view are unchanged.
+
 ## 1.48.0
 
 **Saved venues for the intake API** (owner, 2026-11-03: the Telegram bot should use saved venues "if they're present and if it doesn't exist check for it and then create it").
