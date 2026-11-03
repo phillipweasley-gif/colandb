@@ -50,6 +50,21 @@ final class CTI_Processor {
 		}
 	}
 
+	/** Seconds a new post waits for the rest of an album or its flyer. */
+	public static function album_wait() {
+		return max( 0, (int) apply_filters( 'cti_album_wait', self::DEBOUNCE ) );
+	}
+
+	/** Seconds until the youngest waiting post is old enough, or -1 if none waits. */
+	public static function next_due_in() {
+		global $wpdb;
+		$newest = $wpdb->get_var( 'SELECT MAX(updated_at) FROM ' . CTI_Install::table( 'posts' ) . " WHERE status = 'received'" );
+		if ( ! $newest ) {
+			return -1;
+		}
+		return max( 0, strtotime( $newest . ' UTC' ) + self::album_wait() - time() );
+	}
+
 	public static function schedule_soon() {
 		if ( ! wp_next_scheduled( self::HOOK, array( 'soon' ) ) ) {
 			wp_schedule_single_event( time() + 60, self::HOOK, array( 'soon' ) );
@@ -57,10 +72,10 @@ final class CTI_Processor {
 	}
 
 	/** @return int Posts processed. */
-	public static function run( $limit = 0 ) {
+	public static function run( $limit = 0, $lock_wait = 0 ) {
 		global $wpdb;
 		$limit = is_numeric( $limit ) && (int) $limit > 0 ? (int) $limit : (int) CTI_Config::get( 'max_posts_per_run' );
-		if ( ! CTI_Install::lock( 'run', 900 ) ) {
+		if ( ! CTI_Install::lock( 'run', 900, (int) $lock_wait ) ) {
 			return 0;
 		}
 		$done = 0;
@@ -73,7 +88,7 @@ final class CTI_Processor {
 			$ids  = $wpdb->get_col(
 				$wpdb->prepare(
 					"SELECT id FROM $t WHERE ( status = 'received' AND updated_at <= %s ) OR ( status = 'retry' AND ( next_attempt IS NULL OR next_attempt <= %s ) ) ORDER BY id ASC LIMIT %d",
-					gmdate( 'Y-m-d H:i:s', time() - (int) apply_filters( 'cti_album_wait', self::DEBOUNCE ) ),
+					gmdate( 'Y-m-d H:i:s', time() - self::album_wait() ),
 					$now,
 					$limit
 				)

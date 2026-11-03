@@ -248,7 +248,7 @@ Telegram's own IDs are unique too: one queue row per channel + message, and an u
 |---|---|
 | Nothing arrives | Connection tab: "Last delivery error". Is the bot an admin of the channel? Is the channel on the allowlist (see "Recently ignored")? Is the webhook connected? |
 | 401 in the delivery error | The webhook secret in `wp-config.php` changed; click **Connect webhook** again. |
-| Posts stay "received" | WP-Cron: "Next scheduled run" on the Connection tab; **Process the queue now**. |
+| Posts stay "received" | Since 0.3.2 each post is processed about 90 seconds after it arrives (the site calls `/colandb-intake/v1/run` on itself). If that's blocked, WP-Cron is the backup: check "Next scheduled run" on the Connection tab, or click **Process the queue now**. |
 | Not sure what's wrong | `cti_diagnostics()` (or `wp colandb-intake diagnose`): versions, secret sources, Telegram's view of the webhook, queue counts, recent problems. |
 | Posts go to "retry" | The reason column: Claude overloaded (retries by itself), bad API key (fix, then **Process this post again**), calendar plugin inactive. |
 | Everything is "Needs details" | The Text patterns reader is selected, or the API key is missing. |
