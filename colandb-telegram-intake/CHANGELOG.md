@@ -2,6 +2,22 @@
 
 Versions follow semver: PATCH = fixes, MINOR = features.
 
+## 0.3.1
+
+**Fix: the real Claude API refused the reading request** (found on colandb.com, 2026-11-03, with the first real test post: "Claude API 400: The compiled grammar is too large"). The strict structured-output schema (26 fields, each with value, confidence, evidence and source) is too large for the API to compile. The test kit's fake Claude didn't check this.
+
+- **Reply format.** The same JSON layout is now described in the instructions, and the reply is checked here: it's read even if wrapped in a sentence or code fences, and `CTI_Extractors::clean()` still coerces every field. Unreadable output goes to an editor as before.
+- **Checked against the real API** on colandb.com, read-only, with the owner's test post (a text message and a separate flyer): it found 4 events with dates, times, venue, organizer, evidence and confidence, and left the unstated price as "not posted". About 40 seconds and $0.14 for that post.
+- **A flyer and its text sent as two messages** (a photo with no caption, then the text, or the other way round) by the same sender, in the same chat and topic, within 90 seconds, are now processed as one post, like an album. To match them, a salted hash of the sender is kept for 5 minutes in a transient; the sender's Telegram ID is never stored. The wait before processing a new post went from 45 to 90 seconds to allow for this.
+- Removed a PHP 8.5 deprecation notice (`finfo_close()`).
+
+**Verified** in the local WordPress kit: `tests/telegram-intake-e2e.sh` 97/97. The 7 new checks:
+- the request carries no schema;
+- a fenced reply is read;
+- a flyer after its text, and text after its flyer, are joined;
+- someone else's photo and the same member in another topic are not joined;
+- the joined post is read once, with its flyer.
+
 ## 0.3.0
 
 **Groups and their topics** (owner, 2026-11-03: the events are posted by members of a Telegram group, in topics set aside for events: `t.me/c/3923571403/129`, `/275`, `/573`).

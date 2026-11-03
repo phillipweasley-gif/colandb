@@ -216,6 +216,7 @@ Telegram's own IDs are unique too: one queue row per channel + message, and an u
 
 ## 11. Flyers, images and attribution
 
+- A flyer and its text sent as **two messages** (by the same person, in the same chat and topic, within 90 seconds) are read as one post, like an album.
 - Every flyer (photo, or an image sent as a file) is downloaded, checked and read by the reader:
   - the size is checked before downloading, using Telegram's figure, and again after;
   - the file must really be a JPEG, PNG or WebP, judged from its bytes, not its name;

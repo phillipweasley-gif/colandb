@@ -59,7 +59,7 @@ PHP
 for t in Social Themed Educational; do $W term create cec_event_type $t >/dev/null 2>&1; done
 ev 'CTI_Install::create_tables(); global $wpdb; foreach (array("posts","entries","updates","log") as $t) $wpdb->query("DELETE FROM ".CTI_Install::table($t)); delete_option("cti_unknown_chats"); $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE \"cti_lock_%\" OR option_name LIKE \"_transient_cti_alert_%\"");' >/dev/null
 ev 'foreach (get_posts(array("post_type"=>"cec_event","post_status"=>"any","numberposts"=>-1,"fields"=>"ids","meta_key"=>"_cec_intake_source_url")) as $id) wp_delete_post($id,true);' >/dev/null
-ev 'update_option("cti_settings", array_merge(CTI_Config::defaults(), array("channels"=>CTI_Config::parse_channels("-1001111111111 | no | Test Channel\n@flyerchan | | Flyer Channel\n-1002222222222 | no\n-1005555555555 | yes | Test Group | topics: 275, 573\n-1006666666666 | no | Admin Group | admins"), "dry_run"=>false, "notify_emails"=>"editor@example.com", "max_attempts"=>3)));' >/dev/null
+ev 'update_option("cti_settings", array_merge(CTI_Config::defaults(), array("channels"=>CTI_Config::parse_channels("-1001111111111 | no | Test Channel\n@flyerchan | | Flyer Channel\n-1002222222222 | no\n-1005555555555 | yes | Test Group | topics: 275, 573\n-1006666666666 | no | Admin Group | admins"), "dry_run"=>false, "notify_emails"=>"editor@example.com", "max_attempts"=>3, "max_submissions_per_hour"=>500)));' >/dev/null
 ev '$s=get_option("cec_settings",array()); $s["auto_publish"]=1; update_option("cec_settings",$s);' >/dev/null
 ok "test setup: the calendar's auto-publish setting is on (intake must ignore it)" $(ev 'echo CEC_Admin_Settings::get("auto_publish") ? 1 : 0;')
 
@@ -273,8 +273,8 @@ ok "a photo from someone else is not joined to it" $([ "$(pstat $G 332)" = recei
 gdeliver message $G 333 573 42 "" '{"photo":[{"file_id":"flyer1","file_unique_id":"c3","file_size":5000,"width":400,"height":300}]}' >/dev/null
 gdeliver message $G 334 573 42 "Text after the flyer FX:grpcomp2" >/dev/null
 ok "text sent right after a flyer joins the flyer's post" $([ "$(pstat $G 334)" = merged ] && [ "$(q "SELECT body FROM ${P}cti_posts WHERE chat_id='$G' AND message_id=333")" = "Text after the flyer FX:grpcomp2" ] && echo 1 || echo 0)
-gdeliver message $G 336 573 42 "Only text here FX:grpsep" >/dev/null
-gdeliver message $G 337 275 42 "" '{"photo":[{"file_id":"flyer1","file_unique_id":"c4","file_size":5000,"width":400,"height":300}]}' >/dev/null
+gdeliver message $G 336 573 44 "Only text here FX:grpsep" >/dev/null
+gdeliver message $G 337 275 44 "" '{"photo":[{"file_id":"flyer1","file_unique_id":"c4","file_size":5000,"width":400,"height":300}]}' >/dev/null
 ok "the same member's flyer in another topic is a separate post" $([ "$(pstat $G 336)" = received ] && [ "$(pstat $G 337)" = received ] && echo 1 || echo 0)
 run
 ok "the joined post is read once, with its flyer" $([ "$(q "SELECT COUNT(*) FROM ${P}cti_entries e JOIN ${P}cti_posts p ON p.id=e.post_id WHERE p.chat_id='$G' AND p.message_id IN (330,331)")" = 1 ] && grep 'grpcomp' $T/anthropic.log | grep -v grpcomp2 | tail -1 | grep -q '"images":1' && echo 1 || echo 0)
