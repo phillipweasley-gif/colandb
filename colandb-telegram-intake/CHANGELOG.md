@@ -2,6 +2,29 @@
 
 Versions follow semver: PATCH = fixes, MINOR = features.
 
+## 0.3.0
+
+**Groups and their topics** (owner, 2026-11-03: the events are posted by members of a Telegram group, in topics set aside for events: `t.me/c/3923571403/129`, `/275`, `/573`).
+
+- **Group messages are read as well as channel posts**, only from groups on the allowlist. The bot now asks Telegram for `message` and `edited_message` updates too. Private chats with the bot are still never read.
+- **Topics.** `| topics: 129, 275, 573` on a group's line reads only those topics. Messages in other topics, or in General, are skipped and **not stored**. Only the topic number is remembered (last 20), so an administrator can check which is which. This keeps ordinary chat out.
+- **`| admins`** (optional) reads only messages from the group's administrators or sent as the group. The admin list is asked of Telegram at most once an hour. Not used for COL&B's group, where members post the events.
+- **Always skipped:** service messages (joins, pins), messages from other bots, and a group message presented as a channel post.
+- **No member data:** the sender's name, username and ID are never stored. A group post's link points at the topic message (`t.me/c/<group>/<topic>/<message>`).
+- Settings explains the group format and lists skipped topics. Recently ignored chats show their type and topic. `cti_diagnostics()` adds `skipped_topics`.
+
+**After installing:**
+- reconnect the webhook so Telegram sends group messages;
+- in @BotFather, allow the bot in groups (`/setjoingroups` → Enable) and turn off privacy mode (`/setprivacy` → Disable). Otherwise a bot that isn't an admin only sees commands.
+
+**Verified** in the local WordPress kit: `tests/telegram-intake-e2e.sh` 90/90. The 17 new checks:
+- topic messages kept, other topics, General, service and bot messages skipped and not stored;
+- member details never stored;
+- edits handled;
+- admins-only groups, including messages sent as the group;
+- unlisted groups listed with their type;
+- the allowlist format reads back the same.
+
 ## 0.2.0
 
 **Secrets can be pasted in Settings, and one call reports the bot's health** (owner, 2026-11-03: "Do settings boxes and fill them on this initial setup"; "I need you to be able to control and troubleshoot the bot").

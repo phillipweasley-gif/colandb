@@ -307,12 +307,20 @@ final class CTI_Admin {
 		echo '<tr><th>Webhook secret</th><td><p>' . ( $wsrc ? '<strong style="color:#008a20;">Set ✓</strong> (' . esc_html( 'settings' === $wsrc ? 'made by this site' : ( 'wp-config' === $wsrc ? 'in wp-config.php' : 'in the server environment' ) ) . ')' : 'Made automatically when you connect the webhook.' ) . '</p><p class="description">Nobody needs to type this one. Only Telegram and this site use it.</p></td></tr>';
 		echo '</table><h2>Channels and reading</h2><table class="form-table">';
 		echo '<tr><th>Approved channels</th><td><textarea name="channels" rows="6" class="large-text code">' . esc_textarea( CTI_Config::channels_text( $s['channels'] ) ) . '</textarea>';
-		echo '<p class="description">One channel per line: <code>channel ID or @username | use flyers (yes/no) | label</code>, e.g. <code>-1001234567890 | yes | Kink 101</code>. Prefer the numeric ID (it never changes). Posts from any other chat are ignored. A post\'s flyer becomes the event image unless the line says "no" (use "no" for a channel that hasn\'t agreed to share its flyers).</p>';
+		echo '<p class="description">One channel or group per line: <code>ID or @username | use flyers (yes/no) | label</code>. Channel example: <code>-1001234567890 | yes | Kink 101</code>. Group example: <code>-1003923571403 | yes | COL&amp;B group | topics: 129, 275, 573</code> reads only those topics (members chatting elsewhere is ignored); add <code>| admins</code> to read only the group\'s admins. Prefer the numeric ID (it never changes). Anything not on this list is ignored. A post\'s flyer becomes the event image unless the line says "no".</p>';
+		$topics = get_option( 'cti_seen_topics', array() );
+		if ( $topics ) {
+			echo '<p class="description"><strong>Topics skipped in listed groups:</strong> ';
+			foreach ( $topics as $t ) {
+				echo esc_html( $t['chat'] . ' topic ' . $t['topic'] . ( $t['name'] ? ' "' . $t['name'] . '"' : '' ) ) . '; ';
+			}
+			echo '</p>';
+		}
 		$unknown = get_option( 'cti_unknown_chats', array() );
 		if ( $unknown ) {
 			echo '<p class="description"><strong>Recently ignored (not on the list):</strong> ';
 			foreach ( $unknown as $u ) {
-				echo esc_html( $u['id'] . ( $u['username'] ? ' @' . $u['username'] : '' ) . ( $u['title'] ? ' "' . $u['title'] . '"' : '' ) ) . '; ';
+				echo esc_html( $u['id'] . ( $u['username'] ? ' @' . $u['username'] : '' ) . ( $u['title'] ? ' "' . $u['title'] . '"' : '' ) . ( ! empty( $u['type'] ) ? ' (' . $u['type'] . ( ! empty( $u['topic'] ) ? ', topic ' . $u['topic'] : '' ) . ')' : '' ) ) . '; ';
 			}
 			echo '</p>';
 		}

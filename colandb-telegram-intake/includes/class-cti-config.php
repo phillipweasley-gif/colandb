@@ -156,10 +156,16 @@ final class CTI_Config {
 
 	/**
 	 * The allowlist. Each line of the settings box is
-	 *   <channel id or @username> [| use flyers: yes/no] [| label]
-	 * e.g. "-1001234567890 | yes | Kink 101" or "@capcitypets".
+	 *   <chat id or @username> [| use flyers: yes/no] [| label] [| topics: 1,2,3] [| admins]
+	 * e.g. "-1001234567890 | yes | Kink 101" (a channel), or
+	 *      "-1003923571403 | yes | COL&B group | topics: 129, 275, 573" (a group).
 	 * Flyers are used as the event image unless the line says "no"
 	 * (owner's decision, 2026-11-03).
+	 *
+	 * Groups (0.3.0): "topics:" limits a forum group to those topics (the
+	 * filter that keeps ordinary chat out); "admins" reads only messages
+	 * from the group's administrators or sent as the group. With neither,
+	 * every message in the group is read. Channels ignore both.
 	 */
 	public static function parse_channels( $text ) {
 		$out = array();
@@ -170,7 +176,7 @@ final class CTI_Config {
 			}
 			$parts = array_map( 'trim', explode( '|', $line ) );
 			$ref   = $parts[0];
-			$row   = array( 'id' => '', 'username' => '', 'reuse_images' => false, 'label' => '' );
+			$row   = array( 'id' => '', 'username' => '', 'reuse_images' => true, 'label' => '', 'topics' => array(), 'admins_only' => false );
 			if ( preg_match( '/^-?\d{5,20}$/', $ref ) ) {
 				$row['id'] = $ref;
 			} elseif ( preg_match( '/^@?([A-Za-z][A-Za-z0-9_]{3,31})$/', $ref, $m ) ) {
@@ -179,8 +185,16 @@ final class CTI_Config {
 				continue;
 			}
 			$row['reuse_images'] = ! ( isset( $parts[1] ) && in_array( strtolower( $parts[1] ), array( 'no', 'n', 'off', 'false' ), true ) );
-			$row['label']        = isset( $parts[2] ) ? sanitize_text_field( $parts[2] ) : '';
-			$out[]               = $row;
+			foreach ( array_slice( $parts, 2 ) as $i => $part ) {
+				if ( preg_match( '/^topics?\s*[:=]\s*([\d,\s]+)$/i', $part, $m ) ) {
+					$row['topics'] = array_values( array_unique( array_map( 'intval', array_filter( preg_split( '/[\s,]+/', $m[1] ) ) ) ) );
+				} elseif ( preg_match( '/^admins?( only)?$/i', $part ) ) {
+					$row['admins_only'] = true;
+				} elseif ( 0 === $i ) {
+					$row['label'] = sanitize_text_field( $part );
+				}
+			}
+			$out[] = $row;
 		}
 		return $out;
 	}
@@ -188,7 +202,14 @@ final class CTI_Config {
 	public static function channels_text( $channels ) {
 		$lines = array();
 		foreach ( (array) $channels as $c ) {
-			$lines[] = trim( ( $c['id'] ? $c['id'] : '@' . $c['username'] ) . ' | ' . ( $c['reuse_images'] ? 'yes' : 'no' ) . ( $c['label'] ? ' | ' . $c['label'] : '' ) );
+			$line = ( $c['id'] ? $c['id'] : '@' . $c['username'] ) . ' | ' . ( $c['reuse_images'] ? 'yes' : 'no' ) . ' | ' . ( isset( $c['label'] ) ? $c['label'] : '' );
+			if ( ! empty( $c['topics'] ) ) {
+				$line .= ' | topics: ' . implode( ', ', $c['topics'] );
+			}
+			if ( ! empty( $c['admins_only'] ) ) {
+				$line .= ' | admins';
+			}
+			$lines[] = rtrim( $line, ' |' );
 		}
 		return implode( "\n", $lines );
 	}

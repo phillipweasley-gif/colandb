@@ -86,7 +86,7 @@ final class CTI_Telegram {
 			array(
 				'url'                  => $url,
 				'secret_token'         => $secret,
-				'allowed_updates'      => array( 'channel_post', 'edited_channel_post' ),
+				'allowed_updates'      => CTI_Receiver::UPDATE_TYPES,
 				'drop_pending_updates' => (bool) $drop_pending,
 				'max_connections'      => 5,
 			)

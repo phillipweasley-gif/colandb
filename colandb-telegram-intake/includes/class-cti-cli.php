@@ -66,7 +66,7 @@ final class CTI_CLI {
 				array(
 					'offset'          => $offset,
 					'timeout'         => $timeout,
-					'allowed_updates' => array( 'channel_post', 'edited_channel_post' ),
+					'allowed_updates' => CTI_Receiver::UPDATE_TYPES,
 				),
 				$timeout + 15
 			);

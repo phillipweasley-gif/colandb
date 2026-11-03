@@ -50,6 +50,8 @@ if ( preg_match( '#^/bot([^/]+)/(\w+)$#', $path, $m ) ) {
 		case 'setWebhook':
 		case 'deleteWebhook':
 			tg_ok( true );
+		case 'getChatAdministrators':
+			tg_ok( array( array( 'status' => 'creator', 'user' => array( 'id' => 777, 'is_bot' => false, 'first_name' => 'Owner' ) ), array( 'status' => 'administrator', 'user' => array( 'id' => 123456, 'is_bot' => true, 'first_name' => 'Bot' ) ) ) );
 		case 'getFile':
 			$id = (string) $p['file_id'];
 			$sizes = array( 'big' => 50000000 );

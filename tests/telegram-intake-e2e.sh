@@ -36,6 +36,11 @@ post() { # post <kind> <chat_id> <username> <message_id> <text> [extra-json]
 	php -r '$m=array("message_id"=>(int)$argv[4],"date"=>time(),"chat"=>array("id"=>(int)$argv[2],"type"=>"channel","title"=>"Chan ".$argv[2])); if($argv[3]!=="-") $m["chat"]["username"]=$argv[3]; if($argv[5]!=="") $m[$argv[7]?"caption":"text"]=$argv[5]; $x=json_decode($argv[6],true); if(is_array($x)) $m=array_merge($m,$x); if($argv[1]==="edited_channel_post") $m["edit_date"]=time(); echo json_encode(array("update_id"=>(int)$argv[8],$argv[1]=>$m));' "$1" "$2" "$3" "$4" "$5" "${6:-}" "$( [ -n "${6:-}" ] && echo 1 || echo 0 )" "$UID_N"
 }
 deliver() { send "$(post "$@")" "$COLANDB_TG_WEBHOOK_SECRET"; }
+gmsg() { # gmsg <kind> <chat_id> <message_id> <topic|0> <from_id|0> <text> [extra-json]
+	UID_N=$(( $(cat $T/uid 2>/dev/null || echo 1000) + 1 )); echo $UID_N > $T/uid
+	php -r '$m=array("message_id"=>(int)$argv[3],"date"=>time(),"chat"=>array("id"=>(int)$argv[2],"type"=>"supergroup","title"=>"Group ".$argv[2],"is_forum"=>true)); if((int)$argv[5]) $m["from"]=array("id"=>(int)$argv[5],"is_bot"=>false,"first_name"=>"Pat","last_name"=>"Member","username"=>"patmember"); if((int)$argv[4]){ $m["message_thread_id"]=(int)$argv[4]; $m["is_topic_message"]=true; } if($argv[6]!=="") $m["text"]=$argv[6]; $x=json_decode($argv[7],true); if(is_array($x)) $m=array_merge($m,$x); if($argv[1]==="edited_message") $m["edit_date"]=time(); echo json_encode(array("update_id"=>(int)$argv[8],$argv[1]=>$m));' "$1" "$2" "$3" "$4" "$5" "$6" "${7:-}" "$UID_N"
+}
+gdeliver() { send "$(gmsg "$@")" "$COLANDB_TG_WEBHOOK_SECRET"; }
 entry() { q "SELECT $1 FROM ${P}cti_entries e JOIN ${P}cti_posts p ON p.id=e.post_id WHERE p.chat_id='$2' AND p.message_id=$3 ORDER BY e.idx LIMIT 1"; }
 pstat() { q "SELECT status FROM ${P}cti_posts WHERE chat_id='$1' AND message_id=$2"; }
 meta()  { ev "echo get_post_meta($1, '$2', true);"; }
@@ -54,7 +59,7 @@ PHP
 for t in Social Themed Educational; do $W term create cec_event_type $t >/dev/null 2>&1; done
 ev 'CTI_Install::create_tables(); global $wpdb; foreach (array("posts","entries","updates","log") as $t) $wpdb->query("DELETE FROM ".CTI_Install::table($t)); delete_option("cti_unknown_chats"); $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE \"cti_lock_%\" OR option_name LIKE \"_transient_cti_alert_%\"");' >/dev/null
 ev 'foreach (get_posts(array("post_type"=>"cec_event","post_status"=>"any","numberposts"=>-1,"fields"=>"ids","meta_key"=>"_cec_intake_source_url")) as $id) wp_delete_post($id,true);' >/dev/null
-ev 'update_option("cti_settings", array_merge(CTI_Config::defaults(), array("channels"=>CTI_Config::parse_channels("-1001111111111 | no | Test Channel\n@flyerchan | | Flyer Channel\n-1002222222222 | no"), "dry_run"=>false, "notify_emails"=>"editor@example.com", "max_attempts"=>3)));' >/dev/null
+ev 'update_option("cti_settings", array_merge(CTI_Config::defaults(), array("channels"=>CTI_Config::parse_channels("-1001111111111 | no | Test Channel\n@flyerchan | | Flyer Channel\n-1002222222222 | no\n-1005555555555 | yes | Test Group | topics: 275, 573\n-1006666666666 | no | Admin Group | admins"), "dry_run"=>false, "notify_emails"=>"editor@example.com", "max_attempts"=>3)));' >/dev/null
 ev '$s=get_option("cec_settings",array()); $s["auto_publish"]=1; update_option("cec_settings",$s);' >/dev/null
 ok "test setup: the calendar's auto-publish setting is on (intake must ignore it)" $(ev 'echo CEC_Admin_Settings::get("auto_publish") ? 1 : 0;')
 
@@ -222,6 +227,38 @@ ok "every event the intake created is pending (or set by the test)" $([ "$(q "SE
 ok "no token, secret or API key in the log, entries or emails" $( (q "SELECT GROUP_CONCAT(detail) FROM ${P}cti_log"; q "SELECT GROUP_CONCAT(reason) FROM ${P}cti_posts"; cat wp-content/mail.log) | grep -q -e 'TESTTOKEN' -e 'test_secret_0123' -e 'sk-ant-test' && echo 0 || echo 1)
 ok "the review screen lists what needs a decision" $(ev 'wp_set_current_user(1); ob_start(); CTI_Admin::render(); echo ob_get_clean();' | grep -q 'Possible duplicate' && echo 1 || echo 0)
 ok "WP-CLI dry-run extraction prints proposed fields" $($W colandb-intake extract --text="Test FX:basic https://tickets.example.com/leather-social?utm_source=tg" 2>/dev/null | grep -q '"cec_admission_status": "paid"' && echo 1 || echo 0)
+
+echo "== Groups and topics (0.3.0)"
+G=-1005555555555; GA=-1006666666666
+r=$(gdeliver message $G 300 275 42 "Munch next month FX:grpone")
+ok "a member's message in an event topic is kept" $(echo "$r" | grep -q stored && echo 1 || echo 0)
+ok "its link points at the topic message" $([ "$(q "SELECT post_url FROM ${P}cti_posts WHERE chat_id='$G' AND message_id=300")" = "https://t.me/c/5555555555/275/300" ] && echo 1 || echo 0)
+run
+ok "it becomes a pending event" $([ "$(entry e.status $G 300)" = submitted ] && [ "$(ev "echo get_post_status($(entry event_id $G 300));")" = pending ] && echo 1 || echo 0)
+ok "the member's name and account are not stored anywhere" $( (q "SELECT GROUP_CONCAT(CONCAT(body,channel,post_url,photos,links)) FROM ${P}cti_posts"; q "SELECT GROUP_CONCAT(detail) FROM ${P}cti_log"; q "SELECT GROUP_CONCAT(proposed) FROM ${P}cti_entries") | grep -q -e 'patmember' -e 'Pat Member' && echo 0 || echo 1)
+r=$(gdeliver message $G 301 999 42 "Anyone going to the munch? FX:grptwo")
+ok "a message in another topic is skipped and not stored" $(echo "$r" | grep -q filtered_topic && [ -z "$(pstat $G 301)" ] && echo 1 || echo 0)
+ok "the skipped topic number is listed for the administrator (no message text)" $(ev 'echo wp_json_encode(get_option("cti_seen_topics"));' | grep -q '"topic":999' && ! ev 'echo wp_json_encode(get_option("cti_seen_topics"));' | grep -q 'munch' && echo 1 || echo 0)
+r=$(gdeliver message $G 302 0 42 "General chat FX:grpthree")
+ok "a message in General (no topic) is skipped" $(echo "$r" | grep -q filtered_topic && echo 1 || echo 0)
+r=$(gdeliver message $G 303 275 42 "" '{"new_chat_members":[{"id":43,"is_bot":false,"first_name":"New"}]}')
+ok "service messages (someone joined) are skipped" $(echo "$r" | grep -q filtered_service && echo 1 || echo 0)
+r=$(gdeliver message $G 304 275 0 "Bot says hi" '{"from":{"id":99,"is_bot":true,"first_name":"OtherBot"}}')
+ok "other bots' messages are skipped" $(echo "$r" | grep -q filtered_bot && echo 1 || echo 0)
+r=$(gdeliver edited_message $G 300 275 42 "Munch next month, new time FX:grpone_b")
+ok "an edited message in an event topic is handled as an edit" $(echo "$r" | grep -q edited && echo 1 || echo 0)
+r=$(send "$(gmsg message $G 305 275 42 'x FX:grpfour' | sed 's/"message"/"channel_post"/')" "$COLANDB_TG_WEBHOOK_SECRET")
+ok "a group message labelled as a channel post is ignored" $(echo "$r" | grep -q '"ignored"' && echo 1 || echo 0)
+r=$(gdeliver message $GA 310 0 42 "Member event FX:grpfive")
+ok "admins-only group: a member's message is skipped" $(echo "$r" | grep -q filtered_not_admin && echo 1 || echo 0)
+r=$(gdeliver message $GA 311 0 777 "Admin event FX:grpsix")
+ok "admins-only group: an admin's message is kept" $(echo "$r" | grep -q stored && echo 1 || echo 0)
+r=$(gdeliver message $GA 312 0 0 "Anonymous admin FX:grpseven" '{"sender_chat":{"id":-1006666666666,"type":"supergroup","title":"Admin Group"}}')
+ok "admins-only group: a message sent as the group is kept" $(echo "$r" | grep -q stored && echo 1 || echo 0)
+r=$(gdeliver message -1007777777777 320 0 42 "Not listed FX:grpeight")
+ok "a group not on the list is ignored; its ID and type are listed" $(echo "$r" | grep -q not_allowed && ev 'echo wp_json_encode(get_option("cti_unknown_chats"));' | grep -q '"type":"supergroup"' && echo 1 || echo 0)
+ok "the allowlist line with topics and admins reads back the same" $([ "$(ev 'echo CTI_Config::channels_text(CTI_Config::parse_channels("-1003923571403 | yes | COL&B group | topics: 129, 275, 573\n-1000000001 | no | x | admins"));')" = "$(printf -- '-1003923571403 | yes | COL&B group | topics: 129, 275, 573\n-1000000001 | no | x | admins')" ] && echo 1 || echo 0)
+ok "the webhook asks Telegram for group messages too" $(ev 'echo implode(",", CTI_Receiver::UPDATE_TYPES);' | grep -q 'channel_post,edited_channel_post,message,edited_message' && echo 1 || echo 0)
 
 echo "== Secrets in Settings (0.2.0) and diagnostics"
 NE="env -u COLANDB_TG_BOT_TOKEN -u COLANDB_TG_WEBHOOK_SECRET -u COLANDB_INTAKE_ANTHROPIC_KEY"

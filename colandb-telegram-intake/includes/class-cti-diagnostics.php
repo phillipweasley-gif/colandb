@@ -57,6 +57,7 @@ final class CTI_Diagnostics {
 		$out['problems']      = $wpdb->get_results( 'SELECT id, channel, status, attempts, reason, updated_at FROM ' . CTI_Install::table( 'posts' ) . " WHERE status IN ('retry','failed') ORDER BY id DESC LIMIT 10", ARRAY_A );
 		$out['recent_log']    = $wpdb->get_results( 'SELECT post_id, entry_id, action, LEFT(detail, 200) AS detail, created_at FROM ' . CTI_Install::table( 'log' ) . ' ORDER BY id DESC LIMIT 15', ARRAY_A );
 		$out['ignored_chats'] = array_values( (array) get_option( 'cti_unknown_chats', array() ) );
+		$out['skipped_topics'] = array_values( (array) get_option( 'cti_seen_topics', array() ) );
 		return $out;
 	}
 }

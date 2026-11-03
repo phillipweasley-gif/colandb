@@ -2,7 +2,7 @@
 /**
  * Plugin Name: COL&B Telegram Event Intake
  * Description: Reads event announcements from an approved list of Telegram channels and puts them in the Community Events Calendar's review queue. Never publishes.
- * Version: 0.2.0
+ * Version: 0.3.0
  * Author: RA Marketing
  * Requires PHP: 7.4
  * Requires Plugins: community-events-calendar
@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'CTI_VERSION', '0.2.0' );
+define( 'CTI_VERSION', '0.3.0' );
 define( 'CTI_DIR', plugin_dir_path( __FILE__ ) );
 // The Community Events Calendar release that first shipped the intake API.
 define( 'CTI_MIN_CEC_VERSION', '1.47.0' );
