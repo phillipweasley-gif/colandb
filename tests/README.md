@@ -33,7 +33,7 @@ bash tests/ends-e2e.sh               # event ends: past midnight is the next day
 bash tests/fundraisers-e2e.sh        # public fundraising tracker: wp-admin entry, totals-only cards, private donations: 21 checks
 bash tests/meetings-e2e.sh           # meeting notes: Secretary portal, drafts/approval, motions, files, public page: 27 checks
 bash tests/telegram-intake-e2e.sh    # Telegram event intake + calendar intake API (CEC 1.47.0): webhook secret, allowlist, text and flyer posts, field rules, duplicates, edits, failures and retries, dry run, never publishes, secrets in Settings, diagnostics, groups and topics, a flyer sent apart from its text, processing on arrival, saved venues: 109 checks against a fake Telegram and Claude (tests/mock-intake.php)
-bash tests/intake-rest-e2e.sh        # intake REST routes (CEC 1.50.0): admins only, created pending, every field, updates, duplicates, venues, no email: 39 checks, needs jq
+bash tests/intake-rest-e2e.sh        # intake REST routes (CEC 1.50.0/1.51.0): admins only, created pending, every field, updates, duplicates, venues, organization profiles, no email: 56 checks, needs jq
 bash tests/locations-e2e.sh         # calendar Country / State / City filter and the day list beside the grid (CEC 1.49.0): addresses read in 25 real styles, filtered month on the page, by AJAX and from a shared link, the cache, and in real Chromium the dropdowns, arrows, Today, the URL and the wide / medium / phone layouts: 36 checks
 bash tests/form-cache-e2e.sh         # form pages never cached (host CDN header copied by a test mu-plugin), expired nonces accepted when signed out, guest edit links: 36 checks
 ```

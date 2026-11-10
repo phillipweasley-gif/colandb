@@ -22,6 +22,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   GET  /intake/candidates      possible duplicates (start, end, urls[], days)
  *   GET  /intake/venues/find     a saved venue that is the same place (name, address, city, region)
  *   POST /intake/venues          save a new venue (name, address, city, region, country)
+ *   GET  /intake/orgs/<id>       an organization's or titleholder's profile (1.51.0)
+ *   POST /intake/orgs/<id>       change its profile: description, kind, listed, mission,
+ *                                title, year, producer, city/state or region, socials{}, logo_id
+ *
+ * Organizations themselves are created and linked to events through the
+ * standard routes (/wp/v2/cec_partner_org, the event's cec_partner_org).
  */
 class CEC_Intake_REST {
 
@@ -90,6 +96,22 @@ class CEC_Intake_REST {
 				'methods'             => 'POST',
 				'callback'            => array( __CLASS__, 'create_venue' ),
 				'permission_callback' => $admin,
+			)
+		);
+		register_rest_route(
+			self::NS,
+			'/intake/orgs/(?P<id>\d+)',
+			array(
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( __CLASS__, 'get_org' ),
+					'permission_callback' => $admin,
+				),
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( __CLASS__, 'update_org' ),
+					'permission_callback' => $admin,
+				),
 			)
 		);
 	}
@@ -180,5 +202,109 @@ class CEC_Intake_REST {
 			return self::fail( $id );
 		}
 		return new WP_REST_Response( array( 'id' => $id, 'name' => get_term( $id, 'cec_venue' )->name ), 201 );
+	}
+
+	/* ------------------------------------------------------------------
+	 * Organization and titleholder profiles (1.51.0)
+	 * ---------------------------------------------------------------- */
+
+	private static function org( $id ) {
+		$p = CEC_Orgs::profile( (int) $id );
+		if ( ! $p ) {
+			return new WP_Error( 'cec_org_missing', __( 'That organization doesn\'t exist.', 'cec' ), array( 'status' => 404 ) );
+		}
+		unset( $p['contact'], $p['zip'] ); // Private: never sent out.
+		return $p;
+	}
+
+	public static function get_org( WP_REST_Request $r ) {
+		return self::org( $r['id'] );
+	}
+
+	/** Changes only the fields sent. Same checks as the term edit screen. */
+	public static function update_org( WP_REST_Request $r ) {
+		$id = (int) $r['id'];
+		$p  = self::org( $id );
+		if ( is_wp_error( $p ) ) {
+			return $p;
+		}
+		$f   = self::fields( $r );
+		$out = array();
+
+		if ( isset( $f['kind'] ) ) {
+			if ( ! in_array( $f['kind'], CEC_Orgs::KINDS, true ) ) {
+				return self::fail( new WP_Error( 'cec_org_kind', __( 'kind must be organization or titleholder.', 'cec' ) ) );
+			}
+			$out['kind'] = $f['kind'];
+		}
+		if ( isset( $f['year'] ) && '' !== (string) $f['year'] && ! preg_match( '/^\d{4}$/', (string) $f['year'] ) ) {
+			return self::fail( new WP_Error( 'cec_org_year', __( 'year must be four digits.', 'cec' ) ) );
+		}
+		if ( isset( $f['socials'] ) ) {
+			if ( ! is_array( $f['socials'] ) ) {
+				return self::fail( new WP_Error( 'cec_org_socials', __( 'socials must be an object of links.', 'cec' ) ) );
+			}
+			$socials = $p['socials'];
+			foreach ( $f['socials'] as $k => $raw ) {
+				if ( ! isset( CEC_Orgs::socials()[ $k ] ) ) {
+					/* translators: %s: the key sent */
+					return self::fail( new WP_Error( 'cec_org_socials', sprintf( __( '"%s" is not a known link.', 'cec' ), (string) $k ) ) );
+				}
+				$clean = CEC_Orgs::clean_social( $k, $raw );
+				if ( is_wp_error( $clean ) ) {
+					return self::fail( $clean );
+				}
+				$socials[ $k ] = $clean;
+			}
+			$out['socials'] = array_filter( $socials );
+			update_term_meta( $id, 'cec_url', isset( $out['socials']['website'] ) ? $out['socials']['website'] : '' );
+		}
+		if ( isset( $f['logo_id'] ) ) {
+			$logo_id = (int) $f['logo_id'];
+			if ( $logo_id && ! wp_attachment_is_image( $logo_id ) ) {
+				return self::fail( new WP_Error( 'cec_org_logo', __( 'logo_id must be an image in the media library.', 'cec' ) ) );
+			}
+			$out['logo_id'] = $logo_id;
+			$out['logo']    = $logo_id ? (string) wp_get_attachment_url( $logo_id ) : '';
+		}
+		if ( isset( $f['city'] ) || isset( $f['state'] ) ) {
+			$loc = CEC_Orgs::clean_location( isset( $f['city'] ) ? sanitize_text_field( $f['city'] ) : '', isset( $f['state'] ) ? sanitize_text_field( $f['state'] ) : '', '' );
+			if ( is_wp_error( $loc ) ) {
+				return self::fail( $loc );
+			}
+			unset( $loc['zip'] );
+			$out = array_merge( $out, $loc );
+		} elseif ( isset( $f['region'] ) ) {
+			$out['region'] = sanitize_text_field( $f['region'] ); // Free text, e.g. outside the US.
+		}
+		foreach ( array( 'title', 'producer', 'summary' ) as $k ) {
+			if ( isset( $f[ $k ] ) ) {
+				$out[ $k ] = sanitize_text_field( $f[ $k ] );
+			}
+		}
+		if ( isset( $f['year'] ) ) {
+			$out['year'] = (string) $f['year'];
+		}
+		if ( isset( $f['mission'] ) ) {
+			$out['mission'] = mb_substr( sanitize_textarea_field( $f['mission'] ), 0, 2000 );
+		}
+		if ( isset( $f['highlights'] ) ) {
+			$out['highlights'] = array_slice( array_values( array_filter( array_map( 'sanitize_text_field', (array) $f['highlights'] ) ) ), 0, 8 );
+		}
+		if ( isset( $f['listed'] ) ) {
+			$out['listed'] = $f['listed'] ? '1' : '';
+			if ( $f['listed'] && ! $p['listed'] && ! $p['order'] ) {
+				$out['order'] = CEC_Orgs::next_order();
+			}
+		}
+		if ( isset( $f['description'] ) ) {
+			$t = wp_update_term( $id, 'cec_partner_org', array( 'description' => wp_kses_post( $f['description'] ) ) );
+			if ( is_wp_error( $t ) ) {
+				return self::fail( $t );
+			}
+		}
+		CEC_Orgs::save_profile( $id, $out );
+		CEC_Orgs::refresh_pages();
+		return self::org( $id );
 	}
 }
