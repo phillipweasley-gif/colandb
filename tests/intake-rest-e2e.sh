@@ -87,6 +87,30 @@ ok "venue without a name -> 400" $([ "$(st "$ADMIN" POST /venues '{"city":"Toron
 req "$ADMIN" POST /events/$ID "{\"venue_term_id\":$V}" >/dev/null
 ok "event linked to the saved venue, typed address cleared" $($W post term list $ID cec_venue --field=term_id | grep -qx "$V" && [ -z "$(meta $ID _cec_venue_custom_address)" ] && echo 1 || echo 0)
 
+echo "== Organization profiles (1.51.0)"
+ORG=$($W term create cec_partner_org "IR Title" --porcelain)
+$W term meta update $ORG cec_contact '{"email":"secret@example.invalid"}' --format=json >/dev/null
+PNG=$WPT/ir-logo.png; php -r '$i=imagecreatetruecolor(20,20);imagepng($i,$argv[1]);' "$PNG" 2>/dev/null; LOGO=$($W media import "$PNG" --porcelain)
+ok "subscriber can't read a profile" $([ "$(st "$SUB" GET /orgs/$ORG)" = 403 ] && echo 1 || echo 0)
+ok "editor can't change a profile" $([ "$(st "$EDITOR" POST /orgs/$ORG '{"listed":true}')" = 403 ] && echo 1 || echo 0)
+ok "GET leaves out the private contact" $(yes1 $(req "$ADMIN" GET /orgs/$ORG | jq '.name=="IR Title" and (has("contact")|not) and (has("zip")|not)'))
+ok "missing org -> 404" $([ "$(st "$ADMIN" GET /orgs/999999)" = 404 ] && echo 1 || echo 0)
+r=$(req "$ADMIN" POST /orgs/$ORG "{\"description\":\"A new title.\",\"kind\":\"organization\",\"listed\":true,\"region\":\"Toronto, Ontario\",\"socials\":{\"website\":\"mrlakeontarioleather.com\",\"instagram\":\"https://www.instagram.com/irtitle\"},\"logo_id\":$LOGO,\"mission\":\"Leather, leadership, community.\"}")
+ok "profile saved: description, kind, listed, region, mission" $(yes1 $(echo "$r" | jq '.description=="A new title." and .kind=="organization" and .listed==true and .region=="Toronto, Ontario" and .mission=="Leather, leadership, community." and .order>0'))
+ok "links cleaned, website kept in cec_url" $(yes1 $(echo "$r" | jq '.socials.website=="https://mrlakeontarioleather.com" and .socials.instagram=="https://www.instagram.com/irtitle"') ) 
+ok "cec_url mirrors the website" $([ "$($W term meta get $ORG cec_url)" = "https://mrlakeontarioleather.com" ] && echo 1 || echo 0)
+ok "logo set from the media library" $(yes1 $(echo "$r" | jq ".logo_id==$LOGO and (.logo|test(\"ir-logo\"))"))
+ok "contact untouched" $($W term meta get $ORG cec_contact --format=json | grep -q secret@ && echo 1 || echo 0)
+ok "only what is sent changes" $(yes1 $(req "$ADMIN" POST /orgs/$ORG '{"listed":false}' | jq '.listed==false and .description=="A new title." and .socials.website=="https://mrlakeontarioleather.com"'))
+ok "US city + state" $(yes1 $(req "$ADMIN" POST /orgs/$ORG '{"city":"Columbus","state":"OH"}' | jq '.city=="Columbus" and .state=="OH" and .region=="Columbus, OH"'))
+ok "bad kind -> 400" $([ "$(st "$ADMIN" POST /orgs/$ORG '{"kind":"club"}')" = 400 ] && echo 1 || echo 0)
+ok "bad year -> 400" $([ "$(st "$ADMIN" POST /orgs/$ORG '{"year":"27"}')" = 400 ] && echo 1 || echo 0)
+ok "unknown link -> 400" $([ "$(st "$ADMIN" POST /orgs/$ORG '{"socials":{"myspace":"https://myspace.com/x"}}')" = 400 ] && echo 1 || echo 0)
+ok "not an image -> 400" $([ "$(st "$ADMIN" POST /orgs/$ORG "{\"logo_id\":$ID}")" = 400 ] && echo 1 || echo 0)
+ok "titleholder with title, year, producer" $(yes1 $(req "$ADMIN" POST /orgs/$ORG '{"kind":"titleholder","title":"Mr. IR Leather","year":"2027","producer":"IR Contest"}' | jq '.kind=="titleholder" and .title=="Mr. IR Leather" and .year=="2027" and .producer=="IR Contest"'))
+ok "script stripped from the description" $(yes1 $(req "$ADMIN" POST /orgs/$ORG '{"description":"Hi<script>alert(1)</script>"}' | jq '.description|test("script")|not'))
+$W term delete cec_partner_org $ORG >/dev/null 2>&1
+
 echo "== Publishing is still a person's job"
 ok "admin publishes through wp/v2 as before" $([ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "http://127.0.0.1:8897/?rest_route=/wp/v2/cec_event/$ID" -H "Authorization: Basic $ADMIN" -H 'Content-Type: application/json' --data '{"status":"publish"}')" = 200 ] && [ "$(meta $ID _cec_start)" = 2026-11-21T19:30 ] && echo 1 || echo 0)
 ok "start kept after publishing (no meta wiped)" $([ "$(meta $ID _cec_end)" = 2026-11-21T21:00 ] && echo 1 || echo 0)

@@ -6,6 +6,18 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.51.0
+
+**Organization profiles over the intake REST API** (owner, 2026-11-10, after Claude created the Mr. Lake Ontario Leather and SURR Presents organizations: "Can you please update this based on the information you have been provided?").
+
+- Organizations could be created and linked to events through the standard REST routes, but their profile (description aside) is term meta the standard routes don't expose: kind, listed, logo, website and social links, mission, location, titleholder title/year/producer. Only wp-admin could set those.
+- **New routes** in `CEC_Intake_REST`: `GET /cec/v1/intake/orgs/<id>` reads a profile, `POST /cec/v1/intake/orgs/<id>` changes only the fields sent.
+  - Same checks as the term edit screen: links cleaned by `CEC_Orgs::clean_social()` (website also kept in `cec_url`), kind organization or titleholder, four-digit year, US city + state through `clean_location()`, or a free-text region for places outside the US. The logo must be an image in the media library. A newly listed group goes to the end of the display order.
+  - The private contact and ZIP are never sent out, and the routes don't change them.
+  - Administrators only, as in 1.50.0.
+
+**Verified** in the local WordPress kit: `tests/intake-rest-e2e.sh` now 56/56. The 17 new checks cover who may use the routes, private fields left out, each field saved, partial updates, bad values refused and a script stripped from the description.
+
 ## 1.50.0
 
 **Intake REST routes, so Claude can fill in dates and venues** (owner, 2026-11-10: "You've been able to add other dates, venues, and organizations. Why can't you add these?", then chose to build this update).
