@@ -6,6 +6,21 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.50.0
+
+**Intake REST routes, so Claude can fill in dates and venues** (owner, 2026-11-10: "You've been able to add other dates, venues, and organizations. Why can't you add these?", then chose to build this update).
+
+- Until now, events Claude added from outside the site (through the standard `/wp/v2/cec_event` route) could only carry a title, description, image and event type. Start, end, venue, address, host, admission and links are fields the standard route doesn't expose, so the owner had to type them in wp-admin. Only the Telegram intake, which runs inside the site, could set them.
+- **New `CEC_Intake_REST`**: the existing intake API (1.47.0/1.48.0) over REST, under `cec/v1`:
+  - `POST /intake/events` creates an event, `GET /intake/events/<id>` reads one, `POST /intake/events/<id>` updates one.
+  - `GET /intake/candidates` lists possible duplicates by date or link.
+  - `GET /intake/venues/find` and `POST /intake/venues` find or save a venue.
+- **Same rules as the Telegram intake**: administrators only (`manage_options`); new events are always **pending**, even if asked to publish; updates only while pending or in review. Publishing (which emails subscribers) stays a person's job. The author is the signed-in admin, whatever is sent. Each create and update is written to the event's audit log.
+
+**Verified** in the local WordPress kit:
+- New `tests/intake-rest-e2e.sh`: 39/39. Who may use it (no login, subscriber, editor refused), every field saved, stays pending, no email sent, bad values refused, updates, published and draft events left alone, duplicates by date and link, venues found by name and street, an event linked to a saved venue, then published normally through `/wp/v2` with its dates intact, no PHP warnings.
+- `tests/telegram-intake-e2e.sh` still 109/109 (the intake API itself is unchanged).
+
 ## 1.49.0
 
 **Calendar: filter by place, and the day's events on the right** (owner, 2026-11-03: "I need a city and state and country filter for the calendar and i would like it to show the list of events on the right hand side when a date is selected instead of being underneath it. It's not very user friendly below the calendar.").
