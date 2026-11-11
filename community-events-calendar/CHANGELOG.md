@@ -14,7 +14,7 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 - New donation method **Silent auction** (`auction`) in the private Donations box.
 - Nothing public changes: the cards still show only the total, goal, percentage and count.
 
-**Verified** in the local WordPress kit: `tests/fundraisers-e2e.sh` 21/21; `tests/form-cache-e2e.sh` 36/36 (with WooCommerce and the auction plugin active); the new `tests/auction-e2e.sh` (63/63) pays an auction order and checks the fundraiser total, the "Silent auction" entry, that it's counted once, and the Fundraising page. Month view untouched.
+**Verified** in the local WordPress kit: `tests/fundraisers-e2e.sh` 21/21; `tests/form-cache-e2e.sh` 36/36 (with WooCommerce and the auction plugin active); the new `tests/auction-e2e.sh` (67/67) pays an auction order and checks the fundraiser total, the "Silent auction" entry, that it's counted once, and the Fundraising page. Month view untouched.
 
 ## 1.51.0
 

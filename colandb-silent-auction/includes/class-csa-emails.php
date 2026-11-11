@@ -74,22 +74,27 @@ class CSA_Emails {
 		if ( (float) $order->get_total_tax() > 0 ) {
 			$extra .= __( 'Sales tax', 'csa' ) . ': ' . CSA_Data::money( (int) round( (float) $order->get_total_tax() * 100 ) ) . "\n";
 		}
-		foreach ( $order->get_fees() as $fee ) {
-			$extra .= $fee->get_name() . ': ' . CSA_Data::money( (int) round( (float) $fee->get_total() * 100 ) ) . "\n";
-		}
 		$list  .= $extra;
 		$pickup = '' !== trim( $auction['pickup'] ) ? "\n" . __( 'Collecting your items:', 'csa' ) . "\n" . trim( $auction['pickup'] ) . "\n" : '';
+		$by     = (int) $order->get_meta( '_csa_pay_by' );
+		$notice = '' !== trim( $auction['tax_notice'] ) ? "\n" . trim( $auction['tax_notice'] ) . "\n" : '';
+		$who    = '' !== trim( $auction['collector'] ) ? sprintf( /* translators: %s: business name */ __( ' Payment is collected for COL&B by %s.', 'csa' ), trim( $auction['collector'] ) ) : '';
 		/* translators: %s: auction name */
 		$subject = sprintf( __( 'You won! Pay for your %s items', 'csa' ), $auction['title'] );
 		$body    = sprintf(
-			/* translators: 1: first name, 2: auction, 3: list of items, 4: total, 5: pay link, 6: pickup paragraph */
-			__( "Hi %1\$s,\n\nCongratulations! You won these items in the %2\$s:\n\n%3\$s\nTotal: %4\$s\n\nPlease pay online here (sign in with your colandb.com account if asked):\n%5\$s\n%6\$s\nYour winning bids go to COL&B's fundraising. Thank you for your support!\n\nCOL&B", 'csa' ),
+			/* translators: 1: first name, 2: auction, 3: list of items, 4: total, 5: pay-by date, 6: pay link, 7: (unused, empty), 8: pickup paragraph, 9: tax notice, 10: who collects, 11: terms link */
+			__( "Hi %1\$s,\n\nCongratulations! You won these items in the %2\$s:\n\n%3\$s\nTotal: %4\$s\n\nPlease pay online by %5\$s (sign in with your colandb.com account if asked):\n%6\$s\n%7\$s%8\$s\nYour winning bids (less card processing costs) go to COL&B's fundraising. There are no other fees.%10\$s\n%9\$s\nAuction terms: %11\$s\n\nThank you for your support!\n\nCOL&B", 'csa' ),
 			CSA_Data::first_name( $user ),
 			$auction['title'],
 			$list,
 			CSA_Data::money( (int) round( (float) $order->get_total() * 100 ) ),
+			$by ? wp_date( __( 'l, F j', 'csa' ), $by ) : __( 'the date on the Auction page', 'csa' ),
 			$order->get_checkout_payment_url(),
-			$pickup
+			'',
+			$pickup,
+			$notice,
+			$who,
+			CSA_Install::page_url() . '#csa-terms'
 		);
 		return self::send( $user->user_email, $subject, $body );
 	}

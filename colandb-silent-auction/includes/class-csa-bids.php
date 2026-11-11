@@ -15,7 +15,7 @@ class CSA_Bids {
 
 	/**
 	 * Places a bid. Returns a result code:
-	 * 'placed', 'bought', 'login', 'closed', 'not_open', 'too_low', 'too_high',
+	 * 'placed', 'bought', 'login', 'closed', 'not_open', 'too_low', 'too_high', 'whole',
 	 * 'already_top', 'no_buy_now', 'busy' (someone else bid at the same moment; try again), 'bad'.
 	 */
 	public static function place( $item_id, $user_id, $cents, $buy_now = false, $now = null ) {
@@ -45,6 +45,9 @@ class CSA_Bids {
 		}
 		if ( null === $cents || $cents <= 0 ) {
 			return 'bad';
+		}
+		if ( 0 !== $cents % 100 ) {
+			return 'whole'; // Bids are whole dollars.
 		}
 		if ( $item['high_user'] === $user_id && ! $buy_now ) {
 			return 'already_top';

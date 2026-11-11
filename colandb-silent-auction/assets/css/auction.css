@@ -25,6 +25,11 @@
 .csa-countdown:not(:empty)::before { content: "· "; }
 .csa-for, .csa-terms, .csa-pickup, .csa-signin { margin: 0.5rem 0 0; color: var(--csa-muted); }
 .csa-signin a, .csa-pickup a { color: var(--csa-lime) !important; text-decoration: underline !important; }
+.csa-notice { margin: 0.75rem 0 0; color: var(--csa-lime); }
+.csa-terms-full { margin-top: 1rem; color: var(--csa-muted); font-size: 0.9rem; }
+.csa-terms-full summary { cursor: pointer; font-weight: 700; color: var(--csa-text); }
+.csa-terms-full p { margin: 0.5rem 0 0; }
+.csa-min a { color: var(--csa-muted) !important; text-decoration: underline !important; }
 .csa-desc { color: var(--csa-muted); font-size: 0.95rem; line-height: 1.55; }
 .csa-desc > :first-child { margin-top: 0; }
 .csa-desc > :last-child { margin-bottom: 0; }

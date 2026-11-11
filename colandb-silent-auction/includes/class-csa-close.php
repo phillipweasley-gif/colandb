@@ -117,18 +117,7 @@ class CSA_Close {
 		$order->update_meta_data( '_csa_auction', (int) $auction_id );
 		$a = CSA_Data::auction( $auction_id );
 		$order->calculate_totals( $a['tax'] && wc_tax_enabled() );
-		if ( $a['fee_pct'] || $a['fee_fixed'] ) {
-			// On what the winner pays before the fee (bids plus tax), rounded to the cent.
-			$base = (int) round( (float) $order->get_total() * 100 );
-			$fee  = (int) round( $base * $a['fee_pct'] / 10000 ) + $a['fee_fixed'];
-			$line = new WC_Order_Item_Fee();
-			$line->set_name( __( 'Card processing fee', 'csa' ) );
-			$line->set_tax_status( 'none' );
-			$line->set_amount( $fee / 100 );
-			$line->set_total( $fee / 100 );
-			$order->add_item( $line );
-			$order->calculate_totals( $a['tax'] && wc_tax_enabled() );
-		}
+		$order->update_meta_data( '_csa_pay_by', time() + $a['pay_days'] * DAY_IN_SECONDS );
 		/* translators: %s: auction name */
 		$order->add_order_note( sprintf( __( 'Created when the %s silent auction closed.', 'csa' ), get_the_title( $auction_id ) ) );
 		$order->save();
@@ -156,13 +145,15 @@ class CSA_Close {
 			$cents += (int) round( (float) $li->get_total() * 100 );
 		}
 		$auction = CSA_Data::auction( (int) $order->get_meta( '_csa_auction' ) );
+		$gross   = $cents;
+		$cents  -= (int) round( $cents * $auction['costs_pct'] / 10000 ); // What COL&B receives after card costs.
 		if ( $auction['fundraiser'] && function_exists( 'cec_fundraiser_add_donation' ) && $cents > 0 ) {
 			$added = cec_fundraiser_add_donation(
 				$auction['fundraiser'],
 				CSA_Data::field( $cents ),
 				'auction',
-				/* translators: 1: auction name, 2: order number */
-				sprintf( __( '%1$s, order #%2$s', 'csa' ), $auction['title'], $order->get_order_number() ),
+				/* translators: 1: auction name, 2: order number, 3: winning bids, 4: card costs percent */
+				sprintf( __( '%1$s, order #%2$s: %3$s in bids less %4$s card costs', 'csa' ), $auction['title'], $order->get_order_number(), CSA_Data::money( $gross ), CSA_Data::pct_text( $auction['costs_pct'] ) ),
 				wp_date( 'Y-m-d' )
 			);
 			if ( $added ) {

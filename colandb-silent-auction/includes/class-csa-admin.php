@@ -108,10 +108,19 @@ class CSA_Admin {
 			<tr><th scope="row"><?php esc_html_e( 'Sales tax', 'csa' ); ?></th>
 				<td><label><input type="checkbox" name="csa_tax" value="1" <?php checked( $new || $a['tax'] ); ?> /> <?php esc_html_e( 'Add sales tax to winners\' orders', 'csa' ); ?></label>
 				<p class="description"><?php esc_html_e( 'Uses the rates in WooCommerce → Settings → Tax (based on the shop address, since items are collected in person). Only the winning bids count toward the fundraiser, not tax or fees.', 'csa' ); ?></p></td></tr>
-			<tr><th scope="row"><label for="csa_fee_pct"><?php esc_html_e( 'Processing fee', 'csa' ); ?></label></th>
-				<td><input type="text" inputmode="decimal" class="small-text" id="csa_fee_pct" name="csa_fee_pct" value="<?php echo esc_attr( $a['fee_pct'] ? rtrim( rtrim( number_format( $a['fee_pct'] / 100, 2, '.', '' ), '0' ), '.' ) : '' ); ?>" placeholder="2.9" /> %
-				+ $ <input type="text" inputmode="decimal" class="small-text" id="csa_fee_fixed" name="csa_fee_fixed" value="<?php echo esc_attr( $a['fee_fixed'] ? number_format( $a['fee_fixed'] / 100, 2, '.', '' ) : '' ); ?>" placeholder="0.30" aria-label="<?php esc_attr_e( 'Fixed fee in dollars', 'csa' ); ?>" />
-				<p class="description"><?php esc_html_e( 'Optional. Added to each winner\'s order as "Card processing fee" (worked out on the bids plus tax) and shown to bidders on the Auction page before they bid. Leave both empty for no fee. Check your payment provider\'s rules on passing fees to buyers first.', 'csa' ); ?></p></td></tr>
+			<tr><th scope="row"><label for="csa_costs_pct"><?php esc_html_e( 'Card processing costs', 'csa' ); ?></label></th>
+				<td><input type="text" inputmode="decimal" class="small-text" id="csa_costs_pct" name="csa_costs_pct" value="<?php echo esc_attr( $new ? '3' : ( $a['costs_pct'] ? rtrim( rtrim( number_format( $a['costs_pct'] / 100, 2, '.', '' ), '0' ), '.' ) : '' ) ); ?>" /> %
+				<p class="description"><?php esc_html_e( 'Bids include card processing costs; no fee is added on top. The page tells bidders so, and this percentage is taken off each paid bid before it is added to the fundraiser, so its total shows what COL&B receives. Leave empty if the collector absorbs the costs.', 'csa' ); ?></p></td></tr>
+			<tr><th scope="row"><label for="csa_collector"><?php esc_html_e( 'Payments collected by', 'csa' ); ?></label></th>
+				<td><input type="text" id="csa_collector" name="csa_collector" value="<?php echo esc_attr( $a['collector'] ); ?>" class="regular-text" maxlength="120" placeholder="Weasley Studios" />
+				<label for="csa_pay_days"><?php esc_html_e( 'Winners pay within', 'csa' ); ?></label> <input type="number" min="1" max="60" class="small-text" id="csa_pay_days" name="csa_pay_days" value="<?php echo (int) $a['pay_days']; ?>" /> <?php esc_html_e( 'days', 'csa' ); ?>
+				<p class="description"><?php esc_html_e( 'The business whose payment account receives the money. Shown on the Auction page, so bidders know who charges their card and that it is collected for COL&B.', 'csa' ); ?></p></td></tr>
+			<tr><th scope="row"><label for="csa_tax_notice"><?php esc_html_e( 'Tax-deductible notice', 'csa' ); ?></label></th>
+				<td><textarea id="csa_tax_notice" name="csa_tax_notice" rows="2" class="large-text" maxlength="500"><?php echo esc_textarea( $new ? CSA_Data::default_tax_notice() : $a['tax_notice'] ); ?></textarea>
+				<p class="description"><?php esc_html_e( 'Shown on the Auction page and in each winner\'s email. Change it only on professional advice (for example once COL&B is a 501(c)(3)).', 'csa' ); ?></p></td></tr>
+			<tr><th scope="row"><label for="csa_terms"><?php esc_html_e( 'Auction terms', 'csa' ); ?></label></th>
+				<td><textarea id="csa_terms" name="csa_terms" rows="10" class="large-text" maxlength="5000"><?php echo esc_textarea( $new ? CSA_Data::default_terms() : $a['terms'] ); ?></textarea>
+				<p class="description"><?php esc_html_e( 'Shown on the Auction page under "Auction terms". Bidders agree to them when they bid.', 'csa' ); ?></p></td></tr>
 			<tr><th scope="row"><label for="csa_pickup"><?php esc_html_e( 'How winners collect items', 'csa' ); ?></label></th>
 				<td><textarea id="csa_pickup" name="csa_pickup" rows="3" class="large-text" maxlength="1000"><?php echo esc_textarea( $a['pickup'] ); ?></textarea>
 				<p class="description"><?php esc_html_e( 'Shown on the Auction page and in each winner\'s email. For example: "Pick up at Monthly Leather Invasion on December 13, or contact us to arrange delivery."', 'csa' ); ?></p></td></tr>
@@ -138,10 +147,14 @@ class CSA_Admin {
 		$pickup = isset( $_POST['csa_pickup'] ) ? mb_substr( trim( sanitize_textarea_field( wp_unslash( $_POST['csa_pickup'] ) ) ), 0, 1000 ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		update_post_meta( $post_id, '_csa_pickup', $pickup );
 		update_post_meta( $post_id, '_csa_tax', empty( $_POST['csa_tax'] ) ? '0' : '1' ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$pct = CSA_Data::to_cents( self::posted( 'csa_fee_pct', 10 ) ); // "2.9" → 290: hundredths of a percent.
-		update_post_meta( $post_id, '_csa_fee_pct', null === $pct ? 0 : min( 1000, $pct ) );
-		$fixed = CSA_Data::to_cents( self::posted( 'csa_fee_fixed', 10 ) );
-		update_post_meta( $post_id, '_csa_fee_fixed', null === $fixed ? 0 : min( 1000, $fixed ) );
+		$pct = CSA_Data::to_cents( self::posted( 'csa_costs_pct', 10 ) ); // "3" → 300: hundredths of a percent.
+		update_post_meta( $post_id, '_csa_costs_pct', null === $pct ? 0 : min( 1000, $pct ) );
+		update_post_meta( $post_id, '_csa_collector', self::posted( 'csa_collector', 120 ) );
+		update_post_meta( $post_id, '_csa_pay_days', max( 1, min( 60, absint( self::posted( 'csa_pay_days', 3 ) ) ) ) );
+		foreach ( array( 'tax_notice' => 500, 'terms' => 5000 ) as $k => $max ) {
+			$v = isset( $_POST[ 'csa_' . $k ] ) ? mb_substr( trim( sanitize_textarea_field( wp_unslash( $_POST[ 'csa_' . $k ] ) ) ), 0, $max ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			update_post_meta( $post_id, '_csa_' . $k, $v );
+		}
 		if ( ! metadata_exists( 'post', $post_id, '_csa_closed' ) ) {
 			add_post_meta( $post_id, '_csa_closed', '', true );
 		}
@@ -265,12 +278,12 @@ class CSA_Admin {
 				</select></td></tr>
 			<tr><th scope="row"><label for="csa_donor"><?php esc_html_e( 'Donated by', 'csa' ); ?></label></th>
 				<td><input type="text" id="csa_donor" name="csa_donor" value="<?php echo esc_attr( $it['donor'] ); ?>" class="regular-text" maxlength="120" /> <span class="description"><?php esc_html_e( 'Optional, shown on the item.', 'csa' ); ?></span></td></tr>
-			<tr><th scope="row"><label for="csa_value"><?php esc_html_e( 'Value ($)', 'csa' ); ?></label></th>
-				<td><?php $money( 'csa_value', $it['value'] ); ?> <span class="description"><?php esc_html_e( 'Optional, shown as "Value $…".', 'csa' ); ?></span></td></tr>
+			<tr><th scope="row"><label for="csa_value"><?php esc_html_e( 'Estimated value ($)', 'csa' ); ?></label></th>
+				<td><?php $money( 'csa_value', $it['value'] ); ?> <span class="description"><?php esc_html_e( 'Optional: the donor\'s estimate of its retail value, shown as "Est. value $… (from the donor)". Keep it realistic.', 'csa' ); ?></span></td></tr>
 			<tr><th scope="row"><label for="csa_start_bid"><?php esc_html_e( 'Starting bid ($)', 'csa' ); ?></label></th>
 				<td><?php $money( 'csa_start_bid', $it['start_bid'], '10' ); ?>
 				<label for="csa_increment"><?php esc_html_e( 'Minimum raise ($)', 'csa' ); ?></label> <?php $money( 'csa_increment', $new ? 500 : $it['increment'] ); ?>
-				<p class="description"><?php esc_html_e( 'Each new bid must be at least the current top bid plus the minimum raise.', 'csa' ); ?></p></td></tr>
+				<p class="description"><?php esc_html_e( 'Whole dollars (cents are rounded up). Each new bid must be at least the current top bid plus the minimum raise.', 'csa' ); ?></p></td></tr>
 			<tr><th scope="row"><label for="csa_buy_now"><?php esc_html_e( 'Buy It Now price ($)', 'csa' ); ?></label></th>
 				<td><?php $money( 'csa_buy_now', $it['buy_now'] ); ?> <span class="description"><?php esc_html_e( 'Optional. Anyone can end bidding on this item by paying this price.', 'csa' ); ?></span></td></tr>
 		</table>
@@ -292,7 +305,11 @@ class CSA_Admin {
 		update_post_meta( $post_id, '_csa_donor', self::posted( 'csa_donor', 120 ) );
 		foreach ( array( 'value', 'start_bid', 'increment', 'buy_now' ) as $k ) {
 			$c = CSA_Data::to_cents( self::posted( 'csa_' . $k, 20 ) );
-			update_post_meta( $post_id, '_csa_' . $k, null === $c ? 0 : $c );
+			$c = null === $c ? 0 : $c;
+			if ( 'value' !== $k ) {
+				$c = (int) ( ceil( $c / 100 ) * 100 ); // Bids are whole dollars, so these are too (rounded up).
+			}
+			update_post_meta( $post_id, '_csa_' . $k, $c );
 		}
 		if ( (int) get_post_meta( $post_id, '_csa_increment', true ) < 100 ) {
 			update_post_meta( $post_id, '_csa_increment', 100 );

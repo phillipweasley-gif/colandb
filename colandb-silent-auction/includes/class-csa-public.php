@@ -119,6 +119,7 @@ class CSA_Public {
 			'not_open'    => array( 'error', __( 'Bidding hasn\'t opened yet.', 'csa' ) ),
 			'no_buy_now'  => array( 'error', __( 'Buy It Now is no longer available for this item.', 'csa' ) ),
 			'expired'     => array( 'error', __( 'This page was open too long, so your bid wasn\'t placed. Please try again.', 'csa' ) ),
+			'whole'       => array( 'error', __( 'Please bid in whole dollars, for example 55.', 'csa' ) ),
 			'bad'         => array( 'error', __( 'Please enter an amount in dollars, for example 25.', 'csa' ) ),
 			'login'       => array( 'error', __( 'Please sign in to bid.', 'csa' ) ),
 		);
@@ -149,24 +150,31 @@ class CSA_Public {
 		$fr   = CSA_Data::fundraiser_title( $a['fundraiser'] );
 		if ( $fr ) {
 			/* translators: %s: fundraiser name */
-			$out .= '<p class="csa-for">' . esc_html( sprintf( __( 'Proceeds go to: %s', 'csa' ), $fr ) ) . '</p>';
+			if ( $a['costs_pct'] ) {
+				/* translators: 1: percent, 2: fundraiser name */
+				$for = sprintf( __( 'Bids include card processing costs (about %1$s), which are paid from the winning bid. The rest goes to: %2$s', 'csa' ), CSA_Data::pct_text( $a['costs_pct'] ), $fr );
+			} else {
+				/* translators: %s: fundraiser name */
+				$for = sprintf( __( 'Winning bids (not including sales tax) go to: %s', 'csa' ), $fr );
+			}
+			$out .= '<p class="csa-for">' . esc_html( $for ) . '</p>';
 		}
 		$desc = get_post_field( 'post_content', $id );
 		if ( '' !== trim( $desc ) ) {
 			$out .= '<div class="csa-desc">' . wpautop( wp_kses_post( $desc ) ) . '</div>';
 		}
-		$fee = CSA_Data::fee_text( $a );
-		if ( $a['tax'] || $fee ) {
-			if ( $a['tax'] && $fee ) {
-				/* translators: %s: fee, e.g. "2.9% + $0.30" */
-				$terms = sprintf( __( 'Winning bids are paid online by card, plus sales tax and a %s card processing fee.', 'csa' ), $fee );
-			} elseif ( $fee ) {
-				/* translators: %s: fee, e.g. "2.9% + $0.30" */
-				$terms = sprintf( __( 'Winning bids are paid online by card, plus a %s card processing fee.', 'csa' ), $fee );
-			} else {
-				$terms = __( 'Winning bids are paid online by card, plus sales tax.', 'csa' );
-			}
-			$out .= '<p class="csa-terms">' . esc_html( $terms ) . '</p>';
+		$pay = array(
+			/* translators: %d: number of days */
+			sprintf( _n( 'Winners pay online by card within %d day of bidding closing.', 'Winners pay online by card within %d days of bidding closing.', $a['pay_days'], 'csa' ), $a['pay_days'] ),
+		);
+		$pay[] = $a['tax'] ? __( 'Sales tax is added; there are no other fees.', 'csa' ) : __( 'There are no added fees.', 'csa' );
+		if ( '' !== trim( $a['collector'] ) ) {
+			/* translators: %s: business name */
+			$pay[] = sprintf( __( 'Payments are collected for COL&B by %s.', 'csa' ), trim( $a['collector'] ) );
+		}
+		$out .= '<p class="csa-terms">' . esc_html( implode( ' ', $pay ) ) . '</p>';
+		if ( '' !== trim( $a['tax_notice'] ) ) {
+			$out .= '<p class="csa-notice"><strong>' . esc_html( trim( $a['tax_notice'] ) ) . '</strong></p>';
 		}
 		if ( '' !== trim( $a['pickup'] ) ) {
 			$out .= '<p class="csa-pickup"><strong>' . esc_html__( 'Collecting your items:', 'csa' ) . '</strong> ' . esc_html( $a['pickup'] ) . '</p>';
@@ -178,6 +186,9 @@ class CSA_Public {
 				'<a href="' . esc_url( wp_login_url( self::here() ) ) . '">' . esc_html__( 'sign in', 'csa' ) . '</a>',
 				'<a href="' . esc_url( wp_registration_url() ) . '">' . esc_html__( 'create one', 'csa' ) . '</a>'
 			) . '</p>';
+		}
+		if ( '' !== trim( $a['terms'] ) ) {
+			$out .= '<details class="csa-terms-full" id="csa-terms"><summary>' . esc_html__( 'Auction terms', 'csa' ) . '</summary>' . wpautop( esc_html( $a['terms'] ) ) . '</details>';
 		}
 		$out .= '</header>';
 
@@ -218,7 +229,7 @@ class CSA_Public {
 		}
 		if ( $it['value'] ) {
 			/* translators: %s: amount */
-			$meta[] = esc_html( sprintf( __( 'Value %s', 'csa' ), CSA_Data::money( $it['value'] ) ) );
+			$meta[] = esc_html( sprintf( __( 'Est. value %s (from the donor)', 'csa' ), CSA_Data::money( $it['value'] ) ) );
 		}
 		if ( $meta ) {
 			$out .= '<p class="csa-meta">' . implode( ' · ', $meta ) . '</p>';
@@ -293,10 +304,10 @@ class CSA_Public {
 		} else {
 			$out  .= '<form class="csa-bid" method="post" action="' . $action . '" data-csa-min="' . esc_attr( CSA_Data::field( $it['min_next'] ) ) . '">' . $hidden;
 			$out  .= '<label for="' . $field . '">' . esc_html__( 'Your bid ($)', 'csa' ) . '</label>';
-			$out  .= '<div class="csa-bid-row"><input type="number" inputmode="decimal" id="' . $field . '" name="csa_amount" min="' . esc_attr( CSA_Data::field( $it['min_next'] ) ) . '" step="0.01" value="' . esc_attr( CSA_Data::field( $it['min_next'] ) ) . '" required aria-describedby="' . $field . '-min" />';
+			$out  .= '<div class="csa-bid-row"><input type="number" inputmode="decimal" id="' . $field . '" name="csa_amount" min="' . esc_attr( CSA_Data::field( $it['min_next'] ) ) . '" step="1" value="' . esc_attr( CSA_Data::field( $it['min_next'] ) ) . '" required aria-describedby="' . $field . '-min" />';
 			$out  .= '<button type="submit" class="csa-btn">' . esc_html__( 'Place bid', 'csa' ) . '</button></div>';
 			/* translators: %s: amount */
-			$out .= '<p class="csa-min" id="' . $field . '-min">' . esc_html( sprintf( __( 'Minimum bid %s', 'csa' ), CSA_Data::money( $it['min_next'] ) ) ) . '</p>';
+			$out .= '<p class="csa-min" id="' . $field . '-min">' . esc_html( sprintf( __( 'Minimum bid %s', 'csa' ), CSA_Data::money( $it['min_next'] ) ) ) . ' · <a href="#csa-terms">' . esc_html__( 'By bidding you agree to the auction terms', 'csa' ) . '</a></p>';
 			$out .= '</form>';
 		}
 		if ( $it['buy_now'] && $it['high'] < $it['buy_now'] ) {

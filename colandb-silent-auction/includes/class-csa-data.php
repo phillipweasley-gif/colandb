@@ -10,8 +10,15 @@ defined( 'ABSPATH' ) || exit;
  *   _csa_antisnipe           '1': a bid in the last 2 minutes gives that item 2 more minutes.
  *   _csa_pickup              How winners collect their items (shown to winners).
  *   _csa_tax                 '1': winners' orders add sales tax (WooCommerce → Settings → Tax rates).
- *   _csa_fee_pct, _csa_fee_fixed  Processing fee added to each winner's order: hundredths of a
- *                            percent (290 = 2.9%) and cents. 0 and 0 = no fee.
+ *   _csa_costs_pct           Card processing costs included in the bids, in hundredths of a
+ *                            percent (300 = 3%). Never added on top (card rules forbid a mandatory
+ *                            surcharge on debit cards and Square doesn't support one online); it is
+ *                            taken off each paid bid before it is added to the fundraiser, and said
+ *                            on the page, so the total shows what COL&B actually receives.
+ *   _csa_collector           Who collects the payments (e.g. "Weasley Studios"), said on the page.
+ *   _csa_pay_days            Days winners have to pay (default 7).
+ *   _csa_tax_notice          The tax-deductibility notice shown on the page and in the winner email.
+ *   _csa_terms               The auction terms (shown on the page; bidding means agreeing).
  *   _csa_closed              '' while open; 'closing' while winners are worked out; then the Unix time.
  *
  * Item (`csa_item`, not public): title, description, photo.
@@ -123,8 +130,11 @@ class CSA_Data {
 			'antisnipe'  => '1' === get_post_meta( $id, '_csa_antisnipe', true ),
 			'pickup'     => (string) get_post_meta( $id, '_csa_pickup', true ),
 			'tax'        => '1' === get_post_meta( $id, '_csa_tax', true ),
-			'fee_pct'    => (int) get_post_meta( $id, '_csa_fee_pct', true ),
-			'fee_fixed'  => (int) get_post_meta( $id, '_csa_fee_fixed', true ),
+			'costs_pct'  => (int) get_post_meta( $id, '_csa_costs_pct', true ),
+			'collector'  => (string) get_post_meta( $id, '_csa_collector', true ),
+			'pay_days'   => max( 1, (int) ( get_post_meta( $id, '_csa_pay_days', true ) ? get_post_meta( $id, '_csa_pay_days', true ) : 7 ) ),
+			'tax_notice' => (string) get_post_meta( $id, '_csa_tax_notice', true ),
+			'terms'      => (string) get_post_meta( $id, '_csa_terms', true ),
 			'closed'     => (string) get_post_meta( $id, '_csa_closed', true ),
 		);
 	}
@@ -215,16 +225,18 @@ class CSA_Data {
 		);
 	}
 
-	/** The processing fee in words, e.g. "2.9% + $0.30", or '' for none. */
-	public static function fee_text( $a ) {
-		$parts = array();
-		if ( $a['fee_pct'] ) {
-			$parts[] = rtrim( rtrim( number_format( $a['fee_pct'] / 100, 2, '.', '' ), '0' ), '.' ) . '%';
-		}
-		if ( $a['fee_fixed'] ) {
-			$parts[] = '$' . number_format( $a['fee_fixed'] / 100, 2 );
-		}
-		return implode( ' + ', $parts );
+	/** "3%" for a percent stored in hundredths. */
+	public static function pct_text( $hundredths ) {
+		return rtrim( rtrim( number_format( $hundredths / 100, 2, '.', '' ), '0' ), '.' ) . '%';
+	}
+
+	/** Default texts for a new auction (the site team can change them per auction). */
+	public static function default_tax_notice() {
+		return __( 'COL&B is not a registered 501(c)(3) nonprofit yet, so winning bids and donated items are not tax-deductible.', 'csa' );
+	}
+
+	public static function default_terms() {
+		return __( "1. Every bid is a promise to buy the item at that price if you win. Bids can't be withdrawn.\n2. Winners are emailed when bidding closes and must pay online within the time stated on the Auction page. If a winner doesn't pay in time, we may offer the item to the next-highest bidder or auction it again.\n3. Bids are in whole dollars and include card processing costs. Sales tax is added at checkout; there are no other fees.\n4. Items are donated and sold as-is. Values are the donor's estimates, not appraisals. No returns or refunds, unless an item is not as described.\n5. Items must be collected as described on the Auction page.\n6. Winning bids and donated items are not tax-deductible.\n7. Bidders' names are never shown publicly. Your email is used only to tell you about your bids and winnings.\n8. We may cancel a bid or remove an item if something goes wrong (for example, an item becomes unavailable or a bid is clearly a mistake).", 'csa' );
 	}
 
 	/** Site-time text for a Unix time, e.g. "Saturday, December 6 at 8:00 pm". */

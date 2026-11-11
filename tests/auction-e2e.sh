@@ -55,8 +55,8 @@ U1=$(ev 'echo get_user_by("login","zzabidder1")->ID;'); U2=$(ev 'echo get_user_b
 : > wp-content/debug.log; : > wp-content/mail.log
 FR=$(ev '$id=wp_insert_post(array("post_type"=>"cec_fundraiser","post_status"=>"publish","post_title"=>"ZZA Registration Fund","post_content"=>"x")); update_post_meta($id,"_cec_fr_goal",1000); echo $id;')
 ev "CEC_Fundraisers::add_donation($FR, 100, 'cash', 'opening gift');" >/dev/null
-# WooCommerce taxes on, one 7.5% rate (the test shop's address), as the site team would set up.
-ev 'update_option("woocommerce_calc_taxes","yes"); update_option("woocommerce_tax_based_on","base"); update_option("woocommerce_default_country","US:OH"); global $wpdb; $wpdb->query("DELETE FROM {$wpdb->prefix}woocommerce_tax_rates"); WC_Tax::_insert_tax_rate(array("tax_rate_country"=>"US","tax_rate_state"=>"OH","tax_rate"=>"7.5000","tax_rate_name"=>"Sales tax","tax_rate_priority"=>1,"tax_rate_compound"=>0,"tax_rate_shipping"=>0,"tax_rate_order"=>0,"tax_rate_class"=>""));' >/dev/null
+# WooCommerce taxes on, one 8% rate (Franklin County since April 2025) (the test shop's address), as the site team would set up.
+ev 'update_option("woocommerce_calc_taxes","yes"); update_option("woocommerce_tax_based_on","base"); update_option("woocommerce_default_country","US:OH"); global $wpdb; $wpdb->query("DELETE FROM {$wpdb->prefix}woocommerce_tax_rates"); WC_Tax::_insert_tax_rate(array("tax_rate_country"=>"US","tax_rate_state"=>"OH","tax_rate"=>"8.0000","tax_rate_name"=>"Sales tax","tax_rate_priority"=>1,"tax_rate_compound"=>0,"tax_rate_shipping"=>0,"tax_rate_order"=>0,"tax_rate_class"=>""));' >/dev/null
 
 echo "== Installed"
 PAGE=$(ev 'echo (int) get_option("csa_page_id");')
@@ -69,14 +69,16 @@ login admin admin admin
 curl -s -b $T/admin.jar -c $T/admin.jar -o $T/list.html "$H/wp-admin/edit.php?post_type=csa_auction"
 ok "the draft-page reminder shows on the Auctions list" $(has $T/list.html 'Silent Auction page is still a draft')
 A=$(newpost csa_auction)
+ok "a new auction starts with the not-tax-deductible notice, default terms and 3% card costs" $([ "$(has $T/new.html 'not tax-deductible.</textarea>')$(has $T/new.html 'Bids can')$(has $T/new.html 'name="csa_costs_pct" value="3"')$(hasnt $T/new.html 'csa_fee')" = 1111 ] && echo 1 || echo 0)
 ok "Add New Auction shows the dates, last-minute, fundraiser and pickup fields" $([ "$(has $T/new.html 'name="csa_start"')$(has $T/new.html 'name="csa_antisnipe" value="1"  checked')$(has $T/new.html "value=\"$FR\"")$(has $T/new.html 'name="csa_pickup"')" = 1111 ] && echo 1 || echo 0)
 START=$(ev 'echo wp_date("Y-m-d\TH:i", time()-3600);'); END=$(ev 'echo wp_date("Y-m-d\TH:i", time()+86400);')
 code=$(save admin $A csa_auction --data-urlencode "post_title=ZZA Winter Auction" --data-urlencode "content=Bid on great things." --data-urlencode "csa_start=$START" --data-urlencode "csa_end=$END" \
 	--data-urlencode "csa_antisnipe=1" --data-urlencode "csa_fundraiser=$FR" --data-urlencode "csa_pickup=Pick up at Leather Invasion." \
-	--data-urlencode "csa_tax=1" --data-urlencode "csa_fee_pct=2.9" --data-urlencode "csa_fee_fixed=0.30")
+	--data-urlencode "csa_tax=1" --data-urlencode "csa_costs_pct=3" --data-urlencode "csa_collector=ZZA Studios" --data-urlencode "csa_pay_days=5" \
+	--data-urlencode "csa_tax_notice=ZZA is not a 501(c)(3), so nothing is tax-deductible." --data-urlencode "csa_terms=ZZTERMS bids are binding.")
 ok "saving the auction keeps its dates (site time), fundraiser and pickup" $([ "$code" = 302 ] && [ "$(ev "echo wp_date('Y-m-d\TH:i', get_post_meta($A,'_csa_end',true)).'|'.get_post_meta($A,'_csa_fundraiser',true).'|'.get_post_meta($A,'_csa_antisnipe',true).'|'.get_post_meta($A,'_csa_pickup',true);")" = "$END|$FR|1|Pick up at Leather Invasion." ] && echo 1 || echo 0)
 I1=$(newpost csa_item "&csa_auction=$A")
-ok "sales tax on, processing fee 2.9% + \$0.30 saved" $([ "$(ev "echo get_post_meta($A,'_csa_tax',true).'|'.get_post_meta($A,'_csa_fee_pct',true).'|'.get_post_meta($A,'_csa_fee_fixed',true);")" = "1|290|30" ] && echo 1 || echo 0)
+ok "sales tax on, 3% card costs, collector, 5 days to pay, notice and terms saved" $([ "$(ev "echo get_post_meta($A,'_csa_tax',true).'|'.get_post_meta($A,'_csa_costs_pct',true).'|'.get_post_meta($A,'_csa_collector',true).'|'.get_post_meta($A,'_csa_pay_days',true).'|'.get_post_meta($A,'_csa_terms',true);")" = "1|300|ZZA Studios|5|ZZTERMS bids are binding." ] && echo 1 || echo 0)
 ok "Add an item from the auction picks that auction" $(has $T/new.html "value=\"$A\"  selected")
 code=$(save admin $I1 csa_item --data-urlencode "post_title=ZZA Leather Harness" --data-urlencode "content=Custom fit." --data-urlencode "csa_auction=$A" --data-urlencode "csa_donor=ZZA Leatherworks" \
 	--data-urlencode "csa_value=\$250" --data-urlencode "csa_start_bid=50" --data-urlencode "csa_increment=5" --data-urlencode "csa_buy_now=")
@@ -84,14 +86,15 @@ I2=$(newpost csa_item "&csa_auction=$A")
 save admin $I2 csa_item --data-urlencode "post_title=ZZA Weekend Getaway" --data-urlencode "csa_auction=$A" --data-urlencode "csa_start_bid=100" --data-urlencode "csa_increment=10" --data-urlencode "csa_buy_now=300" >/dev/null
 I3=$(newpost csa_item "&csa_auction=$A")
 save admin $I3 csa_item --data-urlencode "post_title=ZZA Gift Basket" --data-urlencode "csa_auction=$A" --data-urlencode "csa_start_bid=20.50" --data-urlencode "csa_increment=0" >/dev/null
-ok "item prices are saved in cents; a missing minimum raise becomes \$1" $([ "$(ev "echo get_post_meta($I1,'_csa_start_bid',true).'|'.get_post_meta($I1,'_csa_value',true).'|'.get_post_meta($I2,'_csa_buy_now',true).'|'.get_post_meta($I3,'_csa_start_bid',true).'|'.get_post_meta($I3,'_csa_increment',true);")" = "5000|25000|30000|2050|100" ] && echo 1 || echo 0)
+ok "item prices are saved in cents, bids rounded up to whole dollars; a missing minimum raise becomes \$1" $([ "$(ev "echo get_post_meta($I1,'_csa_start_bid',true).'|'.get_post_meta($I1,'_csa_value',true).'|'.get_post_meta($I2,'_csa_buy_now',true).'|'.get_post_meta($I3,'_csa_start_bid',true).'|'.get_post_meta($I3,'_csa_increment',true);")" = "5000|25000|30000|2100|100" ] && echo 1 || echo 0)
 ev "wp_update_post(array('ID'=>$PAGE,'post_status'=>'publish'));" >/dev/null
 
 echo "== The Auction page"
 curl -s -D $T/h.txt -o $T/page.html "$H/?page_id=$PAGE"
-ok "shows the auction, its items, prices, donor, value and pickup" $([ "$(has $T/page.html 'ZZA Winter Auction')$(has $T/page.html 'ZZA Leather Harness')$(has $T/page.html 'Starting bid <strong>\$50</strong>')$(has $T/page.html 'Donated by ZZA Leatherworks · Value \$250')$(has $T/page.html 'Pick up at Leather Invasion.')$(has $T/page.html 'Starting bid <strong>\$20.50</strong>')" = 111111 ] && echo 1 || echo 0)
-ok "says where the money goes" $(has $T/page.html 'Proceeds go to: ZZA Registration Fund')
-ok "tells bidders about tax and the fee before they bid" $(has $T/page.html 'plus sales tax and a 2.9% + \$0.30 card processing fee')
+ok "shows the auction, its items, prices, donor, value and pickup" $([ "$(has $T/page.html 'ZZA Winter Auction')$(has $T/page.html 'ZZA Leather Harness')$(has $T/page.html 'Starting bid <strong>\$50</strong>')$(has $T/page.html 'Donated by ZZA Leatherworks · Est. value \$250 (from the donor)')$(has $T/page.html 'Pick up at Leather Invasion.')$(has $T/page.html 'Starting bid <strong>\$21</strong>')" = 111111 ] && echo 1 || echo 0)
+ok "before bidding: pay within 5 days, tax added, no other fees, who collects" $(has $T/page.html 'Winners pay online by card within 5 days of bidding closing. Sales tax is added; there are no other fees. Payments are collected for COL&amp;B by ZZA Studios.')
+ok "says nothing is tax-deductible, and what the fundraiser gets" $([ "$(has $T/page.html 'ZZA is not a 501(c)(3), so nothing is tax-deductible.')$(has $T/page.html 'Bids include card processing costs (about 3%), which are paid from the winning bid. The rest goes to: ZZA Registration Fund')$(hasnt $T/page.html 'Proceeds go to')" = 111 ] && echo 1 || echo 0)
+ok "shows the auction terms" $([ "$(has $T/page.html 'id="csa-terms"')$(has $T/page.html 'ZZTERMS bids are binding.')" = 11 ] && echo 1 || echo 0)
 ok "signed out: Sign in to bid, no bid form" $([ "$(has $T/page.html 'Sign in to bid')$(hasnt $T/page.html 'name="csa_amount"')" = 11 ] && echo 1 || echo 0)
 ok "never cached (no-store, no CDN hint)" $(grep -qi 'cache-control: no-store' $T/h.txt && echo 1 || echo 0)
 ok "has a countdown to closing" $(has $T/page.html 'data-csa-end=')
@@ -103,6 +106,7 @@ get b1 p1 "$H/?page_id=$PAGE"
 ok "signed in: a bid form with the minimum filled in" $([ "$(has $T/p1.html 'name="csa_amount"')$(has $T/p1.html 'value="50" required')$(has $T/p1.html 'Minimum bid \$50')" = 111 ] && echo 1 || echo 0)
 ok "a bid under the starting bid is refused" $([ "$(bid b1 $I1 45)" = too_low ] && echo 1 || echo 0)
 ok "a bid that isn't an amount is refused" $([ "$(bid b1 $I1 abc)" = bad ] && echo 1 || echo 0)
+ok "bids must be whole dollars" $([ "$(bid b1 $I1 50.50)" = whole ] && [ "$(meta $I1 _csa_high)" = "" ] && echo 1 || echo 0)
 ok "a bid at the starting bid is placed" $([ "$(bid b1 $I1 50)" = placed ] && [ "$(meta $I1 _csa_high)" = "5000|$U1" ] && echo 1 || echo 0)
 ok "the top bidder can't bid against themselves" $([ "$(bid b1 $I1 60)" = already_top ] && echo 1 || echo 0)
 ok "the next bid must add the minimum raise" $([ "$(bid b2 $I1 54)" = too_low ] && echo 1 || echo 0)
@@ -164,11 +168,11 @@ O1=$(meta $I1 _csa_order); O2=$(meta $I2 _csa_order); O3=$(meta $I3 _csa_order)
 W3=$(ev "echo explode('|', get_post_meta($I3,'_csa_high',true))[1];")
 ok "the 5-minute check closes it once every item has ended" $([ "$(ev "echo CSA_Data::auction_status($A);")" = closed ] && echo 1 || echo 0)
 ok "one pending order per winner, holding each won item at its price" $([ -n "$O1" ] && [ "$O1" != "$O2" ] && [ "$(ev "\$o=wc_get_order($O2); echo \$o->get_status().'|'.\$o->get_subtotal().'|'.\$o->get_customer_id().'|'.count(\$o->get_items());")" = "pending|300|$U2|1" ] && [ "$(ev "echo wc_get_order($O1)->get_customer_id();")" = "$U1" ] && echo 1 || echo 0)
-ok "the order adds 7.5% sales tax and the fee on bids plus tax (\$300 + \$22.50 + \$9.65 = \$332.15)" $([ "$(ev "\$o=wc_get_order($O2); \$f=array_values(\$o->get_fees()); echo \$o->get_total_tax().'|'.\$f[0]->get_name().'|'.\$f[0]->get_total().'|'.\$o->get_total();")" = "22.5|Card processing fee|9.65|332.15" ] && echo 1 || echo 0)
+ok "the order adds 8% sales tax and no fee (\$300 + \$24 = \$324)" $([ "$(ev "\$o=wc_get_order($O2); echo \$o->get_total_tax().'|'.count(\$o->get_fees()).'|'.\$o->get_total();")" = "24|0|324.00" ] && echo 1 || echo 0)
 ok "a winner of two items gets one order for both" $( [ "$W3" = "$U1" ] && [ "$O3" = "$O1" ] && [ "$(ev "echo wc_get_order($O1)->get_subtotal();")" = "95" ] || { [ "$W3" = "$U3" ] && [ "$O3" != "$O1" ]; } && echo 1 || echo 0)
 WINNERS=$([ "$O3" = "$O1" ] && echo 2 || echo 3)
 ok "each winner gets one email with their items, total and pay link; the admin gets a summary" $([ "$(mails)" = $((M0+WINNERS+1)) ] && grep -q '"to":"zzabidder1@example.com","subject":"You won! Pay for your ZZA Winter Auction items"' wp-content/mail.log && grep 'You won!' wp-content/mail.log | grep 'zzabidder1' | grep -q 'order-pay' && grep -q 'ZZA Winter Auction has closed' wp-content/mail.log && grep -q 'Pick up at Leather Invasion' wp-content/mail.log && echo 1 || echo 0)
-ok "the winner email lists sales tax, the fee and the total" $(grep 'You won!' wp-content/mail.log | grep zzabidder2 | grep 'Sales tax: \$22.50' | grep 'Card processing fee: \$9.65' | grep -q 'Total: \$332.15' && echo 1 || echo 0)
+ok "the winner email: tax, total, pay-by date, card costs included, who collects, not deductible, terms" $(grep 'You won!' wp-content/mail.log | grep zzabidder2 | grep 'Sales tax: \$24' | grep 'Total: \$324' | grep 'Please pay online by ' | grep 'less card processing costs) go to' | grep 'There are no other fees.' | grep 'collected for COL&B by ZZA Studios' | grep 'nothing is tax-deductible' | grep -q 'csa-terms' && echo 1 || echo 0)
 grep 'You won!' wp-content/mail.log | grep zzabidder2 | php -r '$j=json_decode(trim(fgets(STDIN)),true); echo $j["subject"],"\n",$j["message"],"\n";' > $T/winner-email.txt
 M1=$(mails)
 ev "CSA_Close::maybe_close($A); do_action('csa_check_closing');" >/dev/null
@@ -181,6 +185,9 @@ get b1 pay "$PAY"
 ok "the winner can open the pay page for their order" $([ "$(has $T/pay.html 'Silent auction: ZZA Leather Harness')" = 1 ] && echo 1 || echo 0)
 get b2 pay2 "$PAY"
 ok "someone else can't pay (or see) that order" $(hasnt $T/pay2.html 'Silent auction: ZZA Leather Harness')
+PAY2=$(ev "echo wc_get_order($O2)->get_checkout_payment_url();")
+get b2 pay2b "$PAY2"
+ok "the pay page adds no fee" $([ "$(has $T/pay2b.html 'Silent auction: ZZA Weekend Getaway')$(hasnt $T/pay2b.html 'csa_cover')$(hasnt $T/pay2b.html 'processing fee')" = 111 ] && echo 1 || echo 0)
 curl -s -b $T/admin.jar -o $T/res.html "$H/wp-admin/post.php?post=$A&action=edit"
 ok "wp-admin shows each item's winner, email and order" $([ "$(has $T/res.html 'zzabidder1@example.com')$(has $T/res.html 'Not paid yet')$(has $T/res.html 'Closed. Winners have been emailed')" = 111 ] && echo 1 || echo 0)
 curl -s -b $T/admin.jar -o $T/bids.html "$H/wp-admin/post.php?post=$I1&action=edit"
@@ -189,14 +196,14 @@ ok "an item's private bid history lists every bid" $([ "$(has $T/bids.html '\$70
 echo "== Paying"
 BEFORE=$(meta $FR _cec_fr_raised)
 ev "wc_get_order($O2)->update_status('processing');" >/dev/null
-ok "a paid order adds only the winning bid (not tax or fee) to the fundraiser as a silent-auction donation" $([ "$(meta $FR _cec_fr_raised)" = "$(php -r "echo $BEFORE+300;")" ] && [ "$(ev "\$e=CEC_Fundraisers::entries($FR); \$l=end(\$e); echo \$l['method'].'|'.\$l['amount'];")" = "auction|300" ] && echo 1 || echo 0)
+ok "a paid order adds the winning bid less 3% card costs (\$291 of \$300; no tax) to the fundraiser as a silent-auction donation" $([ "$(meta $FR _cec_fr_raised)" = "$(php -r "echo $BEFORE+291;")" ] && [ "$(ev "\$e=CEC_Fundraisers::entries($FR); \$l=end(\$e); echo \$l['method'].'|'.\$l['amount'];")" = "auction|291" ] && echo 1 || echo 0)
 ev "wc_get_order($O2)->update_status('completed');" >/dev/null
-ok "completing it later doesn't count it twice" $([ "$(meta $FR _cec_fr_raised)" = "$(php -r "echo $BEFORE+300;")" ] && echo 1 || echo 0)
+ok "completing it later doesn't count it twice" $([ "$(meta $FR _cec_fr_raised)" = "$(php -r "echo $BEFORE+291;")" ] && echo 1 || echo 0)
 ok "its items are marked paid" $([ "$(meta $I2 _csa_paid)" = 1 ] && [ "$(meta $I1 _csa_paid)" = "" ] && echo 1 || echo 0)
 ev "update_post_meta($FR,'_cec_fr_end',''); CEC_Admin_Settings::maybe_create_pages();" >/dev/null
 FPAGE=$(ev "echo url_to_postid(CEC_Admin_Settings::get('fundraising_page_url'));")
 curl -s -o $T/fund.html "$H/?page_id=$FPAGE"
-ok "the Fundraising page shows the new total and no auction details" $([ "$(has $T/fund.html '\$400</strong> raised')$(hasnt $T/fund.html 'ZZA Winter Auction')" = 11 ] && echo 1 || echo 0)
+ok "the Fundraising page shows the new total and no auction details" $([ "$(has $T/fund.html '\$391</strong> raised')$(hasnt $T/fund.html 'ZZA Winter Auction')" = 11 ] && echo 1 || echo 0)
 
 echo "== Who may edit"
 curl -s -b $T/b1.jar -o $T/deny.html -w '%{http_code}' "$H/wp-admin/post.php?post=$A&action=edit" > $T/code.txt
