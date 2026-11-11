@@ -11,6 +11,7 @@ More than one Claude session works on this repository. **This repository is the 
 | `colandb-updater/` | COL&B Plugin Updater | Installs releases of the plugins above on the sites. |
 | `colandb-mcp/` | COL&B Claude Connector | Read-only MCP server so Claude can work with the site. Read its `TECHNICAL_BRIEF.md` and `docs/mcp-server-plan.md`. |
 | `colandb-telegram-intake/` | COL&B Telegram Event Intake | Reads approved Telegram channels into the calendar's review queue (never publishes). Read its `README.md`. |
+| `colandb-silent-auction/` | COL&B Silent Auction | Silent auctions on WooCommerce; paid orders count toward a fundraiser. Read its `README.md`. |
 | `tools/cmp-hosting-check/` | CMP Hosting Check | Temporary diagnostic. |
 | `docs/` | Project plan and decisions | `phase-2-integration-plan.md`, `mcp-server-plan.md`, `RELEASING.md`. |
 | `tests/` | Local WordPress test kit | See `tests/README.md`. |

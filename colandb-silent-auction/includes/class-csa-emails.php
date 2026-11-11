@@ -1,0 +1,113 @@
+<?php
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * The three emails. Plain text, sent with wp_mail(), so they go out through
+ * the site's mail setup (FluentSMTP on colandb.com: "COL&B", noreply@colandb.com).
+ * The owner approved none of this wording yet: see the CHANGELOG before release.
+ */
+class CSA_Emails {
+
+	private static function send( $to, $subject, $body ) {
+		/**
+		 * Lets a test or another plugin stop or change an auction email.
+		 *
+		 * @param array $mail { to, subject, body }.
+		 */
+		$mail = apply_filters( 'csa_email', array( 'to' => $to, 'subject' => $subject, 'body' => $body ) );
+		if ( empty( $mail['to'] ) ) {
+			return false;
+		}
+		return wp_mail( $mail['to'], $mail['subject'], $mail['body'] );
+	}
+
+	/** To the person whose top bid was just beaten. */
+	public static function outbid( $user_id, $item_id, $new_cents, $bought ) {
+		$user = get_userdata( $user_id );
+		if ( ! $user || ! is_email( $user->user_email ) ) {
+			return false;
+		}
+		$item    = CSA_Data::item( $item_id );
+		$auction = CSA_Data::auction( $item['auction'] );
+		$link    = CSA_Install::page_url() . '#csa-item-' . $item_id;
+		if ( $bought ) {
+			/* translators: %s: item name */
+			$subject = sprintf( __( '%s has been bought', 'csa' ), $item['title'] );
+			$body    = sprintf(
+				/* translators: 1: first name, 2: item, 3: auction, 4: price, 5: link to the auction */
+				__( "Hi %1\$s,\n\nSomeone bought %2\$s in the %3\$s with Buy It Now for %4\$s, so your bid on it is no longer in the running.\n\nThere may be other items you'd like:\n%5\$s\n\nThank you for supporting COL&B.\n\nCOL&B", 'csa' ),
+				CSA_Data::first_name( $user ),
+				$item['title'],
+				$auction['title'],
+				CSA_Data::money( $new_cents ),
+				CSA_Install::page_url()
+			);
+		} else {
+			/* translators: %s: item name */
+			$subject = sprintf( __( "You've been outbid on %s", 'csa' ), $item['title'] );
+			$body    = sprintf(
+				/* translators: 1: first name, 2: item, 3: auction, 4: new top bid, 5: closing time, 6: link to the item */
+				__( "Hi %1\$s,\n\nSomeone has placed a higher bid on %2\$s in the %3\$s. The top bid is now %4\$s.\n\nBidding closes %5\$s. To bid again:\n%6\$s\n\nThank you for supporting COL&B.\n\nCOL&B", 'csa' ),
+				CSA_Data::first_name( $user ),
+				$item['title'],
+				$auction['title'],
+				CSA_Data::money( $new_cents ),
+				CSA_Data::when( $item['end'] ),
+				$link
+			);
+		}
+		return self::send( $user->user_email, $subject, $body );
+	}
+
+	/** To a winner, once, with every item they won and the Pay now link. */
+	public static function winner( $user_id, $auction_id, $lines, $order ) {
+		$user = get_userdata( $user_id );
+		if ( ! $user || ! is_email( $user->user_email ) ) {
+			return false;
+		}
+		$auction = CSA_Data::auction( $auction_id );
+		$list    = '';
+		foreach ( $lines as $line ) {
+			$list .= '- ' . $line['title'] . ': ' . CSA_Data::money( $line['cents'] ) . "\n";
+		}
+		$extra = '';
+		if ( (float) $order->get_total_tax() > 0 ) {
+			$extra .= __( 'Sales tax', 'csa' ) . ': ' . CSA_Data::money( (int) round( (float) $order->get_total_tax() * 100 ) ) . "\n";
+		}
+		foreach ( $order->get_fees() as $fee ) {
+			$extra .= $fee->get_name() . ': ' . CSA_Data::money( (int) round( (float) $fee->get_total() * 100 ) ) . "\n";
+		}
+		$list  .= $extra;
+		$pickup = '' !== trim( $auction['pickup'] ) ? "\n" . __( 'Collecting your items:', 'csa' ) . "\n" . trim( $auction['pickup'] ) . "\n" : '';
+		/* translators: %s: auction name */
+		$subject = sprintf( __( 'You won! Pay for your %s items', 'csa' ), $auction['title'] );
+		$body    = sprintf(
+			/* translators: 1: first name, 2: auction, 3: list of items, 4: total, 5: pay link, 6: pickup paragraph */
+			__( "Hi %1\$s,\n\nCongratulations! You won these items in the %2\$s:\n\n%3\$s\nTotal: %4\$s\n\nPlease pay online here (sign in with your colandb.com account if asked):\n%5\$s\n%6\$s\nYour winning bids go to COL&B's fundraising. Thank you for your support!\n\nCOL&B", 'csa' ),
+			CSA_Data::first_name( $user ),
+			$auction['title'],
+			$list,
+			CSA_Data::money( (int) round( (float) $order->get_total() * 100 ) ),
+			$order->get_checkout_payment_url(),
+			$pickup
+		);
+		return self::send( $user->user_email, $subject, $body );
+	}
+
+	/** To the site administrator when an auction closes. */
+	public static function summary( $auction_id, $winners, $total_cents, $unsold ) {
+		$auction = CSA_Data::auction( $auction_id );
+		/* translators: 1: auction, 2: total of winning bids */
+		$subject = sprintf( __( '%1$s has closed: %2$s in winning bids', 'csa' ), $auction['title'], CSA_Data::money( $total_cents ) );
+		$body    = sprintf(
+			/* translators: 1: auction, 2: number of winners, 3: total, 4: number of items without bids, 5: wp-admin link */
+			__( "The %1\$s has closed.\n\nWinners: %2\$d\nWinning bids: %3\$s\nItems with no bids: %4\$d\n\nEach winner has been emailed a link to pay. To see who won and who has paid:\n%5\$s\n\nCOL&B website", 'csa' ),
+			$auction['title'],
+			$winners,
+			CSA_Data::money( $total_cents ),
+			$unsold,
+			admin_url( 'post.php?post=' . (int) $auction_id . '&action=edit' )
+		);
+		return self::send( get_option( 'admin_email' ), $subject, $body );
+	}
+}

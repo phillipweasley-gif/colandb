@@ -6,6 +6,16 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.52.0
+
+**Silent auction proceeds on the Fundraising page** (owner, 2026-11-11: "a fundraising section that allows for a silent auction using the wordpress/WooCommerce integration"; chose the COL&B Silent Auction plugin, whose paid orders count toward a fundraiser).
+
+- New public helpers in `includes/class-cec-fundraisers.php` for other COL&B plugins: `cec_get_fundraiser_choices()` (id => title, for the auction's "Money raised goes to" menu) and `cec_fundraiser_add_donation( $id, $amount, $method, $note, $date )`, backed by `CEC_Fundraisers::add_donation()`. It applies the wp-admin box's rules (positive amount, known method, 200-character note), re-sorts the entries, updates the cached total and count, and refreshes the pages showing fundraisers. The member and auction plugins still never touch fundraiser meta directly.
+- New donation method **Silent auction** (`auction`) in the private Donations box.
+- Nothing public changes: the cards still show only the total, goal, percentage and count.
+
+**Verified** in the local WordPress kit: `tests/fundraisers-e2e.sh` 21/21; `tests/form-cache-e2e.sh` 36/36 (with WooCommerce and the auction plugin active); the new `tests/auction-e2e.sh` (63/63) pays an auction order and checks the fundraiser total, the "Silent auction" entry, that it's counted once, and the Fundraising page. Month view untouched.
+
 ## 1.51.0
 
 **Organization profiles over the intake REST API** (owner, 2026-11-10, after Claude created the Mr. Lake Ontario Leather and SURR Presents organizations: "Can you please update this based on the information you have been provided?").
