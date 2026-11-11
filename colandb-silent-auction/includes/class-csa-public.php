@@ -100,7 +100,7 @@ class CSA_Public {
 		}
 		$out = '<div class="csa-wrap">';
 		if ( ! $ids ) {
-			$out .= '<p class="csa-empty">' . esc_html__( 'There is no silent auction right now. Check back soon!', 'csa' ) . '</p>';
+			$out .= '<p class="csa-empty">' . esc_html__( 'There is no sale or silent auction right now. Check back soon!', 'csa' ) . '</p>';
 		}
 		foreach ( $ids as $aid ) {
 			$out .= self::render_auction( $aid );
@@ -108,7 +108,7 @@ class CSA_Public {
 		return $out . '</div>';
 	}
 
-	private static function message( $code ) {
+	private static function message( $code, $sale = false ) {
 		$m = array(
 			'placed'      => array( 'ok', __( 'Your bid is in. You\'re the top bidder! We\'ll email you if someone outbids you.', 'csa' ) ),
 			'bought'      => array( 'ok', __( 'It\'s yours! You bought this item with Buy It Now. When the auction closes we\'ll email you a link to pay.', 'csa' ) ),
@@ -123,6 +123,19 @@ class CSA_Public {
 			'bad'         => array( 'error', __( 'Please enter an amount in dollars, for example 25.', 'csa' ) ),
 			'login'       => array( 'error', __( 'Please sign in to bid.', 'csa' ) ),
 		);
+		if ( $sale ) {
+			$m = array_merge(
+				$m,
+				array(
+					'bought'     => array( 'ok', __( 'It\'s yours! We\'ve emailed you a link to pay.', 'csa' ) ),
+					'closed'     => array( 'error', __( 'This sale has ended.', 'csa' ) ),
+					'not_open'   => array( 'error', __( 'The sale hasn\'t opened yet.', 'csa' ) ),
+					'no_buy_now' => array( 'error', __( 'Sorry, someone else has just bought this item.', 'csa' ) ),
+					'expired'    => array( 'error', __( 'This page was open too long, so nothing was bought. Please try again.', 'csa' ) ),
+					'login'      => array( 'error', __( 'Please sign in to buy.', 'csa' ) ),
+				)
+			);
+		}
 		return isset( $m[ $code ] ) ? $m[ $code ] : null;
 	}
 
@@ -132,7 +145,18 @@ class CSA_Public {
 		$out    = '<section class="csa-auction is-' . esc_attr( $status ) . '" aria-labelledby="csa-a-' . (int) $id . '">';
 		$out   .= '<header class="csa-head">';
 		$out   .= '<h2 class="csa-title" id="csa-a-' . (int) $id . '">' . esc_html( $a['title'] ) . '</h2>';
-		if ( 'upcoming' === $status ) {
+		if ( $a['sale'] ) {
+			if ( 'upcoming' === $status ) {
+				/* translators: %s: date and time */
+				$when = sprintf( __( 'The sale opens %s', 'csa' ), CSA_Data::when( $a['start'] ) );
+			} elseif ( 'open' === $status ) {
+				/* translators: %s: date and time */
+				$when = sprintf( __( 'The sale ends %s', 'csa' ), CSA_Data::when( $a['end'] ) );
+			} else {
+				/* translators: %s: date and time */
+				$when = sprintf( __( 'The sale ended %s', 'csa' ), CSA_Data::when( $a['end'] ) );
+			}
+		} elseif ( 'upcoming' === $status ) {
 			/* translators: %s: date and time */
 			$when = sprintf( __( 'Bidding opens %s', 'csa' ), CSA_Data::when( $a['start'] ) );
 		} elseif ( 'open' === $status ) {
@@ -150,7 +174,13 @@ class CSA_Public {
 		$fr   = CSA_Data::fundraiser_title( $a['fundraiser'] );
 		if ( $fr ) {
 			/* translators: %s: fundraiser name */
-			if ( $a['costs_pct'] ) {
+			if ( $a['costs_pct'] && $a['sale'] ) {
+				/* translators: 1: percent, 2: fundraiser name */
+				$for = sprintf( __( 'Prices include card processing costs (about %1$s), which are paid from the price. The rest goes to: %2$s', 'csa' ), CSA_Data::pct_text( $a['costs_pct'] ), $fr );
+			} elseif ( $a['sale'] ) {
+				/* translators: %s: fundraiser name */
+				$for = sprintf( __( 'Sales (not including sales tax) go to: %s', 'csa' ), $fr );
+			} elseif ( $a['costs_pct'] ) {
 				/* translators: 1: percent, 2: fundraiser name */
 				$for = sprintf( __( 'Bids include card processing costs (about %1$s), which are paid from the winning bid. The rest goes to: %2$s', 'csa' ), CSA_Data::pct_text( $a['costs_pct'] ), $fr );
 			} else {
@@ -164,8 +194,11 @@ class CSA_Public {
 			$out .= '<div class="csa-desc">' . wpautop( wp_kses_post( $desc ) ) . '</div>';
 		}
 		$pay = array(
-			/* translators: %d: number of days */
-			sprintf( _n( 'Winners pay online by card within %d day of bidding closing.', 'Winners pay online by card within %d days of bidding closing.', $a['pay_days'], 'csa' ), $a['pay_days'] ),
+			$a['sale']
+				/* translators: %d: number of days */
+				? sprintf( _n( 'The first person to buy an item gets it, and pays online by card right away (within %d day at the latest).', 'The first person to buy an item gets it, and pays online by card right away (within %d days at the latest).', $a['pay_days'], 'csa' ), $a['pay_days'] )
+				/* translators: %d: number of days */
+				: sprintf( _n( 'Winners pay online by card within %d day of bidding closing.', 'Winners pay online by card within %d days of bidding closing.', $a['pay_days'], 'csa' ), $a['pay_days'] ),
 		);
 		$pay[] = $a['tax'] ? __( 'Sales tax is added; there are no other fees.', 'csa' ) : __( 'There are no added fees.', 'csa' );
 		if ( '' !== trim( $a['collector'] ) ) {
@@ -182,13 +215,13 @@ class CSA_Public {
 		if ( ! is_user_logged_in() && 'closed' !== $status ) {
 			$out .= '<p class="csa-signin">' . sprintf(
 				/* translators: 1: sign-in link, 2: create-account link */
-				esc_html__( 'You need a colandb.com account to bid: %1$s or %2$s.', 'csa' ),
+				$a['sale'] ? esc_html__( 'You need a colandb.com account to buy: %1$s or %2$s.', 'csa' ) : esc_html__( 'You need a colandb.com account to bid: %1$s or %2$s.', 'csa' ),
 				'<a href="' . esc_url( wp_login_url( self::here() ) ) . '">' . esc_html__( 'sign in', 'csa' ) . '</a>',
 				'<a href="' . esc_url( wp_registration_url() ) . '">' . esc_html__( 'create one', 'csa' ) . '</a>'
 			) . '</p>';
 		}
 		if ( '' !== trim( $a['terms'] ) ) {
-			$out .= '<details class="csa-terms-full" id="csa-terms"><summary>' . esc_html__( 'Auction terms', 'csa' ) . '</summary>' . wpautop( esc_html( $a['terms'] ) ) . '</details>';
+			$out .= '<details class="csa-terms-full" id="csa-terms"><summary>' . esc_html( $a['sale'] ? __( 'Sale terms', 'csa' ) : __( 'Auction terms', 'csa' ) ) . '</summary>' . wpautop( esc_html( $a['terms'] ) ) . '</details>';
 		}
 		$out .= '</header>';
 
@@ -199,7 +232,7 @@ class CSA_Public {
 			$mine = is_user_logged_in() ? CSA_Bids::items_bid_by( get_current_user_id(), $id ) : array();
 			$out .= '<div class="csa-items">';
 			foreach ( $items as $item_id ) {
-				$out .= self::render_item( $item_id, $status, in_array( $item_id, $mine, true ) );
+				$out .= $a['sale'] ? self::render_sale_item( $item_id, $status ) : self::render_item( $item_id, $status, in_array( $item_id, $mine, true ) );
 			}
 			$out .= '</div>';
 		}
@@ -210,12 +243,10 @@ class CSA_Public {
 		return remove_query_arg( array( 'csa_msg', 'csa_item' ), home_url( add_query_arg( array() ) ) );
 	}
 
-	private static function render_item( $id, $auction_status, $bid_on ) {
-		$it   = CSA_Data::item( $id );
-		$me   = get_current_user_id();
-		$now  = time();
-		$open = 'open' === $auction_status && $now < $it['end'];
-		$out  = '<article class="csa-item' . ( $open ? ' is-open' : ' is-closed' ) . '" id="csa-item-' . (int) $id . '">';
+	/** An item's opening tag, photo, title, donor, value and description. */
+	private static function item_top( $it, $open ) {
+		$id    = $it['id'];
+		$out   = '<article class="csa-item' . ( $open ? ' is-open' : ' is-closed' ) . '" id="csa-item-' . (int) $id . '">';
 		$photo = get_the_post_thumbnail( $id, 'medium_large', array( 'class' => 'csa-photo', 'loading' => 'lazy' ) );
 		if ( $photo ) {
 			$out .= '<div class="csa-media">' . $photo . '</div>';
@@ -238,6 +269,68 @@ class CSA_Public {
 		if ( '' !== trim( $desc ) ) {
 			$out .= '<div class="csa-desc">' . wpautop( wp_kses_post( $desc ) ) . '</div>';
 		}
+		return $out;
+	}
+
+	/** The message after a bid or purchase on this item, if any: [ 'ok'|'error', text ]. */
+	private static function item_message( $id, $sale ) {
+		$code = isset( $_GET['csa_msg'], $_GET['csa_item'] ) && (int) $_GET['csa_item'] === $id ? sanitize_key( wp_unslash( $_GET['csa_msg'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return $code ? self::message( $code, $sale ) : null;
+	}
+
+	/** An item in a fixed-price sale: its price and a Buy button. */
+	private static function render_sale_item( $id, $auction_status ) {
+		$it   = CSA_Data::item( $id );
+		$me   = get_current_user_id();
+		$open = 'open' === $auction_status && time() < $it['end'];
+		$out  = self::item_top( $it, $open );
+		if ( $it['high'] ) {
+			$price = '<strong>' . esc_html__( 'Sold', 'csa' ) . '</strong>';
+		} elseif ( ! $it['buy_now'] ) {
+			$price = esc_html__( 'Price coming soon', 'csa' );
+		} elseif ( $open || 'upcoming' === $auction_status ) {
+			/* translators: %s: amount */
+			$price = sprintf( esc_html__( 'Price %s', 'csa' ), '<strong>' . esc_html( CSA_Data::money( $it['buy_now'] ) ) . '</strong>' );
+		} else {
+			$price = esc_html__( 'Not sold', 'csa' );
+		}
+		$out .= '<p class="csa-price">' . wp_kses( $price, array( 'strong' => array() ) ) . '</p>';
+		$msg  = self::item_message( $id, true );
+		if ( $me && $it['high_user'] === $me && ! ( $msg && 'ok' === $msg[0] ) ) {
+			$order = ( $it['order'] && function_exists( 'wc_get_order' ) ) ? wc_get_order( $it['order'] ) : null;
+			if ( $order && ! $it['paid'] && $order->needs_payment() ) {
+				$out .= '<p class="csa-you is-top">' . esc_html__( 'You bought this item.', 'csa' ) . ' <a href="' . esc_url( $order->get_checkout_payment_url() ) . '">' . esc_html__( 'Pay now', 'csa' ) . '</a></p>';
+			} else {
+				$out .= '<p class="csa-you is-top">' . esc_html__( 'You bought this item. Thank you!', 'csa' ) . '</p>';
+			}
+		}
+		if ( $msg ) {
+			$out .= '<p class="csa-msg is-' . esc_attr( $msg[0] ) . '" role="status">' . esc_html( $msg[1] ) . '</p>';
+		}
+		if ( $open && ! $it['high'] && $it['buy_now'] ) {
+			if ( $me ) {
+				$out .= '<form class="csa-buy" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" data-csa-confirm="' . esc_attr( sprintf( /* translators: %s: amount */ __( 'Buy this item for %s? You\'ll go straight to payment.', 'csa' ), CSA_Data::money( $it['buy_now'] ) ) ) . '">'
+					. '<input type="hidden" name="action" value="csa_bid" />'
+					. '<input type="hidden" name="csa_item" value="' . (int) $id . '" />'
+					. '<input type="hidden" name="csa_back" value="' . esc_attr( self::here() ) . '" />'
+					. wp_nonce_field( CSA_Bids::NONCE, 'csa_nonce', false, false )
+					. '<input type="hidden" name="csa_buy_now" value="1" />'
+					/* translators: %s: amount */
+					. '<button type="submit" class="csa-btn">' . esc_html( sprintf( __( 'Buy for %s', 'csa' ), CSA_Data::money( $it['buy_now'] ) ) ) . '</button></form>'
+					. '<p class="csa-min"><a href="#csa-terms">' . esc_html__( 'By buying you agree to the sale terms', 'csa' ) . '</a></p>';
+			} else {
+				$out .= '<p class="csa-give"><a class="csa-btn" href="' . esc_url( wp_login_url( self::here() . '#csa-item-' . $id ) ) . '">' . esc_html__( 'Sign in to buy', 'csa' ) . '</a></p>';
+			}
+		}
+		return $out . '</div></article>';
+	}
+
+	private static function render_item( $id, $auction_status, $bid_on ) {
+		$it   = CSA_Data::item( $id );
+		$me   = get_current_user_id();
+		$now  = time();
+		$open = 'open' === $auction_status && $now < $it['end'];
+		$out  = self::item_top( $it, $open );
 
 		// The price line.
 		if ( $it['sold_at'] ) {
@@ -258,8 +351,7 @@ class CSA_Public {
 		$out .= '<p class="csa-price">' . wp_kses( $price, array( 'strong' => array() ) ) . '</p>';
 
 		// Message after a bid on this item.
-		$code = isset( $_GET['csa_msg'], $_GET['csa_item'] ) && (int) $_GET['csa_item'] === $id ? sanitize_key( wp_unslash( $_GET['csa_msg'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$msg  = $code ? self::message( $code ) : null;
+		$msg = self::item_message( $id, false );
 
 		// Where the signed-in visitor stands (the message says it right after a bid).
 		$quiet = $msg && 'ok' === $msg[0];

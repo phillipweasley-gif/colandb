@@ -85,13 +85,17 @@ class CSA_Admin {
 		$choices = function_exists( 'cec_get_fundraiser_choices' ) ? cec_get_fundraiser_choices() : array();
 		?>
 		<table class="form-table" role="presentation">
-			<tr><th scope="row"><label for="csa_start"><?php esc_html_e( 'Bidding opens', 'csa' ); ?></label></th>
+			<tr><th scope="row"><?php esc_html_e( 'Format', 'csa' ); ?></th>
+				<td><label><input type="radio" name="csa_format" value="sale" <?php checked( $new || $a['sale'] ); ?> /> <?php esc_html_e( 'Fixed-price sale: each item has one price (its Buy It Now price); the first person to buy it gets it and pays right away.', 'csa' ); ?></label><br />
+				<label><input type="radio" name="csa_format" value="auction" <?php checked( ! $new && ! $a['sale'] ); ?> /> <?php esc_html_e( 'Silent auction: people bid; the top bid when bidding closes wins.', 'csa' ); ?></label>
+				<p class="description"><?php esc_html_e( 'Ohio\'s auctioneer licensing law covers online silent auctions. Until COL&B has confirmed it may run one without a licensed auctioneer, use a fixed-price sale. If the terms below are still the standard text, they switch to match the format when you save.', 'csa' ); ?></p></td></tr>
+			<tr><th scope="row"><label for="csa_start"><?php esc_html_e( 'Opens', 'csa' ); ?></label></th>
 				<td><input type="datetime-local" id="csa_start" name="csa_start" value="<?php echo esc_attr( self::local_input( $a['start'] ) ); ?>" required />
-				<label for="csa_end"><?php esc_html_e( 'Bidding closes', 'csa' ); ?></label>
+				<label for="csa_end"><?php esc_html_e( 'Closes', 'csa' ); ?></label>
 				<input type="datetime-local" id="csa_end" name="csa_end" value="<?php echo esc_attr( self::local_input( $a['end'] ) ); ?>" required />
-				<p class="description"><?php echo esc_html( sprintf( /* translators: %s: time zone */ __( 'Site time (%s). Bids are accepted only between these times.', 'csa' ), wp_timezone_string() ) ); ?></p></td></tr>
+				<p class="description"><?php echo esc_html( sprintf( /* translators: %s: time zone */ __( 'Site time (%s). Bids and purchases are accepted only between these times.', 'csa' ), wp_timezone_string() ) ); ?></p></td></tr>
 			<tr><th scope="row"><?php esc_html_e( 'Last-minute bids', 'csa' ); ?></th>
-				<td><label><input type="checkbox" name="csa_antisnipe" value="1" <?php checked( $new || $a['antisnipe'] ); ?> /> <?php esc_html_e( 'A bid in the last 2 minutes gives that item 2 more minutes, so nobody wins by bidding at the final second.', 'csa' ); ?></label></td></tr>
+				<td><label><input type="checkbox" name="csa_antisnipe" value="1" <?php checked( $new || $a['antisnipe'] ); ?> /> <?php esc_html_e( 'A bid in the last 2 minutes gives that item 2 more minutes, so nobody wins by bidding at the final second. (Auctions only.)', 'csa' ); ?></label></td></tr>
 			<tr><th scope="row"><label for="csa_fundraiser"><?php esc_html_e( 'Money raised goes to', 'csa' ); ?></label></th>
 				<td>
 				<?php if ( $choices ) : ?>
@@ -119,7 +123,7 @@ class CSA_Admin {
 				<td><textarea id="csa_tax_notice" name="csa_tax_notice" rows="2" class="large-text" maxlength="500"><?php echo esc_textarea( $new ? CSA_Data::default_tax_notice() : $a['tax_notice'] ); ?></textarea>
 				<p class="description"><?php esc_html_e( 'Shown on the Auction page and in each winner\'s email. Change it only on professional advice (for example once COL&B is a 501(c)(3)).', 'csa' ); ?></p></td></tr>
 			<tr><th scope="row"><label for="csa_terms"><?php esc_html_e( 'Auction terms', 'csa' ); ?></label></th>
-				<td><textarea id="csa_terms" name="csa_terms" rows="10" class="large-text" maxlength="5000"><?php echo esc_textarea( $new ? CSA_Data::default_terms() : $a['terms'] ); ?></textarea>
+				<td><textarea id="csa_terms" name="csa_terms" rows="10" class="large-text" maxlength="5000"><?php echo esc_textarea( $new ? CSA_Data::default_terms( true ) : $a['terms'] ); ?></textarea>
 				<p class="description"><?php esc_html_e( 'Shown on the Auction page under "Auction terms". Bidders agree to them when they bid.', 'csa' ); ?></p></td></tr>
 			<tr><th scope="row"><label for="csa_pickup"><?php esc_html_e( 'How winners collect items', 'csa' ); ?></label></th>
 				<td><textarea id="csa_pickup" name="csa_pickup" rows="3" class="large-text" maxlength="1000"><?php echo esc_textarea( $a['pickup'] ); ?></textarea>
@@ -141,6 +145,8 @@ class CSA_Admin {
 		update_post_meta( $post_id, '_csa_start', $start );
 		update_post_meta( $post_id, '_csa_end', $end );
 		update_post_meta( $post_id, '_csa_antisnipe', empty( $_POST['csa_antisnipe'] ) ? '0' : '1' ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$sale = 'sale' === self::posted( 'csa_format', 10 );
+		update_post_meta( $post_id, '_csa_format', $sale ? 'sale' : 'auction' );
 		$fr      = absint( self::posted( 'csa_fundraiser', 20 ) );
 		$choices = function_exists( 'cec_get_fundraiser_choices' ) ? cec_get_fundraiser_choices() : array();
 		update_post_meta( $post_id, '_csa_fundraiser', isset( $choices[ $fr ] ) ? $fr : 0 );
@@ -153,11 +159,22 @@ class CSA_Admin {
 		update_post_meta( $post_id, '_csa_pay_days', max( 1, min( 60, absint( self::posted( 'csa_pay_days', 3 ) ) ) ) );
 		foreach ( array( 'tax_notice' => 500, 'terms' => 5000 ) as $k => $max ) {
 			$v = isset( $_POST[ 'csa_' . $k ] ) ? mb_substr( trim( sanitize_textarea_field( wp_unslash( $_POST[ 'csa_' . $k ] ) ) ), 0, $max ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			if ( 'terms' === $k && self::same_text( $v, CSA_Data::default_terms( ! $sale ) ) ) {
+				$v = CSA_Data::default_terms( $sale ); // Standard terms follow the format.
+			}
 			update_post_meta( $post_id, '_csa_' . $k, $v );
 		}
 		if ( ! metadata_exists( 'post', $post_id, '_csa_closed' ) ) {
 			add_post_meta( $post_id, '_csa_closed', '', true );
 		}
+	}
+
+	/** True if two texts match, ignoring line endings and spacing at the ends. */
+	private static function same_text( $a, $b ) {
+		$norm = function ( $t ) {
+			return trim( str_replace( "\r\n", "\n", (string) $t ) );
+		};
+		return $norm( $a ) === $norm( $b );
 	}
 
 	public static function box_results( $post ) {
@@ -216,7 +233,7 @@ class CSA_Admin {
 			esc_html(
 				sprintf(
 					/* translators: 1: total of top bids, 2: amount paid */
-					__( 'Top bids total %1$s. Paid so far: %2$s. To record a cash or Venmo payment, open the order and set its status to Completed.', 'csa' ),
+					__( 'Top bids or sales total %1$s. Paid so far: %2$s. To record a cash or Venmo payment, open the order and set its status to Completed. In a sale, cancelling an unpaid order puts its item back on sale.', 'csa' ),
 					CSA_Data::money( $total ),
 					CSA_Data::money( $paid )
 				)
@@ -285,9 +302,9 @@ class CSA_Admin {
 				<label for="csa_increment"><?php esc_html_e( 'Minimum raise ($)', 'csa' ); ?></label> <?php $money( 'csa_increment', $new ? 500 : $it['increment'] ); ?>
 				<p class="description"><?php esc_html_e( 'Whole dollars (cents are rounded up). Each new bid must be at least the current top bid plus the minimum raise.', 'csa' ); ?></p></td></tr>
 			<tr><th scope="row"><label for="csa_buy_now"><?php esc_html_e( 'Buy It Now price ($)', 'csa' ); ?></label></th>
-				<td><?php $money( 'csa_buy_now', $it['buy_now'] ); ?> <span class="description"><?php esc_html_e( 'Optional. Anyone can end bidding on this item by paying this price.', 'csa' ); ?></span></td></tr>
+				<td><?php $money( 'csa_buy_now', $it['buy_now'] ); ?> <span class="description"><?php esc_html_e( 'In a fixed-price sale, this is the item\'s price (required). In an auction it is optional: anyone can end bidding on the item by paying this price.', 'csa' ); ?></span></td></tr>
 		</table>
-		<p><?php esc_html_e( 'The title, description and photo (Featured image) are shown on the Auction page. Only published items are shown.', 'csa' ); ?></p>
+		<p><?php esc_html_e( 'The title, description and photo (Featured image) are shown on the Auction page. Only published items are shown. In a fixed-price sale the starting bid and minimum raise are not used.', 'csa' ); ?></p>
 		<?php
 		if ( $it['bids'] ) {
 			echo '<p class="description">' . esc_html__( 'This item already has bids. Changing its prices now applies to the next bid only.', 'csa' ) . '</p>';

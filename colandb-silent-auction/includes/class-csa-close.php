@@ -15,6 +15,7 @@ class CSA_Close {
 		add_action( CSA_Install::CRON, array( __CLASS__, 'check_all' ) );
 		add_action( 'woocommerce_order_status_processing', array( __CLASS__, 'order_paid' ) );
 		add_action( 'woocommerce_order_status_completed', array( __CLASS__, 'order_paid' ) );
+		add_action( 'woocommerce_order_status_cancelled', array( __CLASS__, 'order_cancelled' ) );
 	}
 
 	public static function check_all() {
@@ -53,10 +54,18 @@ class CSA_Close {
 
 		$by_winner = array();
 		$unsold    = 0;
+		$buyers    = array();
+		$total     = 0;
 		foreach ( CSA_Data::item_ids( $auction_id ) as $item_id ) {
 			$item = CSA_Data::item( $item_id );
 			if ( ! $item['high'] || ! $item['high_user'] ) {
 				++$unsold;
+				continue;
+			}
+			if ( $item['order'] ) {
+				// Bought in a fixed-price sale: its order and email went out then.
+				$buyers[ $item['high_user'] ] = true;
+				$total                       += $item['high'];
 				continue;
 			}
 			$by_winner[ $item['high_user'] ][] = array(
@@ -66,7 +75,6 @@ class CSA_Close {
 			);
 		}
 
-		$total = 0;
 		foreach ( $by_winner as $user_id => $lines ) {
 			$order = self::create_order( $auction_id, $user_id, $lines );
 			if ( ! $order ) {
@@ -77,10 +85,54 @@ class CSA_Close {
 				$total += $line['cents'];
 			}
 			CSA_Emails::winner( $user_id, $auction_id, $lines, $order );
+			$buyers[ $user_id ] = true;
 		}
 		update_post_meta( $auction_id, '_csa_closed', (string) ( null === $now ? time() : $now ) );
-		CSA_Emails::summary( $auction_id, count( $by_winner ), $total, $unsold );
+		CSA_Emails::summary( $auction_id, count( $buyers ), $total, $unsold );
 		return true;
+	}
+
+	/**
+	 * In a fixed-price sale: the buyer's order for one item, made as soon as they buy it,
+	 * and the email with its pay link. Returns the order or null.
+	 */
+	public static function sale_order( $auction_id, $user_id, $item_id ) {
+		$item  = CSA_Data::item( $item_id );
+		$lines = array( array( 'id' => (int) $item_id, 'title' => $item['title'], 'cents' => $item['high'] ) );
+		$order = self::create_order( $auction_id, $user_id, $lines );
+		if ( ! $order ) {
+			return null;
+		}
+		update_post_meta( $item_id, '_csa_order', $order->get_id() );
+		CSA_Emails::purchase( $user_id, $auction_id, $lines, $order );
+		return $order;
+	}
+
+	/**
+	 * A cancelled order (the site team cancels one that wasn't paid in time): in a sale
+	 * that is still open, its unpaid items go back on sale. In an auction nothing changes;
+	 * the site team decides what to do with the item.
+	 */
+	public static function order_cancelled( $order_id ) {
+		$order = function_exists( 'wc_get_order' ) ? wc_get_order( $order_id ) : null;
+		if ( ! $order || ! $order->get_meta( '_csa_auction' ) ) {
+			return;
+		}
+		$auction_id = (int) $order->get_meta( '_csa_auction' );
+		$a          = CSA_Data::auction( $auction_id );
+		if ( ! $a['sale'] || 'open' !== CSA_Data::auction_status( $auction_id ) ) {
+			return;
+		}
+		foreach ( $order->get_items() as $li ) {
+			$item_id = (int) $li->get_meta( '_csa_item' );
+			if ( ! $item_id || (int) get_post_meta( $item_id, '_csa_order', true ) !== (int) $order_id || '1' === get_post_meta( $item_id, '_csa_paid', true ) ) {
+				continue;
+			}
+			update_post_meta( $item_id, '_csa_high', '' );
+			update_post_meta( $item_id, '_csa_sold_at', 0 );
+			update_post_meta( $item_id, '_csa_order', 0 );
+		}
+		$order->add_order_note( __( 'Cancelled, so its items are back on sale.', 'csa' ) );
 	}
 
 	/** A pending order holding a winner's items, to pay on WooCommerce's "pay for order" page. */
@@ -99,10 +151,11 @@ class CSA_Close {
 		if ( is_wp_error( $order ) || ! $order ) {
 			return null;
 		}
+		$a = CSA_Data::auction( $auction_id );
 		foreach ( $lines as $line ) {
 			$li = new WC_Order_Item_Product();
 			/* translators: %s: item name */
-			$li->set_name( sprintf( __( 'Silent auction: %s', 'csa' ), $line['title'] ) );
+			$li->set_name( sprintf( $a['sale'] ? __( 'COL&B sale: %s', 'csa' ) : __( 'Silent auction: %s', 'csa' ), $line['title'] ) );
 			$li->set_quantity( 1 );
 			$li->set_subtotal( $line['cents'] / 100 );
 			$li->set_total( $line['cents'] / 100 );
@@ -115,11 +168,10 @@ class CSA_Close {
 			$order->set_billing_last_name( (string) get_user_meta( $user_id, 'last_name', true ) );
 		}
 		$order->update_meta_data( '_csa_auction', (int) $auction_id );
-		$a = CSA_Data::auction( $auction_id );
 		$order->calculate_totals( $a['tax'] && wc_tax_enabled() );
 		$order->update_meta_data( '_csa_pay_by', time() + $a['pay_days'] * DAY_IN_SECONDS );
-		/* translators: %s: auction name */
-		$order->add_order_note( sprintf( __( 'Created when the %s silent auction closed.', 'csa' ), get_the_title( $auction_id ) ) );
+		/* translators: %s: auction or sale name */
+		$order->add_order_note( sprintf( $a['sale'] ? __( 'Created when the item was bought in %s.', 'csa' ) : __( 'Created when the %s silent auction closed.', 'csa' ), get_the_title( $auction_id ) ) );
 		$order->save();
 		return $order;
 	}
@@ -152,8 +204,8 @@ class CSA_Close {
 				$auction['fundraiser'],
 				CSA_Data::field( $cents ),
 				'auction',
-				/* translators: 1: auction name, 2: order number, 3: winning bids, 4: card costs percent */
-				sprintf( __( '%1$s, order #%2$s: %3$s in bids less %4$s card costs', 'csa' ), $auction['title'], $order->get_order_number(), CSA_Data::money( $gross ), CSA_Data::pct_text( $auction['costs_pct'] ) ),
+				/* translators: 1: auction or sale name, 2: order number, 3: winning bids or sale prices, 4: card costs percent */
+				sprintf( $auction['sale'] ? __( '%1$s, order #%2$s: %3$s in sales less %4$s card costs', 'csa' ) : __( '%1$s, order #%2$s: %3$s in bids less %4$s card costs', 'csa' ), $auction['title'], $order->get_order_number(), CSA_Data::money( $gross ), CSA_Data::pct_text( $auction['costs_pct'] ) ),
 				wp_date( 'Y-m-d' )
 			);
 			if ( $added ) {

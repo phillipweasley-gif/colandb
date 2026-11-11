@@ -5,6 +5,9 @@ defined( 'ABSPATH' ) || exit;
  * Auctions, items and the facts about them.
  *
  * Auction (`csa_auction`, not public): title, description, photo.
+ *   _csa_format              'auction' (silent auction, the default) or 'sale' (fixed-price sale:
+ *                            each item has one price, the first person to buy it gets it and pays
+ *                            straight away). A sale needs no auctioneer; see the README.
  *   _csa_start, _csa_end    Unix times (UTC) bidding opens and closes.
  *   _csa_fundraiser          CEC fundraiser id paid orders are added to (0 = none).
  *   _csa_antisnipe           '1': a bid in the last 2 minutes gives that item 2 more minutes.
@@ -26,13 +29,14 @@ defined( 'ABSPATH' ) || exit;
  *   _csa_donor, _csa_value   "Donated by" and its value in cents (shown).
  *   _csa_start_bid           Starting bid in cents.
  *   _csa_increment           Minimum raise in cents.
- *   _csa_buy_now             Buy It Now price in cents (0 = none).
+ *   _csa_buy_now             Buy It Now price in cents (0 = none); in a sale, the price.
  *   _csa_high                "<cents>|<user id>" of the top bid, '' for none. Changed only by
  *                            CSA_Bids::place() with a compare-and-swap, so two bids can't both win.
  *   _csa_bid_count           Number of bids.
  *   _csa_extended            Unix time this item's bidding was extended to (anti-sniping), or 0.
  *   _csa_sold_at             Unix time it was bought with Buy It Now, or 0.
- *   _csa_order               WooCommerce order id once the auction has closed.
+ *   _csa_order               WooCommerce order id: once the auction has closed, or (in a sale)
+ *                            as soon as it is bought.
  *   _csa_paid                '1' once that order is paid.
  *
  * Money is kept in whole cents everywhere so sums are exact.
@@ -124,6 +128,7 @@ class CSA_Data {
 		return array(
 			'id'         => $id,
 			'title'      => get_the_title( $id ),
+			'sale'       => 'sale' === get_post_meta( $id, '_csa_format', true ),
 			'start'      => (int) get_post_meta( $id, '_csa_start', true ),
 			'end'        => (int) get_post_meta( $id, '_csa_end', true ),
 			'fundraiser' => (int) get_post_meta( $id, '_csa_fundraiser', true ),
@@ -232,10 +237,13 @@ class CSA_Data {
 
 	/** Default texts for a new auction (the site team can change them per auction). */
 	public static function default_tax_notice() {
-		return __( 'COL&B is not a registered 501(c)(3) nonprofit yet, so winning bids and donated items are not tax-deductible.', 'csa' );
+		return __( 'COL&B is not a 501(c)(3) charity, so payments and donated items are not tax-deductible.', 'csa' );
 	}
 
-	public static function default_terms() {
+	public static function default_terms( $sale = false ) {
+		if ( $sale ) {
+			return __( "1. Each item has one price. The first person to buy it gets it. Buying is a promise to pay that price.\n2. You pay online right after buying. If an item isn't paid within the time stated on the Sale page, we may cancel the order and offer the item to someone else.\n3. Prices are in whole dollars and include card processing costs. Sales tax is added at checkout; there are no other fees.\n4. Items are donated and sold as-is. Values are the donor's estimates, not appraisals. No returns or refunds, unless an item is not as described.\n5. Items must be collected as described on the Sale page.\n6. Purchases and donated items are not tax-deductible.\n7. Buyers' names are never shown publicly. Your email is used only to tell you about your purchases.\n8. We may cancel a purchase or remove an item if something goes wrong (for example, an item becomes unavailable or a price is clearly a mistake).", 'csa' );
+		}
 		return __( "1. Every bid is a promise to buy the item at that price if you win. Bids can't be withdrawn.\n2. Winners are emailed when bidding closes and must pay online within the time stated on the Auction page. If a winner doesn't pay in time, we may offer the item to the next-highest bidder or auction it again.\n3. Bids are in whole dollars and include card processing costs. Sales tax is added at checkout; there are no other fees.\n4. Items are donated and sold as-is. Values are the donor's estimates, not appraisals. No returns or refunds, unless an item is not as described.\n5. Items must be collected as described on the Auction page.\n6. Winning bids and donated items are not tax-deductible.\n7. Bidders' names are never shown publicly. Your email is used only to tell you about your bids and winnings.\n8. We may cancel a bid or remove an item if something goes wrong (for example, an item becomes unavailable or a bid is clearly a mistake).", 'csa' );
 	}
 

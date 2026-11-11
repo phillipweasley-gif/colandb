@@ -14,7 +14,7 @@ class CSA_Bids {
 	}
 
 	/**
-	 * Places a bid. Returns a result code:
+	 * Places a bid (or, in a fixed-price sale, buys the item and creates its order). Returns a result code:
 	 * 'placed', 'bought', 'login', 'closed', 'not_open', 'too_low', 'too_high', 'whole',
 	 * 'already_top', 'no_buy_now', 'busy' (someone else bid at the same moment; try again), 'bad'.
 	 */
@@ -34,11 +34,17 @@ class CSA_Bids {
 		if ( ! $auction['start'] || 'publish' !== get_post_status( $auction['id'] ) || $now < $auction['start'] ) {
 			return 'not_open';
 		}
+		if ( $auction['sale'] && $item['high'] && '' === $auction['closed'] ) {
+			return 'no_buy_now'; // Someone else bought it first.
+		}
 		if ( ( '' !== $auction['closed'] ) || $now >= $item['end'] ) {
 			return 'closed';
 		}
+		if ( $auction['sale'] ) {
+			$buy_now = true; // A sale has no bidding: every purchase is at the price.
+		}
 		if ( $buy_now ) {
-			if ( ! $item['buy_now'] || $item['high'] >= $item['buy_now'] ) {
+			if ( ! $item['buy_now'] || $item['high'] >= $item['buy_now'] || $item['sold_at'] ) {
 				return 'no_buy_now';
 			}
 			$cents = $item['buy_now'];
@@ -52,7 +58,7 @@ class CSA_Bids {
 		if ( $item['high_user'] === $user_id && ! $buy_now ) {
 			return 'already_top';
 		}
-		if ( $cents < $item['min_next'] ) {
+		if ( ! $auction['sale'] && $cents < $item['min_next'] ) {
 			return 'too_low';
 		}
 		if ( $cents > self::MAX_CENTS ) {
@@ -105,6 +111,9 @@ class CSA_Bids {
 		if ( $item['high_user'] && $item['high_user'] !== $user_id ) {
 			CSA_Emails::outbid( $item['high_user'], $item_id, $cents, $buy_now );
 		}
+		if ( $auction['sale'] ) {
+			CSA_Close::sale_order( $auction['id'], $user_id, $item_id );
+		}
 		return $buy_now ? 'bought' : 'placed';
 	}
 
@@ -147,6 +156,14 @@ class CSA_Bids {
 			}
 			if ( 'busy' === $code ) {
 				$code = 'too_low';
+			}
+		}
+		if ( 'bought' === $code && function_exists( 'wc_get_order' ) ) {
+			// In a sale the order exists now: go straight to paying for it.
+			$order = wc_get_order( (int) get_post_meta( $item_id, '_csa_order', true ) );
+			if ( $order && (int) $order->get_customer_id() === get_current_user_id() && $order->needs_payment() ) {
+				wp_safe_redirect( $order->get_checkout_payment_url() );
+				exit;
 			}
 		}
 		wp_safe_redirect( add_query_arg( array( 'csa_msg' => $code, 'csa_item' => $item_id ), $back ) . '#csa-item-' . $item_id );

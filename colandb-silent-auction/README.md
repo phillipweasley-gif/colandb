@@ -5,6 +5,7 @@ Silent auctions for COL&B fundraising, built on WooCommerce (owner request, 2026
 ## How it works
 
 - **wp-admin → Silent Auction → Auctions.** An auction has a name, description, photo, the times bidding opens and closes (site time), the fundraiser its money goes to, sales tax on/off, the card costs included in bids (default 3%; never added on top), who collects the payments, days to pay, a not-tax-deductible notice, auction terms, "how winners collect items", and last-minute protection (a bid in the last 2 minutes gives that item 2 more minutes).
+- **Format** (per auction): *fixed-price sale* (default for new ones: each item has one price, its Buy It Now price; the first signed-in person to buy gets it, their order is created at once and they go straight to pay; cancelling an unpaid order while the sale is open puts the item back on sale) or *silent auction* (bidding, as below). Use a sale until COL&B has confirmed it may run an online auction without a licensed Ohio auctioneer (R.C. 4707).
 - **Items** (Silent Auction → Items, or "Add an item to this auction" on the auction): title, description, photo (Featured image), donated by, value, starting bid, minimum raise, optional Buy It Now price (all whole dollars). Only published items are shown.
 - **The Auction page** (`[csa_auction]`, created as a draft "Silent Auction" page on activation; publish it when ready). It shows open and upcoming auctions, then results of auctions closed in the last 30 days. `[csa_auction id="123"]` shows one. Never cached.
 - **Bidding:** anyone signed in to a colandb.com account. Bids are whole dollars. Each bid must be at least the top bid plus the minimum raise (or the starting bid). The top bid and number of bids are public; **bidders' names never are** (only the site team sees them, on the item and the auction in wp-admin). The top bidder can't bid against themselves. Bids above $50,000 are refused as likely typos. A bid at or above the Buy It Now price buys the item.
@@ -25,14 +26,14 @@ Silent auctions for COL&B fundraising, built on WooCommerce (owner request, 2026
 
 ## Compliance (research 2026-11-11, not legal advice)
 
-See "Silent auction compliance in Ohio" in the project files. In short: no surcharge on top of bids (card rules); 8.0% Franklin County tax on the full bid, collected by the business that takes the payments; say nothing is tax-deductible; say exactly what COL&B receives and who collects; publish terms; a written agreement between COL&B and the collecting business. Open question: Ohio auctioneer licensing (R.C. 4707) for a sponsor that isn't yet tax-exempt.
+See "Silent auction compliance in Ohio" in the project files. In short: no surcharge on top of bids (card rules); 8.0% Franklin County tax on the full bid, collected by the business that takes the payments; say nothing is tax-deductible; say exactly what COL&B receives and who collects; publish terms; a written agreement between COL&B and the collecting business. Open question: Ohio auctioneer licensing (R.C. 4707): its charity exemption covers only 501(c)(3)s, so a 501(c)(4) COL&B should run fixed-price sales until the Ohio Department of Agriculture confirms otherwise. A raffle instead of an auction falls under Ohio gambling law (R.C. 2915.092): a 501(c)(4) may run one only once it exists, must give at least half the net profit to a charitable purpose, and must draw winners by hand.
 
 ## Files
 
 - `includes/class-csa-data.php` post types, meta, money (cents), status
 - `includes/class-csa-bids.php` the bid rules, compare-and-swap, form handler
 - `includes/class-csa-close.php` closing, orders, payments → fundraiser
-- `includes/class-csa-emails.php` the four emails
+- `includes/class-csa-emails.php` the five emails
 - `includes/class-csa-admin.php` wp-admin boxes, lists, results
 - `includes/class-csa-public.php` the Auction page
 - `includes/class-csa-install.php` bids table `{prefix}csa_bids`, cron, draft page
