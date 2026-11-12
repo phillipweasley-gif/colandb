@@ -128,10 +128,15 @@ ok "a new message brings it back with only the new message" $([ "$(has $T/d4.htm
 echo "== Blocking"
 ev "global \$wpdb; \$wpdb->insert('$D_T',array('type'=>'friends','proposer_id'=>$DANA,'partner_id'=>$CARL,'proposer_side'=>'','status'=>'active','proposer_show'=>1,'partner_show'=>1,'created_at'=>gmdate('Y-m-d H:i:s')));" >/dev/null
 DYN=$(q "SELECT MAX(id) FROM $D_T")
+# 0.39.0: Dana holds the key to Carl's running lock; blocking must not send Carl the "now a self-lock" notice either.
+ev "CMP_Dynamics::grant('chastity',$DANA,$CARL); global \$wpdb; \$n=gmdate('Y-m-d H:i:s'); \$wpdb->insert(CMP_Install::table('locks'),array('wearer_id'=>$CARL,'keyholder_id'=>$DANA,'started_at'=>\$n,'status'=>'locked','created_at'=>\$n,'updated_at'=>\$n));" >/dev/null
+NC=$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$CARL")
 ev "global \$wpdb; \$wpdb->insert('$P_T',array('author_id'=>$DANA,'body'=>'Dana feed post','event_id'=>0,'visibility'=>'members','status'=>'published','reports'=>0,'created_at'=>gmdate('Y-m-d H:i:s'),'updated_at'=>gmdate('Y-m-d H:i:s')));" >/dev/null
 r=$(act dana $DN block --data-urlencode "member=$CARL")
 ok "Dana blocks Carl" $(echo "$r" | grep -q 'msg_blocked' && [ "$(q "SELECT COUNT(*) FROM $B_T WHERE blocker_id=$DANA AND blocked_id=$CARL")" = 1 ] && echo 1 || echo 0)
 ok "their dynamic ended" $([ "$(q "SELECT status FROM $D_T WHERE id=$DYN")" = ended ] && echo 1 || echo 0)
+ok "Carl's lock is now a self-lock, and Carl got no notification at all (they aren't told)" $([ "$(q "SELECT keyholder_id FROM $(TBL locks) WHERE wearer_id=$CARL AND status='locked'")" = 0 ] && [ "$(q "SELECT COUNT(*) FROM $N_T WHERE user_id=$CARL")" = "$NC" ] && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->query(\"DELETE FROM \".CMP_Install::table('locks').\" WHERE wearer_id=$CARL\");" >/dev/null
 r=$(act carl $CN send --data-urlencode "conversation=$CID" --data-urlencode "body=why?")
 ok "Carl can't message Dana" $(echo "$r" | grep -q 'msg_gone' && echo 1 || echo 0)
 r=$(act carl $CN send --data-urlencode "to=$DANA" --data-urlencode "body=new thread?")

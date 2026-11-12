@@ -4,6 +4,21 @@ Private member area for the Community Events Calendar site (project brief Phases
 
 ---
 
+## 0.39.0
+
+**End a dynamic quietly** (owner, 2026-11-11: "When someone dissolves a dynamic is there a way to do it in silent mode on the website for all aspects it would affect? Sometimes people don't want to have those conversations", then "this should be for all connections to another user not just chastity"). On the Dynamics tab, next to each button that ends or refuses something between two members, there is now a "…quietly" button:
+
+- **End quietly** on an active dynamic, **Turn off quietly** on chastity or homework, and **Decline quietly** on an invitation or an add-on request.
+- Done quietly, nobody is sent a notification: not the other member, and none of the knock-on notices either. That includes the wearer's "your lock is now a self-lock" notice; the owner chose fully silent over keeping a neutral notice for the wearer (decision card, 2026-11-11). Homework archiving never sent one.
+- Everything else happens exactly as before: permissions stop at once, homework is archived, a running lock becomes a self-lock, and the dynamic leaves both profiles and the other member's Dynamics tab. So the other member can still see the change if they look; they just aren't told. The confirm question and the result message ("Done quietly…") say so.
+- The audit log records the end or decline with the reason "Quietly", so the site team can see what happened.
+- **Blocking is now fully silent too.** It already promised "They aren't told", but a dynamic ended by a block still sent the wearer the self-lock notice. It no longer does.
+- **Fix:** the confirm question on End and Turn off ("End this dynamic? …") was never shown, because those little forms lacked the `cmp-form` class that `member.js` looks for. They have it now, so End, Turn off and each "…quietly" button ask first.
+
+Accepting is never quiet (a quiet flag on Accept is ignored). Follows, nods and leaving a conversation never sent the other member anything, so they needed no change.
+
+**Verified** in the local WordPress kit: `tests/dynamics-e2e.sh` gains 15 checks (70/70) covering each quiet action, no notifications to either member, the self-lock with no notice, the audit reason, the confirm questions, and that an ordinary End still notifies; `tests/messages-e2e.sh` gains a check that blocking a keyholder leaves the wearer a self-lock with no notification (52/52). Regression: homework 55/55, member-admin 43/43, profile 84/84, base e2e 60/60, chastity 221/222. The one chastity failure ("calendar beside Verification, missed days link to the correction") fails the same way on `main` without this change, so it is not caused by it. Screenshots at phone and desktop width checked: buttons wrap, no sideways scroll.
+
 ## 0.38.1
 
 **Usernames kept out of public view** (owner, 2026-10-22, while checking SEO). The site's users sitemap listed the login names of the 3 administrators and of 6 members who had submitted events. The same names were also available from `/author/<name>/` pages, `?author=<id>` redirects and the public users API (`/wp-json/wp/v2/users`). Login names help password guessing and can identify members. New class `CMP_Username_Privacy`, for visitors and members:

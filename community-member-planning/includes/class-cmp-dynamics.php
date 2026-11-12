@@ -103,6 +103,7 @@ class CMP_Dynamics {
 			'dyn_addon_no'    => array( 'success', __( 'Request declined.', 'cmp' ) ),
 			'dyn_addon_off'   => array( 'success', __( 'Turned off. It no longer gives either of you any permissions.', 'cmp' ) ),
 			'dyn_addon_taken' => array( 'error', __( 'That\'s already on, or already asked for.', 'cmp' ) ),
+			'dyn_quiet'       => array( 'success', __( 'Done quietly: they weren\'t sent any notification about it. It\'s gone from their Dynamics tab and profile too, so they\'ll see the change if they look.', 'cmp' ) ),
 		);
 	}
 
@@ -472,6 +473,21 @@ class CMP_Dynamics {
 		exit;
 	}
 
+	/**
+	 * "…quietly" buttons (0.39.0; owner, 2026-11-11: "Sometimes people don't
+	 * want to have those conversations"). Ending, declining or turning off
+	 * then sends no notification to anyone, including the knock-on ones
+	 * (a wearer's lock becoming a self-lock: owner chose fully silent).
+	 * The change itself still shows wherever the other member looks.
+	 */
+	private static function quiet() {
+		$quiet = ! empty( $_POST['quiet'] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked in guard().
+		if ( $quiet ) {
+			CMP_Notifications::$muted = true;
+		}
+		return $quiet;
+	}
+
 	private static function posted_dynamic( $user_id ) {
 		$id  = isset( $_POST['dynamic'] ) ? absint( $_POST['dynamic'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked in guard().
 		$dyn = $id ? self::get( $id ) : null;
@@ -643,13 +659,14 @@ class CMP_Dynamics {
 			self::back( 'dyn_gone' );
 		}
 		$status = 'accept' === $answer ? 'active' : 'declined';
+		$quiet  = 'declined' === $status && self::quiet();
 		$key    = self::group_key( $dyn );
 		$rows   = self::only( self::group_rows( $key ), 'pending' );
 		$addons = self::group_addons( $key );
 		$lines  = self::invitation_lines( $rows, $addons, (int) $dyn->proposer_id );
 		foreach ( $rows as $row ) {
 			$wpdb->update( CMP_Install::table( 'dynamics' ), array( 'status' => $status, 'responded_at' => gmdate( 'Y-m-d H:i:s' ) ), array( 'id' => $row->id, 'status' => 'pending' ), array( '%s', '%s' ), array( '%d', '%s' ) );
-			CMP_Audit::log( 'dynamic_' . ( 'active' === $status ? 'accepted' : 'declined' ), 'dynamic', $row->id, array( 'status' => 'pending' ), array( 'status' => $status ) );
+			CMP_Audit::log( 'dynamic_' . ( 'active' === $status ? 'accepted' : 'declined' ), 'dynamic', $row->id, array( 'status' => 'pending' ), array( 'status' => $status ), $quiet ? 'Quietly' : '' );
 		}
 		foreach ( $addons as $ad ) {
 			self::set_addon_status( $ad, $status );
@@ -665,7 +682,7 @@ class CMP_Dynamics {
 			),
 			self::url()
 		);
-		self::back( 'active' === $status ? 'dyn_accepted' : 'dyn_declined' );
+		self::back( $quiet ? 'dyn_quiet' : ( 'active' === $status ? 'dyn_accepted' : 'dyn_declined' ) );
 	}
 
 	public static function handle_withdraw() {
@@ -695,8 +712,9 @@ class CMP_Dynamics {
 			self::back( 'dyn_gone' );
 		}
 		$other = self::other( $dyn, $user_id );
+		$quiet = self::quiet();
 		$wpdb->update( CMP_Install::table( 'dynamics' ), array( 'status' => 'ended', 'ended_at' => gmdate( 'Y-m-d H:i:s' ), 'ended_by' => $user_id ), array( 'id' => $dyn->id, 'status' => 'active' ), array( '%s', '%s', '%d' ), array( '%d', '%s' ) );
-		CMP_Audit::log( 'dynamic_ended', 'dynamic', $dyn->id, array( 'status' => 'active' ), array( 'status' => 'ended', 'ended_by' => $user_id ) );
+		CMP_Audit::log( 'dynamic_ended', 'dynamic', $dyn->id, array( 'status' => 'active' ), array( 'status' => 'ended', 'ended_by' => $user_id ), $quiet ? 'Quietly' : '' );
 		if ( ! self::active_between( $user_id, $other ) ) {
 			self::close_addons( $user_id, $other, $user_id ); // Add-ons need a dynamic to belong to.
 		}
@@ -718,7 +736,7 @@ class CMP_Dynamics {
 			),
 			self::url()
 		);
-		self::back( 'dyn_ended' );
+		self::back( $quiet ? 'dyn_quiet' : 'dyn_ended' );
 	}
 
 	public static function handle_show() {
@@ -775,7 +793,8 @@ class CMP_Dynamics {
 		$mine    = (int) $ad->requested_by === $user_id;
 		$waiting = 'pending' === $ad->status && ! (int) $ad->group_id;
 		if ( in_array( $do, array( 'accept', 'decline' ), true ) && $waiting && ! $mine ) {
-			$on = 'accept' === $do && self::active_between( $user_id, $other );
+			$on    = 'accept' === $do && self::active_between( $user_id, $other );
+			$quiet = ! $on && self::quiet();
 			self::set_addon_status( $ad, $on ? 'active' : 'declined' );
 			CMP_Notifications::add(
 				$other,
@@ -788,13 +807,14 @@ class CMP_Dynamics {
 				),
 				self::url()
 			);
-			self::back( $on ? 'dyn_addon_on' : 'dyn_addon_no' );
+			self::back( $quiet ? 'dyn_quiet' : ( $on ? 'dyn_addon_on' : 'dyn_addon_no' ) );
 		}
 		if ( 'withdraw' === $do && $waiting && $mine ) {
 			self::set_addon_status( $ad, 'withdrawn' );
 			self::back( 'dyn_withdrawn' );
 		}
 		if ( 'off' === $do && 'active' === $ad->status ) {
+			$quiet = self::quiet();
 			self::set_addon_status( $ad, 'ended', $user_id );
 			do_action( 'cmp_dynamic_ended', self::pair_stub( $ad->user_a, $ad->user_b ), $user_id );
 			CMP_Notifications::add(
@@ -804,7 +824,7 @@ class CMP_Dynamics {
 				sprintf( __( '%1$s turned off %2$s between you.', 'cmp' ), wp_get_current_user()->display_name, mb_strtolower( self::addon_labels()[ $ad->kind ][0] ) ),
 				self::url()
 			);
-			self::back( 'dyn_addon_off' );
+			self::back( $quiet ? 'dyn_quiet' : 'dyn_addon_off' );
 		}
 		self::back( 'dyn_gone' );
 	}
@@ -835,14 +855,23 @@ class CMP_Dynamics {
 		return '<div class="cmp-who"><span class="cmp-who-av" aria-hidden="true">' . esc_html( mb_strtoupper( mb_substr( $name, 0, 1 ) ) ) . '</span><div><b>' . $link . '</b><small>' . $line . '</small></div></div>';
 	}
 
-	private static function action_form( $action, $dyn_id, $label, $class = 'cmp-btn cmp-btn-small', $extra = array(), $confirm = '' ) {
+	/**
+	 * $quiet: label of a second button in the same form that does the same
+	 * with quiet=1 (no notifications), with its own $quiet_confirm question.
+	 * cmp-form so member.js asks the confirm questions (0.39.0).
+	 */
+	private static function action_form( $action, $dyn_id, $label, $class = 'cmp-btn cmp-btn-small', $extra = array(), $confirm = '', $quiet = '', $quiet_confirm = '' ) {
 		$field = 'addon' === $action ? 'addon' : 'dynamic';
-		$html  = '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="cmp-inline-form"><input type="hidden" name="action" value="cmp_dyn_' . esc_attr( $action ) . '" /><input type="hidden" name="' . $field . '" value="' . (int) $dyn_id . '" />'
+		$html  = '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="cmp-form cmp-inline-form"><input type="hidden" name="action" value="cmp_dyn_' . esc_attr( $action ) . '" /><input type="hidden" name="' . $field . '" value="' . (int) $dyn_id . '" />'
 			. '<input type="hidden" name="_cmp_nonce" value="' . esc_attr( wp_create_nonce( self::NONCE ) ) . '" />';
 		foreach ( $extra as $k => $v ) {
 			$html .= '<input type="hidden" name="' . esc_attr( $k ) . '" value="' . esc_attr( $v ) . '" />';
 		}
-		return $html . '<button type="submit" class="' . esc_attr( $class ) . '"' . ( $confirm ? ' data-cmp-confirm="' . esc_attr( $confirm ) . '"' : '' ) . '>' . esc_html( $label ) . '</button></form>';
+		$html .= '<button type="submit" class="' . esc_attr( $class ) . '"' . ( $confirm ? ' data-cmp-confirm="' . esc_attr( $confirm ) . '"' : '' ) . '>' . esc_html( $label ) . '</button>';
+		if ( $quiet ) {
+			$html .= ' <button type="submit" name="quiet" value="1" class="' . esc_attr( $class . ' cmp-dyn-quiet' ) . '"' . ( $quiet_confirm ? ' data-cmp-confirm="' . esc_attr( $quiet_confirm ) . '"' : '' ) . '>' . esc_html( $quiet ) . '</button>';
+		}
+		return $html . '</form>';
 	}
 
 	private static function list_html( $lines ) {
@@ -892,7 +921,7 @@ class CMP_Dynamics {
 		?>
 		<section class="cmp-step" aria-labelledby="cmp-dyn-title">
 			<h2 id="cmp-dyn-title" class="cmp-title"><?php esc_html_e( 'Dynamics', 'cmp' ); ?></h2>
-			<p><?php esc_html_e( 'Relationships and power dynamics with other members. Both of you must agree, and either of you can end one at any time. Chastity and homework are add-ons you both agree to, with any dynamic.', 'cmp' ); ?></p>
+			<p><?php esc_html_e( 'Relationships and power dynamics with other members. Both of you must agree, and either of you can end one at any time, quietly if you prefer (no notification). Chastity and homework are add-ons you both agree to, with any dynamic.', 'cmp' ); ?></p>
 			<p class="cmp-muted"><?php esc_html_e( 'To propose one, open a member\'s profile and choose "Propose a dynamic".', 'cmp' ); ?></p>
 		</section>
 
@@ -912,7 +941,7 @@ class CMP_Dynamics {
 					<div class="cmp-dyn-acts">
 						<?php
 						echo self::action_form( 'respond', $key, __( 'Accept', 'cmp' ), 'cmp-btn cmp-btn-small', array( 'answer' => 'accept' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-						echo self::action_form( 'respond', $key, __( 'Decline', 'cmp' ), 'cmp-btn cmp-btn-small cmp-btn-outline', array( 'answer' => 'decline' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+						echo self::action_form( 'respond', $key, __( 'Decline', 'cmp' ), 'cmp-btn cmp-btn-small cmp-btn-outline', array( 'answer' => 'decline' ), '', __( 'Decline quietly', 'cmp' ), __( 'Decline without notifying them? They\'ll only see the invitation is no longer waiting.', 'cmp' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 						?>
 					</div>
 				</div>
@@ -924,7 +953,7 @@ class CMP_Dynamics {
 					<div class="cmp-dyn-acts">
 						<?php
 						echo self::action_form( 'addon', $ad->id, __( 'Accept', 'cmp' ), 'cmp-btn cmp-btn-small', array( 'do' => 'accept' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-						echo self::action_form( 'addon', $ad->id, __( 'Decline', 'cmp' ), 'cmp-btn cmp-btn-small cmp-btn-outline', array( 'do' => 'decline' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+						echo self::action_form( 'addon', $ad->id, __( 'Decline', 'cmp' ), 'cmp-btn cmp-btn-small cmp-btn-outline', array( 'do' => 'decline' ), '', __( 'Decline quietly', 'cmp' ), __( 'Decline without notifying them? They\'ll only see the request is no longer waiting.', 'cmp' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 						?>
 					</div>
 				</div>
@@ -963,7 +992,7 @@ class CMP_Dynamics {
 								<span class="cmp-dyn-item-acts">
 									<?php
 									echo self::action_form( 'show', $d->id, $mine_show ? __( 'Shown on my profile ✓', 'cmp' ) : __( 'Hidden from my profile', 'cmp' ), 'cmp-btn cmp-btn-small cmp-btn-outline', array( 'show' => $mine_show ? '' : '1' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-									echo self::action_form( 'end', $d->id, __( 'End', 'cmp' ), 'cmp-btn cmp-btn-small cmp-btn-outline cmp-btn-danger', array(), 1 === count( $rows ) ? __( 'End this dynamic? Chastity and homework between you stop straight away too.', 'cmp' ) : __( 'End this dynamic? Your other dynamics with them carry on.', 'cmp' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+									echo self::action_form( 'end', $d->id, __( 'End', 'cmp' ), 'cmp-btn cmp-btn-small cmp-btn-outline cmp-btn-danger', array(), 1 === count( $rows ) ? __( 'End this dynamic? Chastity and homework between you stop straight away too.', 'cmp' ) : __( 'End this dynamic? Your other dynamics with them carry on.', 'cmp' ), __( 'End quietly', 'cmp' ), __( 'End this dynamic without notifying them? Nobody is sent a notification, including about chastity or homework that stops with it. It still disappears from their Dynamics tab and profile.', 'cmp' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 									?>
 								</span>
 							</li>
@@ -971,7 +1000,7 @@ class CMP_Dynamics {
 						<?php foreach ( $on as $ad ) : ?>
 							<li class="cmp-dyn-item cmp-dyn-addon-on">
 								<span class="cmp-dyn-item-text"><?php echo esc_html( self::addon_line( $ad, $user_id ) ); ?></span>
-								<span class="cmp-dyn-item-acts"><?php echo self::action_form( 'addon', $ad->id, __( 'Turn off', 'cmp' ), 'cmp-btn cmp-btn-small cmp-btn-outline cmp-btn-danger', array( 'do' => 'off' ), __( 'Turn this off? It stops straight away for both of you.', 'cmp' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+								<span class="cmp-dyn-item-acts"><?php echo self::action_form( 'addon', $ad->id, __( 'Turn off', 'cmp' ), 'cmp-btn cmp-btn-small cmp-btn-outline cmp-btn-danger', array( 'do' => 'off' ), __( 'Turn this off? It stops straight away for both of you.', 'cmp' ), __( 'Turn off quietly', 'cmp' ), __( 'Turn this off without notifying them? It stops straight away for both of you, and nobody is sent a notification.', 'cmp' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
 							</li>
 						<?php endforeach; ?>
 						<?php foreach ( isset( $asks_out[ $other ] ) ? $asks_out[ $other ] : array() as $ad ) : ?>
