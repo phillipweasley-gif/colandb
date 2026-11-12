@@ -161,6 +161,46 @@ ev "global \$wpdb; \$d=CMP_Install::table('dynamics'); \$n=gmdate('Y-m-d H:i:s')
 ok "upgrade keeps what pairs use: Keyholder -> chastity; running homework -> homework only" $([ "$(can $TH $OUT chastity)$(can $TH $OUT homework)$(can $KH $OUT homework)$(can $KH $OUT chastity)" = 1010 ] && echo 1 || echo 0)
 ev "global \$wpdb; \$wpdb->query(\"DELETE FROM \".CMP_Install::table('dynamics').\" WHERE proposer_id=$OUT OR partner_id=$OUT\"); \$wpdb->query(\"DELETE FROM \".$AD.\" WHERE user_a=$OUT OR user_b=$OUT\"); \$wpdb->query(\"DELETE FROM \".CMP_Install::table('programs').\" WHERE title='ZZ'\");" >/dev/null
 
+echo "== Quietly (0.39.0)"
+nq(){ ev "global \$wpdb; echo (int)\$wpdb->get_var(\"SELECT COUNT(*) FROM \".CMP_Install::table('notifications').\" WHERE user_id=$1\");"; }
+LK="CMP_Install::table('locks')"
+# Keyholder dynamic KH -> Third with chastity, homework set by KH, and a running lock with KH holding the key.
+r=$(post kh --data-urlencode "action=cmp_dyn_propose" --data-urlencode "_cmp_nonce=$N" --data-urlencode "partner=$TH" --data-urlencode "types[]=keyholder" --data-urlencode "side[keyholder]=a" --data-urlencode "addon[homework]=1" --data-urlencode "addon_lead[homework]=me"); QG=$(lastid)
+post third -d "action=cmp_dyn_respond&_cmp_nonce=$TN&dynamic=$QG&answer=accept" >/dev/null
+ev "global \$wpdb; \$n=gmdate('Y-m-d H:i:s'); \$wpdb->insert($LK,array('wearer_id'=>$TH,'keyholder_id'=>$KH,'started_at'=>\$n,'status'=>'locked','created_at'=>\$n,'updated_at'=>\$n)); \$wpdb->insert(CMP_Install::table('programs'),array('lead_id'=>$KH,'member_id'=>$TH,'title'=>'ZZQ','status'=>'active','created_at'=>\$n,'updated_at'=>\$n));" >/dev/null
+ok "set up: keyholder with chastity and homework" $([ "$(status $QG)$(can $KH $TH chastity)$(can $KH $TH homework)" = active11 ] && echo 1 || echo 0)
+get third q1 "$PAGE&cmp_tab=dynamics"
+ok "Active offers End quietly and Turn off quietly, each with its own question" $([ "$(has $T/q1.html '>End quietly<')$(has $T/q1.html '>Turn off quietly<')$(has $T/q1.html 'End this dynamic without notifying them?')$(has $T/q1.html 'name="quiet" value="1"')" = 1111 ] && echo 1 || echo 0)
+ok "End's confirm question now asked (form has cmp-form)" $(has $T/q1.html 'class="cmp-form cmp-inline-form"><input type="hidden" name="action" value="cmp_dyn_end"')
+HW=$(adid homework $KH active)
+B=$(nq $KH)
+r=$(post third -d "action=cmp_dyn_addon&_cmp_nonce=$TN&do=off&addon=$HW&quiet=1")
+ok "turn off quietly: off, homework archived, the other not told" $(echo "$r" | grep -q 'dyn_quiet' && [ "$(can $KH $TH homework)" = 0 ] && [ "$(ev "global \$wpdb; echo \$wpdb->get_var(\"SELECT status FROM \".CMP_Install::table('programs').\" WHERE title='ZZQ'\");")" = archived ] && [ "$(nq $KH)" = "$B" ] && echo 1 || echo 0)
+BK=$(nq $KH); BT=$(nq $TH)
+r=$(post kh -d "action=cmp_dyn_end&_cmp_nonce=$N&dynamic=$QG&quiet=1")
+ok "end quietly: ended, powers gone, lock is now a self-lock" $(echo "$r" | grep -q 'dyn_quiet' && [ "$(status $QG)$(can $KH $TH chastity)" = ended0 ] && [ "$(ev "global \$wpdb; echo \$wpdb->get_var(\"SELECT keyholder_id FROM \".$LK.\" WHERE wearer_id=$TH AND status='locked'\");")" = 0 ] && echo 1 || echo 0)
+ok "...and nobody got a notification (not even the wearer's self-lock notice)" $([ "$(nq $KH)/$(nq $TH)" = "$BK/$BT" ] && echo 1 || echo 0)
+ok "audit log records it was done quietly" $(ev "\$r=CMP_Audit::for_object('dynamic',$QG); \$e=\$r[0]; echo 'dynamic_ended'===\$e->action && 'Quietly'===\$e->reason?1:0;")
+get kh q2 "$PAGE&cmp_notice=dyn_quiet&cmp_tab=dynamics"
+ok "the one who ended it is told nobody was notified" $(has $T/q2.html 'Done quietly')
+ok "a later ordinary call notifies as usual (mute doesn't stick)" $(ev "echo CMP_Notifications::add($KH,'account','ZZ check')?1:0;")
+r=$(post kh -d "action=cmp_dyn_propose&_cmp_nonce=$N&partner=$TH&type=friends"); QD=$(lastid)
+get third q3 "$PAGE&cmp_tab=dynamics"
+ok "an invitation offers Decline quietly" $(has $T/q3.html '>Decline quietly<')
+BK=$(nq $KH)
+r=$(post third -d "action=cmp_dyn_respond&_cmp_nonce=$TN&dynamic=$QD&answer=decline&quiet=1")
+ok "decline quietly: declined, proposer not told" $(echo "$r" | grep -q 'dyn_quiet' && [ "$(status $QD)" = declined ] && [ "$(nq $KH)" = "$BK" ] && echo 1 || echo 0)
+r=$(post kh -d "action=cmp_dyn_propose&_cmp_nonce=$N&partner=$TH&type=play"); QA=$(lastid)
+r=$(post third -d "action=cmp_dyn_respond&_cmp_nonce=$TN&dynamic=$QA&answer=accept&quiet=1")
+ok "quiet does nothing on accept (still told)" $(echo "$r" | grep -q 'dyn_accepted' && [ "$(nq $KH)" -gt "$BK" ] && echo 1 || echo 0)
+post kh -d "action=cmp_dyn_addon&_cmp_nonce=$N&do=ask&partner=$TH&choice=homework:me" >/dev/null
+QH=$(adid homework $KH pending); BK=$(nq $KH)
+r=$(post third -d "action=cmp_dyn_addon&_cmp_nonce=$TN&do=decline&addon=$QH&quiet=1")
+ok "decline an add-on request quietly: not told" $(echo "$r" | grep -q 'dyn_quiet' && [ "$(nq $KH)" = "$BK" ] && echo 1 || echo 0)
+post third -d "action=cmp_dyn_end&_cmp_nonce=$TN&dynamic=$QA" >/dev/null
+ok "an ordinary End still tells them" $([ "$(nq $KH)" -gt "$BK" ] && echo 1 || echo 0)
+ev "global \$wpdb; \$wpdb->query(\"DELETE FROM \".$LK.\" WHERE wearer_id=$TH\"); \$wpdb->query(\"DELETE FROM \".CMP_Install::table('programs').\" WHERE title='ZZQ'\");" >/dev/null
+
 echo "== Limits and access"
 ev "global \$wpdb; for(\$i=0;\$i<9;\$i++){ \$wpdb->insert(CMP_Install::table('dynamics'),array('type'=>'friends','proposer_id'=>$KH,'partner_id'=>$TH+1000+\$i,'status'=>'pending','created_at'=>gmdate('Y-m-d H:i:s'))); }" >/dev/null
 r=$(post kh -d "action=cmp_dyn_propose&_cmp_nonce=$N&partner=$TH&type=play")
