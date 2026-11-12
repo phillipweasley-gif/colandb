@@ -15,6 +15,7 @@ community-member-planning:community-member-planning.php
 colandb-updater:colandb-updater.php
 colandb-mcp:colandb-mcp.php
 colandb-telegram-intake:colandb-telegram-intake.php
+colandb-silent-auction:colandb-silent-auction.php
 tools/cmp-hosting-check:cmp-hosting-check.php
 "
 

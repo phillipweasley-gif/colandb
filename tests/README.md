@@ -31,6 +31,7 @@ bash tests/recurrence-e2e.sh         # recurring series saved from wp-admin: app
 bash tests/series-e2e.sh             # a series saved in wp-admin keeps its dates (1.45.1), and the 1.45.2 in-place repair: 13 checks
 bash tests/ends-e2e.sh               # event ends: past midnight is the next day, earlier dates refused, the 1.45.3 repair: 18 checks
 bash tests/fundraisers-e2e.sh        # public fundraising tracker: wp-admin entry, totals-only cards, private donations: 21 checks
+bash tests/auction-e2e.sh           # silent auction (needs WooCommerce; the script installs it in the kit): wp-admin entry, bidding, simultaneous bids, Buy It Now, last-minute extension, closing, whole-dollar bids, orders with tax and no fee, emails, terms and notices, fundraiser total less card costs, no tracking: 67 checks
 bash tests/meetings-e2e.sh           # meeting notes: Secretary portal, drafts/approval, motions, files, public page: 27 checks
 bash tests/telegram-intake-e2e.sh    # Telegram event intake + calendar intake API (CEC 1.47.0): webhook secret, allowlist, text and flyer posts, field rules, duplicates, edits, failures and retries, dry run, never publishes, secrets in Settings, diagnostics, groups and topics, a flyer sent apart from its text, processing on arrival, saved venues: 109 checks against a fake Telegram and Claude (tests/mock-intake.php)
 bash tests/intake-rest-e2e.sh        # intake REST routes (CEC 1.50.0/1.51.0): admins only, created pending, every field, updates, duplicates, venues, organization profiles, no email: 56 checks, needs jq

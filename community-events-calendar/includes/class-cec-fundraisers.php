@@ -79,6 +79,7 @@ class CEC_Fundraisers {
 			'venmo'  => __( 'Venmo', 'cec' ),
 			'cashapp' => __( 'Cash App', 'cec' ),
 			'paypal' => __( 'PayPal', 'cec' ),
+			'auction' => __( 'Silent auction', 'cec' ),
 			'check'  => __( 'Check', 'cec' ),
 			'other'  => __( 'Other', 'cec' ),
 		);
@@ -91,6 +92,42 @@ class CEC_Fundraisers {
 			return null;
 		}
 		return round( (float) $raw, 2 );
+	}
+
+	/**
+	 * 1.52.0: adds one donation from code (the COL&B Silent Auction plugin
+	 * adds each paid auction order). Same rules as the wp-admin box; the
+	 * totals and the pages showing them are refreshed. Returns false when
+	 * $id isn't a fundraiser or the amount isn't a positive amount.
+	 */
+	public static function add_donation( $id, $amount, $method = 'other', $note = '', $date = '' ) {
+		$id = (int) $id;
+		if ( self::POST_TYPE !== get_post_type( $id ) ) {
+			return false;
+		}
+		$amount = self::money( $amount );
+		if ( null === $amount || 0.0 === $amount ) {
+			return false;
+		}
+		$d = DateTime::createFromFormat( '!Y-m-d', (string) $date );
+		$entries   = self::entries( $id );
+		$entries[] = array(
+			'date'   => ( $d && $d->format( 'Y-m-d' ) === $date ) ? $date : wp_date( 'Y-m-d' ),
+			'amount' => $amount,
+			'method' => isset( self::methods()[ $method ] ) ? $method : 'other',
+			'note'   => mb_substr( trim( sanitize_text_field( (string) $note ) ), 0, 200 ),
+		);
+		usort(
+			$entries,
+			function ( $a, $b ) {
+				return strcmp( $a['date'], $b['date'] );
+			}
+		);
+		update_post_meta( $id, '_cec_fr_entries', $entries );
+		update_post_meta( $id, '_cec_fr_raised', round( array_sum( wp_list_pluck( $entries, 'amount' ) ), 2 ) );
+		update_post_meta( $id, '_cec_fr_count', count( $entries ) );
+		self::refresh_pages();
+		return true;
 	}
 
 	public static function entries( $id ) {
@@ -468,4 +505,22 @@ class CEC_Fundraisers {
 		wp_enqueue_style( 'cec-fundraisers' );
 		return '<div class="cec-fr-wrap">' . self::card( $id ) . '</div>';
 	}
+}
+
+/**
+ * 1.52.0: public helpers for other COL&B plugins (the silent auction).
+ */
+
+/** Fundraisers (published or draft) as id => title, newest first. */
+function cec_get_fundraiser_choices() {
+	$out = array();
+	foreach ( get_posts( array( 'post_type' => CEC_Fundraisers::POST_TYPE, 'post_status' => array( 'publish', 'draft', 'pending', 'future' ), 'posts_per_page' => 200, 'orderby' => 'date', 'order' => 'DESC' ) ) as $p ) {
+		$out[ (int) $p->ID ] = get_the_title( $p );
+	}
+	return $out;
+}
+
+/** Adds a donation to a fundraiser's totals (see CEC_Fundraisers::add_donation()). */
+function cec_fundraiser_add_donation( $fundraiser_id, $amount, $method = 'other', $note = '', $date = '' ) {
+	return CEC_Fundraisers::add_donation( $fundraiser_id, $amount, $method, $note, $date );
 }
