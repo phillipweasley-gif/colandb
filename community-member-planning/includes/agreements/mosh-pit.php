@@ -31,7 +31,6 @@ return array(
 		'No sharp gear, jewelry or glass near the mats.',
 		'Drinks stay off the mats.',
 		'Not moshing? Step off the mats.',
-		'No more than 6 play pals on the mats at once.',
 		'15 minutes of play if others are waiting.',
 		'No photos or video without permission.',
 		'Monitors keep you safe. Follow their lead.',
@@ -62,7 +61,7 @@ return array(
 <li>No spikes, sharp studs or protrusions on collars or hoods, jewelry that could catch or cut, or glass on or near the mats.</li>
 <li>Soft knee pads are recommended for wrestling and crawling. Pet gear such as hoods, tails and harnesses is always welcome, never required.</li>
 <li>Keep drinks off the mats. If you're not actively moshing, step off the mats.</li>
-<li>No more than 6 play pals on the mats at once, and 15 minutes of play if others are waiting. Monitors may set a different limit for the space.</li>
+<li>15 minutes of play if others are waiting. Monitors may limit how many people are on the mats at once.</li>
 <li>Respect any quiet or cuddle zones the event sets up.</li>
 </ul>
 

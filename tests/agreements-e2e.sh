@@ -39,8 +39,8 @@ $W user create agold agold@example.com --role=subscriber --user_pass=agold12345 
 rm -f wp-content/mail.log
 
 echo "== The starter agreement"
-ok "mosh-pit agreement seeded: version 1, 12 rules, 12-hour renewal, on, full terms with the release" $(all "$([ "$(ev "echo CMP_Agreements::get('mosh-pit')['version'];")" = 1 ] && echo 1)$([ "$(ev "echo count(CMP_Agreements::get('mosh-pit')['rules']);")" = 12 ] && echo 1)$([ "$(ev "echo CMP_Agreements::get('mosh-pit')['renew_hours'];")" = 12 ] && echo 1)$([ "$(ev "echo (int) CMP_Agreements::get('mosh-pit')['active'];")" = 1 ] && echo 1)$(ev "echo strpos(CMP_Agreements::get('mosh-pit')['body'],'Released Parties')?1:0;")")
-ok "rules match the poster's first and last rule" $([ "$(ev "\$r=CMP_Agreements::get('mosh-pit')['rules']; echo \$r[0].'|'.\$r[11];")" = "Scan the code and agree before you play.|Monitors keep you safe. Follow their lead." ] && echo 1 || echo 0)
+ok "mosh-pit agreement seeded: version 1, 11 rules, 12-hour renewal, on, full terms with the release" $(all "$([ "$(ev "echo CMP_Agreements::get('mosh-pit')['version'];")" = 1 ] && echo 1)$([ "$(ev "echo count(CMP_Agreements::get('mosh-pit')['rules']);")" = 11 ] && echo 1)$([ "$(ev "echo CMP_Agreements::get('mosh-pit')['renew_hours'];")" = 12 ] && echo 1)$([ "$(ev "echo (int) CMP_Agreements::get('mosh-pit')['active'];")" = 1 ] && echo 1)$(ev "echo strpos(CMP_Agreements::get('mosh-pit')['body'],'Released Parties')?1:0;")")
+ok "rules match the poster's first and last rule" $([ "$(ev "\$r=CMP_Agreements::get('mosh-pit')['rules']; echo \$r[0].'|'.\$r[10];")" = "Scan the code and agree before you play.|Monitors keep you safe. Follow their lead." ] && echo 1 || echo 0)
 ev "CMP_Agreements::seed(); \$a=get_option('cmp_agreements'); \$a['mosh-pit']['title']='Edited title'; update_option('cmp_agreements',\$a); CMP_Agreements::seed();" >/dev/null
 ok "seed() never overwrites an edited agreement" $([ "$(ev "echo CMP_Agreements::get('mosh-pit')['title'];")" = "Edited title" ] && echo 1 || echo 0)
 ev "\$a=get_option('cmp_agreements'); \$a['mosh-pit']['title']='Mosh pit rules'; update_option('cmp_agreements',\$a);" >/dev/null
@@ -158,7 +158,7 @@ curl -s -b $T/agold.jar -o $T/o3.html "$URL"
 ok "renew 0: an agreement from 13+ hours ago still counts" $(has $T/o3.html 'You agreed')
 curl -s -b $T/admin.jar -o /dev/null "$H/wp-admin/admin-post.php" -d action=cmp_agreement_save -d _wpnonce=$NONCE -d key=mosh-pit --data-urlencode "title=Mosh pit rules" --data-urlencode "rules=$RULES
 Wear closed-toe shoes in the pit." --data-urlencode "body=$BODY<script>alert(1)</script>" -d renew_hours=12 -d active=1
-ok "new rule: version 2, version 1 kept in history, scripts stripped" $(all "$([ "$(ev "echo CMP_Agreements::get('mosh-pit')['version'];")" = 2 ] && echo 1)$([ "$(ev "echo count(CMP_Agreements::get('mosh-pit')['history'][1]['rules']);")" = 12 ] && echo 1)$(ev "echo strpos(CMP_Agreements::get('mosh-pit')['body'],'<script')===false?1:0;")")
+ok "new rule: version 2, version 1 kept in history, scripts stripped" $(all "$([ "$(ev "echo CMP_Agreements::get('mosh-pit')['version'];")" = 2 ] && echo 1)$([ "$(ev "echo count(CMP_Agreements::get('mosh-pit')['history'][1]['rules']);")" = 11 ] && echo 1)$(ev "echo strpos(CMP_Agreements::get('mosh-pit')['body'],'<script')===false?1:0;")")
 curl -s -b $T/agold.jar -o $T/o4.html "$URL"
 ok "after a rule change, everyone is asked again and sees the new rule" $(all "$(has $T/o4.html 'value="confirm"')$(has $T/o4.html 'closed-toe')")
 curl -s -b $T/admin.jar -o /dev/null "$H/wp-admin/admin-post.php" -d action=cmp_agreement_save -d _wpnonce=$NONCE -d key=mosh-pit --data-urlencode "title=Mosh pit rules" --data-urlencode "rules=$RULES" --data-urlencode "body=$BODY" -d renew_hours=12
