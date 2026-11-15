@@ -64,6 +64,7 @@ class CMP_Retention {
 				'homework_photos' => 90,
 				'image_reports' => 1095,
 				'feedback' => 730,
+				'agreements' => 1095,
 			)
 		);
 	}
@@ -113,6 +114,7 @@ class CMP_Retention {
 		$done['homework_photos'] = CMP_Homework::purge_photos( CMP_Homework::photo_days() );
 		$done['image_reports']   = CMP_Image_Reports::purge( isset( $p['image_reports'] ) ? (int) $p['image_reports'] : 1095 );
 		$done['feedback']        = CMP_Feedback::purge( isset( $p['feedback'] ) ? (int) $p['feedback'] : 730 ); // 0.34.0
+		$done['agreements']      = CMP_Agreements::purge( isset( $p['agreements'] ) ? (int) $p['agreements'] : 1095 ); // 0.40.0
 		CMP_Photo_Vault::seal_existing( 200 );
 		$done['reports'] = (int) $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . CMP_Install::table( 'message_reports' ) . ' WHERE created_at < %s', gmdate( 'Y-m-d H:i:s', time() - (int) $p['reports'] * DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		require_once ABSPATH . 'wp-admin/includes/user.php';

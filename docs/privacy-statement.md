@@ -1,6 +1,6 @@
 # Privacy Statement — Central Ohio Leather & Beyond (colandb.com)
 
-> **DRAFT for owner and legal review — not yet published.** Written for colandb.com from what the site's software actually does (Community Events Calendar 1.28 and Community Member Planning 0.14). Items in **[brackets]** need the owner's answer. This is not legal advice; have a lawyer review it before publishing, especially the US state-law section.
+> **DRAFT for owner and legal review — not yet published.** Written for colandb.com from what the site's software actually does (Community Events Calendar 1.28 and Community Member Planning 0.14; event agreements added for 0.40). Items in **[brackets]** need the owner's answer. This is not legal advice; have a lawyer review it before publishing, especially the US state-law section.
 
 **Effective date:** [date]  ·  **Last updated:** [date]
 
@@ -52,6 +52,18 @@ This statement covers colandb.com, including the public calendar and the member 
 | **Email verification** | To confirm your address belongs to you. |
 | **Date of birth** | To confirm you're 18 or older and to work out your age if you choose to show it. **Your date of birth is never shown to anyone**, never searchable, and can't be changed by you after sign-up (contact us to correct it). If someone gives a date under 18, we record that the account was turned away. |
 | **Display name** | How other members see you. It's always shown to signed-in members. **We suggest a scene name** you don't use elsewhere online, rather than your legal name. |
+
+### When you agree to event rules (for example the mosh pit)
+
+Some activities at events ask you to agree to their rules first, by scanning a QR code on a poster. You sign in, or join free with your email, a name, your date of birth and a password.
+
+| What | Why |
+|---|---|
+| **That you agreed, which version of the rules, and when**, with the name and email on your account at that moment | So event hosts and monitors can check who agreed to the rules. Only the site team sees the list. |
+| **Whether you were already signed in, signed in or joined** | To understand how people use the form. |
+| **A scrambled (one-way) code made from your network address** | To limit how many emails can be checked from one network, so nobody can test a list of emails to find members. We can't turn it back into your address. |
+
+If you enter an email that already has an account, the page asks for that account's password. That tells whoever is holding the phone that the email belongs to a member, so the number of look-ups from one network is limited (20 in 10 minutes).
 
 ### Your profile (all optional)
 
@@ -169,6 +181,7 @@ We don't use your information for advertising, profiling for marketing, or autom
 | Events on your calendar | 12 months after the event, or until you remove them. |
 | Volunteer sign-ups | 2 years, or until you ask us to remove them. |
 | Reports about a member | 3 years, for community safety. |
+| Event rule agreements (who agreed, when, which version) | 3 years. Also removed when you erase your data. |
 | Audit log | 2 years. |
 | Security log (sign-ins, admin changes, with IP address) | 30 days. |
 | Copies of emails the site sends (for delivery problems) | 14 days. |
@@ -224,4 +237,5 @@ Questions, requests or concerns: **foxxyforce@gmail.com**. If you need a postal 
 4a. **Google Fonts** could be self-hosted to remove that data flow entirely.
 5. **Research basis:** structure and topics were compared with Sniffies (updated May 2026), FetLife (updated Jul 2026), Recon / T101 (updated Aug 2025) and Grindr's US health-data notice. No text was copied. Things we chose deliberately: FetLife's plain-language, values-first style, its court-order-only stance and its no-AI-training commitment; Recon's retention table and its rule that optional fields you leave blank are never searchable. Not adopted: Sniffies' public-by-default profiles and its use of data to train AI.
 6. **Ohio** has no general consumer privacy law, and COL&B is probably below the size thresholds of CCPA-style laws. The state-rights section is written so it's safe to keep either way. A lawyer should confirm.
+6a. **Event agreements (CMP 0.40.0):** decided by Claude, please confirm: agreement records are kept 3 years and **are deleted on an erase request**, like other personal data. If your attorney wants signed releases kept for the time limit on injury claims (Ohio: generally 2 years) even after an erase request, say so and the eraser can keep them with a note, the way it keeps the under-18 lock. Accounts created at the door that never confirm their email are still removed after 60 days; their agreement records stay (name and email copied) until the 3 years are up or someone asks to erase them.
 7. **Link it:** add "Privacy" to the site footer, the sign-up form ("By creating an account you agree to … and have read our Privacy Statement"), and the member area.
