@@ -29,6 +29,10 @@ community-member-planning/
 │   ├── class-cmp-photo-consent.php 0.32.0: one-time explicit consent before the first chastity/homework photo (`cmp_photo_consent_at`)
 │   ├── class-cmp-image-reports.php 0.32.0: public [cmp_image_report] form (TAKE IT DOWN Act), Users → Image reports, remove a private photo by link
 │   ├── class-cmp-e2e.php           0.33.0: optional end-to-end photos: keys (user meta), envelope checks, panel, share-page decrypt (with assets/js/e2e-photos.js)
+│   ├── class-cmp-agreements.php    0.40.0: event agreements (data): option `cmp_agreements` (wording, versions + history, renew_hours, active), table `cmp_agreement_signs`, page lookup, `?cmp_agree=` QR link, export/erase by email, 3-year purge
+│   ├── class-cmp-agreement-form.php 0.40.0: [cmp_agreement key="…"]: rules, then confirm (signed in) or email → password / join free → confirm; posts back to the page (no email in URLs); never cached
+│   ├── class-cmp-agreements-admin.php 0.40.0: Users → Event agreements: list, Create the page, edit (new version on wording change), who agreed, CSV
+│   ├── agreements/mosh-pit.php     0.40.0: starter wording for the mosh pit agreement (read once by CMP_Agreements::seed())
 │   ├── class-cmp-feedback.php      0.34.0: "Need help?" link under the account bar, [cmp_feedback] form, Users → Help requests
 │   ├── class-cmp-member-admin.php  Users → Member Dynamics & Locks: site-team corrections to locks and dynamics (0.26.0)
 │   ├── class-cmp-feed.php          member feed: text/photo posts, event tags, likes, reports, admin hide, Feed tab
@@ -78,6 +82,8 @@ community-member-planning/
 | `{prefix}cmp_task_entries.photo` | 0.32.0: sealed like lock photos, context `hwproof` (program id, member id). `photo_sha` is `purged` after 90 days (from the logged day) or `deleted` when the member or site team deletes it. |
 | `{prefix}cmp_image_reports` | 0.32.0: id, created_at, email, name, signature, relation (self/behalf/minor), location, details, ip_hash (HMAC), status (new/removed/declined), handled_at, handled_by, note. Kept 3 years. |
 | `{prefix}cmp_photo_shares` | 0.31.0: id, wearer_id, lock_id, event_id, salt, created_at, expires_at, max_views (0 = until expiry, 1 = once), views, last_view_at, revoked_at. No token stored: the link token is `CMP_Photo_Vault::mac( 'share|<id>|<salt>' )`. Cleared a day after a link stops working, or when its photo is purged. |
+| option `cmp_agreements` | 0.40.0: key => title, intro, rules[], body (HTML, wp_kses_post), renew_hours (0 = until the wording changes), active, version, updated_at, history[version] => wording + from/to. A wording change bumps the version; switching on/off or renew_hours doesn't. Option `cmp_agreement_pages` caches key => page ID. |
+| `{prefix}cmp_agreement_signs` | 0.40.0: id, agreement, version, user_id, email + name (copied at the time), via (member / signin / signup), created_at, ip_hash (HMAC). Kept 3 years; export/erase by email. |
 | option `cmp_settings` | member_page_id, privacy_notice_url, attestation_text, attestation_version, delete_data_on_delete, lock_dashboard (default on) |
 | option `cmp_db_version` | Schema version. Don't delete on a live site. |
 

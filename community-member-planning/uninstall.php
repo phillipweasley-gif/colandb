@@ -14,12 +14,14 @@ if ( empty( $cmp_settings['delete_data_on_delete'] ) ) {
 }
 
 global $wpdb;
-foreach ( array( 'audit_log', 'notifications', 'profile_values', 'profile_images' ) as $cmp_table ) {
+foreach ( array( 'audit_log', 'notifications', 'profile_values', 'profile_images', 'agreement_signs' ) as $cmp_table ) {
 	$wpdb->query( 'DROP TABLE IF EXISTS ' . $wpdb->prefix . 'cmp_' . $cmp_table ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.SchemaChange
 }
 $wpdb->query( "DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE 'cmp\\_%'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 delete_option( 'cmp_settings' );
 delete_option( 'cmp_profile_options' );
+delete_option( 'cmp_agreements' );
+delete_option( 'cmp_agreement_pages' );
 $cmp_admin = get_role( 'administrator' );
 if ( $cmp_admin ) {
 	$cmp_admin->remove_cap( 'cmp_manage_member_fields' );

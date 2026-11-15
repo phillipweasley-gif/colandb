@@ -40,7 +40,7 @@ class CMP_Install {
 	}
 
 	public static function table_names() {
-		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ), self::table( 'follows' ), self::table( 'nods' ), self::table( 'dynamic_addons' ), self::table( 'calendar' ), self::table( 'group_links' ), self::table( 'photo_shares' ), self::table( 'image_reports' ), self::table( 'feedback' ) );
+		return array( self::table( 'audit_log' ), self::table( 'notifications' ), self::table( 'profile_values' ), self::table( 'profile_images' ), self::table( 'dynamics' ), self::table( 'programs' ), self::table( 'tasks' ), self::table( 'task_entries' ), self::table( 'locks' ), self::table( 'lock_events' ), self::table( 'posts' ), self::table( 'post_photos' ), self::table( 'post_likes' ), self::table( 'conversations' ), self::table( 'messages' ), self::table( 'blocks' ), self::table( 'message_reports' ), self::table( 'follows' ), self::table( 'nods' ), self::table( 'dynamic_addons' ), self::table( 'calendar' ), self::table( 'group_links' ), self::table( 'photo_shares' ), self::table( 'image_reports' ), self::table( 'feedback' ), self::table( 'agreement_signs' ) );
 	}
 
 	private static function create_tables() {
@@ -56,6 +56,7 @@ class CMP_Install {
 		CMP_Profile_Fields::upgrade_kinks();
 		CMP_Dynamics::migrate_addons(); // 0.16.0, once.
 		CMP_Calendar::migrate(); // 0.17.0, once.
+		CMP_Agreements::seed(); // 0.40.0: the mosh pit agreement, if missing.
 		// 0.25.0: locks that existed before keyholder names on badges keep
 		// their old badge ("Locked · N days") until the keyholder turns it on.
 		if ( $from && $from < 17 ) {
@@ -487,6 +488,24 @@ class CMP_Install {
 			KEY idx_ip (ip_hash,created_at)
 		) $charset;";
 
-		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports, $follows, $nods, $addons, $calendar, $groups, $shares, $image_reports, $feedback );
+		// Who agreed to an event agreement (0.40.0, CMP_Agreements). Email and
+		// name are copied so the record outlives a removed account. Kept 3 years.
+		$agreement_signs = 'CREATE TABLE ' . self::table( 'agreement_signs' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			agreement varchar(40) NOT NULL DEFAULT '',
+			version int(10) unsigned NOT NULL DEFAULT 1,
+			user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			email varchar(190) NOT NULL DEFAULT '',
+			name varchar(100) NOT NULL DEFAULT '',
+			via varchar(12) NOT NULL DEFAULT '',
+			created_at datetime NOT NULL,
+			ip_hash char(64) NOT NULL DEFAULT '',
+			PRIMARY KEY  (id),
+			KEY idx_agreement (agreement,created_at),
+			KEY idx_user (user_id,agreement),
+			KEY idx_email (email)
+		) $charset;";
+
+		return array( $audit, $notifications, $values, $images, $dynamics, $programs, $tasks, $entries, $locks, $events, $posts, $photos, $likes, $convs, $msgs, $blocks, $reports, $follows, $nods, $addons, $calendar, $groups, $shares, $image_reports, $feedback, $agreement_signs );
 	}
 }

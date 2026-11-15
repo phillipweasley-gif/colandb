@@ -1,0 +1,156 @@
+/* [cmp_agreement] (CMP 0.40.0): the page people reach from a poster's QR
+   code, usually on a phone in a dark venue. COL&B colours: Hot Pink #FF50D7,
+   Electric Lime #E1F577, Night Plum #15121F, Leather Black #100F0F, Soft
+   White #F5F4F7. Scoped to .cmp-agreement; !important on interactive
+   elements because the theme styles buttons and inputs (TECHNICAL_BRIEF §4). */
+
+.cmp-agreement {
+	max-width: 680px;
+	margin: 0 auto;
+	padding: 20px 18px 28px;
+	background: #15121F;
+	color: #F5F4F7;
+	border: 4px solid #FF50D7;
+	border-radius: 18px;
+	font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	font-size: 17px;
+	line-height: 1.45;
+	box-sizing: border-box;
+}
+.cmp-agreement *, .cmp-agreement *::before, .cmp-agreement *::after { box-sizing: border-box; }
+
+.cmp-agreement .cmp-ag-title {
+	font-family: Montserrat, "Arial Black", sans-serif !important;
+	font-weight: 900 !important;
+	text-transform: uppercase;
+	color: #FF50D7 !important;
+	font-size: clamp(28px, 8vw, 40px) !important;
+	line-height: 1.05 !important;
+	margin: 0 0 8px !important;
+}
+.cmp-agreement .cmp-ag-intro { margin: 0 0 14px; }
+
+.cmp-agreement .cmp-ag-rules {
+	list-style: none;
+	counter-reset: cmpag;
+	margin: 0 0 16px;
+	padding: 0;
+}
+.cmp-agreement .cmp-ag-rules li {
+	counter-increment: cmpag;
+	position: relative;
+	padding: 8px 0 8px 44px;
+	border-bottom: 1px solid rgba(245, 244, 247, .12);
+	font-weight: 600;
+}
+.cmp-agreement .cmp-ag-rules li::before {
+	content: counter(cmpag) ".";
+	position: absolute;
+	left: 0;
+	width: 34px;
+	text-align: right;
+	font-family: Montserrat, "Arial Black", sans-serif;
+	font-weight: 900;
+	color: #E1F577;
+}
+
+.cmp-agreement .cmp-ag-terms {
+	margin: 0 0 18px;
+	border: 1px solid rgba(225, 245, 119, .5);
+	border-radius: 10px;
+	padding: 10px 14px;
+}
+.cmp-agreement .cmp-ag-terms summary {
+	cursor: pointer;
+	color: #E1F577;
+	font-weight: 700;
+	min-height: 44px;
+	display: flex;
+	align-items: center;
+}
+.cmp-agreement .cmp-ag-terms-body { font-size: 15px; }
+.cmp-agreement .cmp-ag-terms-body h3 { color: #FF50D7; font-size: 17px; margin: 16px 0 6px; }
+
+.cmp-agreement .cmp-ag-box {
+	background: #100F0F;
+	border-radius: 12px;
+	padding: 16px;
+}
+.cmp-agreement .cmp-ag-step { color: #E1F577 !important; font-size: 20px !important; margin: 0 0 6px !important; }
+.cmp-agreement .cmp-ag-small { display: block; font-size: 14px; opacity: .85; margin: 4px 0 10px; }
+.cmp-agreement a { color: #E1F577 !important; text-decoration: underline !important; }
+
+.cmp-agreement label { display: block; font-weight: 700; margin-bottom: 4px; color: #F5F4F7 !important; }
+.cmp-agreement input[type=email],
+.cmp-agreement input[type=text],
+.cmp-agreement input[type=password],
+.cmp-agreement select {
+	width: 100% !important;
+	min-height: 48px !important;
+	padding: 10px 12px !important;
+	font-size: 17px !important;            /* 16+ stops iPhone zooming in */
+	color: #100F0F !important;
+	background: #F5F4F7 !important;
+	border: 2px solid #F5F4F7 !important;
+	border-radius: 8px !important;
+}
+.cmp-agreement input:focus, .cmp-agreement select:focus, .cmp-agreement button:focus-visible, .cmp-agreement summary:focus-visible {
+	outline: 3px solid #E1F577 !important;
+	outline-offset: 2px !important;
+}
+.cmp-agreement .cmp-dob { display: grid; grid-template-columns: 1.5fr 1fr 1.2fr; gap: 6px; }
+.cmp-agreement .cmp-dob select { padding: 8px 4px !important; font-size: 16px !important; min-width: 0 !important; }
+.cmp-agreement .cmp-ag-terms .cmp-ag-rules { margin: 8px 0 0; }
+
+.cmp-agreement .cmp-ag-check { display: flex; gap: 12px; align-items: flex-start; margin: 14px 0; }
+.cmp-agreement .cmp-ag-check input {
+	width: 28px !important;
+	height: 28px !important;
+	flex: 0 0 28px;
+	margin: 0 !important;
+	accent-color: #FF50D7;
+}
+.cmp-agreement .cmp-ag-check label { font-weight: 600; margin: 0; }
+
+.cmp-agreement .cmp-ag-btn {
+	display: block !important;
+	width: 100% !important;
+	min-height: 54px !important;
+	border: 0 !important;
+	border-radius: 10px !important;
+	background: #FF50D7 !important;
+	color: #100F0F !important;
+	font-family: Montserrat, "Arial Black", sans-serif !important;
+	font-weight: 900 !important;
+	font-size: 20px !important;
+	text-transform: uppercase !important;
+	letter-spacing: .02em !important;
+	cursor: pointer !important;
+}
+.cmp-agreement .cmp-ag-btn:hover { background: #E1F577 !important; }
+
+.cmp-agreement .cmp-ag-notice {
+	padding: 12px 14px;
+	border: 2px solid #E1F577;
+	border-radius: 8px;
+	margin: 0 0 12px;
+}
+.cmp-agreement .cmp-ag-error { border-color: #FF50D7; }
+
+.cmp-agreement .cmp-ag-done { text-align: center; padding: 6px 0 4px; }
+.cmp-agreement .cmp-ag-tick {
+	width: 96px;
+	height: 96px;
+	margin: 0 auto 8px;
+	border-radius: 50%;
+	background: #E1F577;
+	color: #100F0F;
+	font-size: 64px;
+	line-height: 96px;
+	font-weight: 900;
+}
+.cmp-agreement .cmp-ag-done-title { font-family: Montserrat, "Arial Black", sans-serif; font-weight: 900; font-size: 30px; text-transform: uppercase; color: #E1F577; margin: 0; }
+.cmp-agreement .cmp-ag-done-name { font-size: 24px; font-weight: 700; margin: 4px 0 0; }
+.cmp-agreement .cmp-ag-done-when { font-size: 18px; margin: 2px 0 8px; }
+
+.cmp-agreement .cmp-ag-hp { position: absolute !important; left: -9999px !important; }
