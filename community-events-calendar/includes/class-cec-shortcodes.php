@@ -386,15 +386,26 @@ class CEC_Shortcodes {
 
 	public static function upcoming( $atts ) {
 		$atts = shortcode_atts(
-			array( 'count' => CEC_Admin_Settings::get( 'upcoming_count' ) ),
+			array(
+				'count'  => CEC_Admin_Settings::get( 'upcoming_count' ),
+				// 1.53.0: only events in this US state / province (blank = everywhere).
+				'region' => CEC_Admin_Settings::get( 'upcoming_region' ),
+			),
 			$atts
 		);
+		$count  = max( 1, (int) $atts['count'] );
+		$region = CEC_Locations::region( (string) $atts['region'] );
+		if ( '' === $region && '' !== trim( (string) $atts['region'] ) ) {
+			$region = trim( (string) $atts['region'] );
+		}
 
 		$query = new WP_Query(
 			array(
 				'post_type'      => 'cec_event',
 				'post_status'    => 'publish',
-				'posts_per_page' => (int) $atts['count'],
+				// With a place filter, look further ahead so the strip still
+				// fills up with events from that place.
+				'posts_per_page' => '' === $region ? $count : 200,
 				'meta_key'       => '_cec_start',
 				'orderby'        => 'meta_value',
 				'order'          => 'ASC',
@@ -408,7 +419,23 @@ class CEC_Shortcodes {
 			)
 		);
 
-		if ( ! $query->have_posts() ) {
+		$cards = array();
+		foreach ( $query->posts as $p ) {
+			$data = CEC_Event_Helper::data( $p->ID );
+			if ( '' !== $region ) {
+				// Online events and events whose place can't be read are left out.
+				$loc = CEC_Locations::for_event( $data );
+				if ( 0 !== strcasecmp( $region, $loc['region'] ) ) {
+					continue;
+				}
+			}
+			$cards[] = $data;
+			if ( count( $cards ) >= $count ) {
+				break;
+			}
+		}
+
+		if ( ! $cards ) {
 			return '<p class="cec-no-events">' . esc_html__( 'No upcoming events.', 'cec' ) . '</p>';
 		}
 
@@ -417,9 +444,7 @@ class CEC_Shortcodes {
 		<div class="cec-upcoming-wrap">
 			<button type="button" class="cec-scroll-btn cec-scroll-left" aria-label="<?php esc_attr_e( 'Scroll left', 'cec' ); ?>">&larr;</button>
 			<div class="cec-upcoming-scroll">
-				<?php foreach ( $query->posts as $p ) :
-					$data = CEC_Event_Helper::data( $p->ID );
-					?>
+				<?php foreach ( $cards as $data ) : ?>
 					<a class="cec-upcoming-card" href="<?php echo esc_url( $data['permalink'] ); ?>">
 						<?php if ( $data['thumb_card'] ) : ?>
 							<img src="<?php echo esc_url( $data['thumb_card'] ); ?>" alt="<?php echo esc_attr( $data['photo_alt'] ? $data['photo_alt'] : $data['title'] ); ?>" />

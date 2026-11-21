@@ -16,6 +16,7 @@ class CEC_Admin_Settings {
 			'color_text'      => '#f5f4f7',
 			'color_bg'        => '#15121f',
 			'upcoming_count'             => 8,
+			'upcoming_region'            => 'Ohio',
 			'first_weekday'              => '0',
 			'require_login'              => 1,
 			'auto_publish'               => 0,
@@ -124,6 +125,7 @@ class CEC_Admin_Settings {
 			}
 		}
 		$out['upcoming_count']             = isset( $input['upcoming_count'] ) ? absint( $input['upcoming_count'] ) : 8;
+		$out['upcoming_region']            = isset( $input['upcoming_region'] ) ? sanitize_text_field( wp_unslash( $input['upcoming_region'] ) ) : '';
 		$out['first_weekday']              = isset( $input['first_weekday'] ) && in_array( $input['first_weekday'], array( '0', '1', '2', '3', '4', '5', '6' ), true ) ? $input['first_weekday'] : '0';
 		$out['require_login']              = isset( $input['require_login'] ) ? 1 : 0;
 		$out['auto_publish']               = isset( $input['auto_publish'] ) ? 1 : 0;
@@ -252,6 +254,11 @@ class CEC_Admin_Settings {
 						<td><input type="number" min="1" max="50" name="<?php echo esc_attr( self::OPTION ); ?>[upcoming_count]" id="cec_upcoming_count" value="<?php echo esc_attr( $opts['upcoming_count'] ); ?>" /></td>
 					</tr>
 					<tr>
+						<th><label for="cec_upcoming_region"><?php esc_html_e( '"Upcoming Events" only in', 'cec' ); ?></label></th>
+						<td><input type="text" class="regular-text" name="<?php echo esc_attr( self::OPTION ); ?>[upcoming_region]" id="cec_upcoming_region" value="<?php echo esc_attr( $opts['upcoming_region'] ); ?>" />
+							<p class="description"><?php esc_html_e( 'A US state or Canadian province (e.g. Ohio or OH). The scrolling upcoming events strip shows only in-person events there. Leave blank to show events everywhere.', 'cec' ); ?></p></td>
+					</tr>
+					<tr>
 						<th><?php esc_html_e( 'Guest submissions', 'cec' ); ?></th>
 						<td>
 							<label><input type="checkbox" name="<?php echo esc_attr( self::OPTION ); ?>[allow_guest_submission]" value="1" <?php checked( $opts['allow_guest_submission'], 1 ); ?> /> <?php esc_html_e( 'Let visitors submit without creating an account, using just their email', 'cec' ); ?></label>
@@ -366,7 +373,7 @@ class CEC_Admin_Settings {
 			<table class="widefat striped" style="max-width:800px;">
 				<tr><td><code>[cec_calendar]</code></td><td><?php esc_html_e( 'Traditional month calendar view', 'cec' ); ?></td></tr>
 				<tr><td><code>[cec_events view="grid"]</code></td><td><?php esc_html_e( 'Filterable grid view (or view="list")', 'cec' ); ?></td></tr>
-				<tr><td><code>[cec_upcoming count="6"]</code></td><td><?php esc_html_e( 'Scrolling upcoming events widget', 'cec' ); ?></td></tr>
+				<tr><td><code>[cec_upcoming count="6"]</code></td><td><?php esc_html_e( 'Scrolling upcoming events widget (add region="" to show every place, or region="Indiana" for another state)', 'cec' ); ?></td></tr>
 				<tr><td><code>[cec_submit_event]</code></td><td><?php esc_html_e( 'Front-end event submission form for members', 'cec' ); ?></td></tr>
 				<tr><td><code>[cec_admin_dashboard]</code></td><td><?php esc_html_e( 'Front-end approval/management dashboard for Calendar Managers', 'cec' ); ?></td></tr>
 				<tr><td><code>[cec_my_events]</code></td><td><?php esc_html_e( 'Lets a logged-in submitter view, edit, postpone/cancel, and withdraw their own submitted events', 'cec' ); ?></td></tr>

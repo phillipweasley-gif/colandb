@@ -6,6 +6,17 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
+## 1.53.0
+
+**Homepage upcoming events: Ohio only** (owner, 2026-11-21: "filter out any event not in Ohio and only display dates with events").
+
+- The scrolling "Check out our upcoming events" strip (`[cec_upcoming]`) now shows only in-person events in Ohio. Out-of-state events (e.g. the Mr. Lake Ontario Leather weekend in Toronto), online events and events whose place can't be read are left out. The place is read the same way as the calendar's State filter (1.49.0, `CEC_Locations::for_event()`), so "OH", "Ohio" and one-line addresses all count.
+- The strip still fills up to its count (8 by default) by looking further ahead, so it only ever shows cards for dates that have Ohio events, never empty or short.
+- New setting, Events → Settings → **"Upcoming Events" only in** (default Ohio; blank shows everywhere). The shortcode also takes `region="Indiana"` or `region=""` to override it.
+- Numbered 1.53.0 because 1.52.0 is already used by the unmerged silent auction branch.
+
+**Verified** in the local WordPress kit: new `tests/upcoming-e2e.sh`, 15/15 (Ohio only and in date order, Toronto/Chicago/Indiana/online/unreadable left out, filled to its count, `region=""`, other states and provinces, the setting saved and blank, no plugin warnings). `php -l` clean. The calendar month view is untouched, so no `snap.php` comparison was needed.
+
 ## 1.51.0
 
 **Organization profiles over the intake REST API** (owner, 2026-11-10, after Claude created the Mr. Lake Ontario Leather and SURR Presents organizations: "Can you please update this based on the information you have been provided?").
