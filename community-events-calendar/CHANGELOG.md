@@ -15,7 +15,18 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 - Nothing public changes: the cards still show only the total, goal, percentage and count.
 
 **Verified** in the local WordPress kit: `tests/fundraisers-e2e.sh` 21/21; `tests/form-cache-e2e.sh` 36/36 (with WooCommerce and the auction plugin active); the new `tests/auction-e2e.sh` (67/67) pays an auction order and checks the fundraiser total, the "Silent auction" entry, that it's counted once, and the Fundraising page. Month view untouched.
-- Numbered 1.54.0: first drafted as 1.52.0, then renumbered after merging `main`, which had released 1.53.0 (Ohio-only upcoming events) in the meantime. The two changes touch different files. Merged with 1.53.0 and re-checked as below.
+- Numbered 1.54.0: first drafted as 1.52.0, then renumbered after merging `main`, which had released 1.53.0 (Ohio-only upcoming events) in the meantime (and later 1.53.1, the phone fix for that strip). The changes touch different files. Merged with both and re-checked as below.
+
+## 1.53.1
+
+**Homepage upcoming events strip fixed on phones** (owner, 2026-11-21, iPhone screenshot: "This is not displaying correctly").
+
+- The flyer showed as a thin strip at the top of a tall empty card, the arrows were wide pink boxes, and the next card was cut off. Cause: the theme's `img { height: auto }` and Elementor's `.elementor img { height: auto }` have the same weight as the plugin's `.cec-upcoming-card img` rule and load later, so they won; the theme's button rules did the same to the arrows. The image grew to the flyer's full height and iPhone Safari drew it badly.
+- The strip's rules are now scoped under `.cec-upcoming-wrap`, with `!important` on the image and arrow sizes, so the image box is a fixed 130px (whole flyer shown, `object-fit: contain`) and the arrows are 34px circles again.
+- On phones (600px and narrower) the arrows are hidden and the strip is swiped: each card is 78% of the width with a 220px flyer box and the next card peeking in, snapping one card at a time.
+- CSS only, no PHP changed.
+
+**Verified** against the live homepage's own markup in Chromium (iPhone 13 size and 1280px desktop) with this stylesheet swapped in: before, the flyer box was 283px tall and the arrows 49×34; after, 130px on desktop (220px on phones) and 34×34 circles, no sideways page scroll (page width 390 on the phone). Not run in real iPhone Safari; please check on your phone after updating.
 
 ## 1.53.0
 
