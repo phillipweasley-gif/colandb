@@ -6,7 +6,7 @@
 
 - Auctions and items in wp-admin (Silent Auction menu), a never-cached Auction page (`[csa_auction]`, created as a draft), bidding for signed-in accounts with minimum raises, Buy It Now, last-minute extension and safe handling of simultaneous bids.
 - Bidder names are never public. The top bid and bid count are.
-- At close, one WooCommerce order per winner: winning bids plus sales tax, no other fees. Paid orders add the winning bids, less the auction's card-costs percentage, to the linked fundraiser (needs Community Events Calendar 1.52.0).
+- At close, one WooCommerce order per winner: winning bids plus sales tax, no other fees. Paid orders add the winning bids, less the auction's card-costs percentage, to the linked fundraiser (needs Community Events Calendar 1.54.0).
 - **Compliance changes after research** (owner, 2026-11-11: "make sure we're following all local, state, and federal rules"; report in the project files, "Silent auction compliance in Ohio"):
   - No card fee is added on top. A required surcharge breaks Visa/Mastercard rules (none on debit cards, 3% cap) and Square supports none online. The owner chose to have bids include card costs: the page says "Bids include card processing costs (about 3%), which are paid from the winning bid. The rest goes to: …", and that percentage is taken off before the fundraiser total.
   - Bids, starting bids, minimum raises and Buy It Now are whole dollars (owner: "The bid should be in round numbers").

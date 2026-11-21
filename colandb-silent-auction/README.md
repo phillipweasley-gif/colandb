@@ -12,7 +12,7 @@ Silent auctions for COL&B fundraising, built on WooCommerce (owner request, 2026
 - **Two bids at once:** the top bid is changed with a compare-and-swap on one meta row (`_csa_high` = "cents|user"), so only one of two simultaneous bids wins; the other is checked again against the new top bid.
 - **Emails** (plain text through `wp_mail()`, so FluentSMTP's "COL&B" sender): outbid, item bought with Buy It Now, winner (once per winner, all their items, tax, fee, total and a Pay now link), and a summary to the site admin email.
 - **Closing:** once every item's bidding has ended, the auction is closed once (by the 5-minute WP-Cron check, the Auction page, or opening it in wp-admin): one pending WooCommerce order per winner (`created_via = csa`, so WooCommerce never cancels it as abandoned), with sales tax (WooCommerce tax rates) and no other fee.
-- **Paying:** the winner pays on WooCommerce's "pay for order" page with whatever payment method is set up (Square on colandb.com). When an order becomes Processing or Completed (including marked Completed by hand for cash), its items are marked paid and the **winning bids less the card-costs percentage** (never tax) are added to the linked fundraiser through `cec_fundraiser_add_donation()` (Community Events Calendar 1.52.0+), once.
+- **Paying:** the winner pays on WooCommerce's "pay for order" page with whatever payment method is set up (Square on colandb.com). When an order becomes Processing or Completed (including marked Completed by hand for cash), its items are marked paid and the **winning bids less the card-costs percentage** (never tax) are added to the linked fundraiser through `cec_fundraiser_add_donation()` (Community Events Calendar 1.54.0+), once.
 - **No tracking:** WooCommerce's Order attribution feature (sbjs_* cookies on every page) is kept off while this plugin is active, because the Privacy Policy promises no analytics.
 
 ## Setting up on the live site (owner)
@@ -21,7 +21,7 @@ Silent auctions for COL&B fundraising, built on WooCommerce (owner request, 2026
 2. WooCommerce → Settings → **Site visibility: Live** (a new WooCommerce shows "coming soon" instead of the pay page until then).
 3. Install **WooCommerce Square** and connect the Weasley Studios Square account (WooCommerce → Settings → Payments).
 4. WooCommerce → Settings → General: shop address (where items are collected) and US dollar. Tick **Enable tax rates**, then Settings → Tax → Standard rates: the sales tax rate(s) your accountant gives you (Franklin County: 8.0% since April 2025), with "Calculate tax based on: Shop base address".
-5. Update the COL&B plugins (Community Events Calendar 1.52.0, then this one through the updater).
+5. Update the COL&B plugins (Community Events Calendar 1.54.0, then this one through the updater).
 6. Silent Auction → Auctions → Add New; add items; publish the Silent Auction page and add it to the menu.
 
 ## Compliance (research 2026-11-11, not legal advice)

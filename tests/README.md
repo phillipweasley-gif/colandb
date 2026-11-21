@@ -9,14 +9,15 @@ bash tests/setup.sh                  # downloads WordPress + WP-CLI, installs bo
 bash tests/e2e.sh                    # member plugin: 57 end-to-end checks over real HTTP
 bash tests/account-e2e.sh            # member plugin Account tab + dashboard lockout: 64 checks
 bash tests/profile-e2e.sh            # member plugin profiles, photos, preferences, menus, account bar: 80 checks
-bash tests/dynamics-e2e.sh           # dynamics between members: 34 checks
+bash tests/dynamics-e2e.sh           # dynamics between members, incl. ending, declining and turning off quietly (CMP 0.39.0): 70 checks
 bash tests/homework-e2e.sh           # homework programs: 44 checks
 bash tests/chastity-e2e.sh           # chastity tracking, incl. keyholder-proposed locks, "verified elsewhere", last verified on badges, handing a running lock to a keyholder and setting the end date, encrypted photos, share links, the 90-day purge, consent, download and delete, correcting any day, the star calendar, milestone stars, runs, Locktober, late logging, undo, self check-ins, new-star notifications and sharing, the profile-stars prompt and icons only: 222 checks
 bash tests/image-report-e2e.sh        # intimate-image reports (CMP 0.32.0): public form, limits, emails, admin screen, remove a photo by link, never cached: 24 checks
 bash tests/e2e-photos-e2e.sh          # end-to-end photos (CMP 0.33.0) in real Chromium via Playwright: 33 checks
 bash tests/feedback-e2e.sh            # "Need help?" link and form (CMP 0.34.0): 20 checks
+bash tests/agreements-e2e.sh          # event agreements, e.g. the mosh pit (CMP 0.40.0): QR link, signing in or joining free, confirming, renewal, versions, limits, admin list and CSV, privacy: 53 checks
 bash tests/feed-e2e.sh               # member feed: 41 checks
-bash tests/messages-e2e.sh           # member messages: 46 checks
+bash tests/messages-e2e.sh           # member messages: 52 checks
 bash tests/follows-e2e.sh            # follow / unfollow: 27 checks
 bash tests/directory-e2e.sh          # Members search and the profile view: 21 checks
 bash tests/nods-e2e.sh               # nods: 20 checks
@@ -36,6 +37,7 @@ bash tests/meetings-e2e.sh           # meeting notes: Secretary portal, drafts/a
 bash tests/telegram-intake-e2e.sh    # Telegram event intake + calendar intake API (CEC 1.47.0): webhook secret, allowlist, text and flyer posts, field rules, duplicates, edits, failures and retries, dry run, never publishes, secrets in Settings, diagnostics, groups and topics, a flyer sent apart from its text, processing on arrival, saved venues: 109 checks against a fake Telegram and Claude (tests/mock-intake.php)
 bash tests/intake-rest-e2e.sh        # intake REST routes (CEC 1.50.0/1.51.0): admins only, created pending, every field, updates, duplicates, venues, organization profiles, no email: 56 checks, needs jq
 bash tests/locations-e2e.sh         # calendar Country / State / City filter and the day list beside the grid (CEC 1.49.0): addresses read in 25 real styles, filtered month on the page, by AJAX and from a shared link, the cache, and in real Chromium the dropdowns, arrows, Today, the URL and the wide / medium / phone layouts: 36 checks
+bash tests/upcoming-e2e.sh           # homepage upcoming strip shows only events in one state, Ohio by default (CEC 1.53.0): 15 checks
 bash tests/form-cache-e2e.sh         # form pages never cached (host CDN header copied by a test mu-plugin), expired nonces accepted when signed out, guest edit links: 36 checks
 ```
 
@@ -50,6 +52,7 @@ bash tests/form-cache-e2e.sh         # form pages never cached (host CDN header 
 | `homework-e2e.sh` | Homework (CMP 0.7.0): programs only from the leading side, tasks, member logging (date window, proof types), proof photos (EXIF stripped, private to the pair), lead review, archive when the dynamic ends, access, export/erase. Needs PHP GD. Empties the dynamics and homework tables before and after. |
 | `feedback-e2e.sh` | "Need help?" (CMP 0.34.0): the link under `[cmp_account_bar]`, the `[cmp_feedback]` form signed out and in, spam limits, emails with Reply-To, Users → Help requests and replies, export/erase by email, 2-year clean-up. Creates and deletes its own pages and test user. |
 | `e2e-photos-e2e.sh` + `e2e-photos.js` | End-to-end encrypted chastity photos (CMP 0.33.0), driven in Chromium with Playwright (`NODE_PATH=/opt/node-tools/node_modules` in the cloud sandbox): key setup, browser encryption and upload, wearer/keyholder decryption, unlock/forget/wrong passphrase, non-recipients, refused plain uploads, share links with the key in the #fragment, download, passphrase change. Creates and removes its own users and lock. |
+| `agreements-e2e.sh` | Event agreements (CMP 0.40.0): the seeded mosh pit agreement, Users → Event agreements (Create the page, edit, versions, on/off), the `?cmp_agree=` QR link, the `[cmp_agreement]` page signed out (email look-up, password step, join free with name / date of birth / password, 18+ and tick-box checks, honeypot, timing, 20 look-ups per 10 minutes, sign-ups closed) and signed in (confirm, nonce, date of birth for older accounts, under-18 lock), the 12-hour renewal, rule changes asking again, who agreed and the CSV (formula-safe), export/erase by email, 3-year clean-up. Creates and deletes its own pages and users. |
 | `image-report-e2e.sh` | Intimate-image reports (CMP 0.32.0): the public `[cmp_image_report]` form (honeypot, timing, daily limit, signature and statement), team and reporter emails, possible-minor wording, Users → Image reports, closing a report, removing a photo by its link, export by email, 3-year clean-up. Creates and deletes its own page and test user. |
 | `chastity-e2e.sh` | Chastity (CMP 0.8.0): starting a lock (self / keyholder only from a dynamic), keyholder time and rules, hidden timer, verification codes and photo privacy, hygiene, releases, ask to unlock, profile badge, dynamic ending (self-lock), emergency unlock, keyholder-proposed locks (CMP 0.24.0: propose, accept, decline, withdraw, dropped when the dynamic ends), export/erase. Needs PHP GD. Empties the lock and dynamics tables before and after. |
 | `feed-e2e.sh` | Feed (CMP 0.9.0): posting rules (empty, length, audience, photos, event window), who sees what (members / connections / signed out / not yet members), photo privacy and re-encoding, likes, reports (admin email), admin hide, delete, profile posts, dynamic ending, export/erase. Needs PHP GD. Creates and removes two test events and an administrator "mod". |
@@ -69,6 +72,8 @@ bash tests/form-cache-e2e.sh         # form pages never cached (host CDN header 
 | `form-cache-e2e.sh` | Pages with forms (CEC 1.46.1): with a must-use plugin adding the host's `ec-cdn-cache-control` header, every form page (sign-in, sign-up, event and organization submission, guest edit, subscribe, volunteer, meeting portal, an Elementor-only page) sends `no-store` and drops the hint while other pages keep it; signed out, a 2-day-old nonce still signs in, signs up, volunteers, subscribes, requests an edit link, submits and withdraws an event, while honeypots, missing nonces and signed-in nonces are still refused; guest edit links open (plain and pretty permalinks). Creates and deletes its own pages, events and user; restores settings. |
 | `snap.php` | `wp eval-file tests/snap.php <dir>` saves the public month calendar's HTML for 12 cases. Run it before and after any change to `CEC_Month_Grid` and `diff -r` the two folders: they must be identical unless the change is meant to alter the markup (then check every difference is intended). |
 | `shots.js` | `node tests/shots.js <outdir> <member-page-id>` (Playwright): screenshots of each member-area state and a horizontal-overflow check at 320/375/768/1440 px. Expects users `unv`, `att`, `mem` (password `pass1234`) in the matching states. |
+
+If wordpress.org can't be reached (some sandboxes only allow GitHub), clone WordPress from `https://github.com/WordPress/WordPress.git --branch <latest x.y.z tag>` into `$WPTEST/wordpress` and the SQLite plugin from `https://github.com/WordPress/sqlite-database-integration.git --branch <tag>` (its plugin is in `packages/plugin-sqlite-database-integration`), do the `wp-config.php` / `core install` steps from `setup.sh` by hand, then run `setup.sh` as usual.
 
 The test site runs on `http://localhost:8899` via `php -S 127.0.0.1:8899 -t $WPTEST/wordpress` (e2e.sh starts and stops it).
 

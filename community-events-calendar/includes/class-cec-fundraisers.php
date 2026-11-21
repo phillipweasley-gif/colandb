@@ -95,7 +95,7 @@ class CEC_Fundraisers {
 	}
 
 	/**
-	 * 1.52.0: adds one donation from code (the COL&B Silent Auction plugin
+	 * 1.54.0: adds one donation from code (the COL&B Silent Auction plugin
 	 * adds each paid auction order). Same rules as the wp-admin box; the
 	 * totals and the pages showing them are refreshed. Returns false when
 	 * $id isn't a fundraiser or the amount isn't a positive amount.
@@ -508,7 +508,7 @@ class CEC_Fundraisers {
 }
 
 /**
- * 1.52.0: public helpers for other COL&B plugins (the silent auction).
+ * 1.54.0: public helpers for other COL&B plugins (the silent auction).
  */
 
 /** Fundraisers (published or draft) as id => title, newest first. */

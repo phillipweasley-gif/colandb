@@ -320,6 +320,8 @@ class CMP_Messages {
 			CMP_Follows::remove_pair( $user_id, $them );
 			CMP_Nods::remove_pair( $user_id, $them );
 			CMP_Audit::log( 'member_blocked', 'user', $them );
+			// "They aren't told" (0.39.0): no notices from what ends with it either, e.g. a wearer's lock becoming a self-lock.
+			CMP_Notifications::$muted = true;
 			$d = CMP_Install::table( 'dynamics' );
 			foreach ( $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $d WHERE status IN ('pending','active') AND ( ( proposer_id = %d AND partner_id = %d ) OR ( proposer_id = %d AND partner_id = %d ) )", $user_id, $them, $them, $user_id ) ) as $dyn ) { // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$was = $dyn->status;
@@ -330,6 +332,7 @@ class CMP_Messages {
 				}
 			}
 			CMP_Dynamics::close_addons( $user_id, $them, $user_id );
+			CMP_Notifications::$muted = false;
 		}
 		self::go( array(), 'msg_blocked' );
 	}

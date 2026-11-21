@@ -6,7 +6,7 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 
 ---
 
-## 1.52.0
+## 1.54.0
 
 **Silent auction proceeds on the Fundraising page** (owner, 2026-11-11: "a fundraising section that allows for a silent auction using the wordpress/WooCommerce integration"; chose the COL&B Silent Auction plugin, whose paid orders count toward a fundraiser).
 
@@ -15,6 +15,18 @@ Custom WordPress plugin. Not a git repo — this file is the change history in l
 - Nothing public changes: the cards still show only the total, goal, percentage and count.
 
 **Verified** in the local WordPress kit: `tests/fundraisers-e2e.sh` 21/21; `tests/form-cache-e2e.sh` 36/36 (with WooCommerce and the auction plugin active); the new `tests/auction-e2e.sh` (67/67) pays an auction order and checks the fundraiser total, the "Silent auction" entry, that it's counted once, and the Fundraising page. Month view untouched.
+- Numbered 1.54.0: first drafted as 1.52.0, then renumbered after merging `main`, which had released 1.53.0 (Ohio-only upcoming events) in the meantime. The two changes touch different files. Merged with 1.53.0 and re-checked as below.
+
+## 1.53.0
+
+**Homepage upcoming events: Ohio only** (owner, 2026-11-21: "filter out any event not in Ohio and only display dates with events").
+
+- The scrolling "Check out our upcoming events" strip (`[cec_upcoming]`) now shows only in-person events in Ohio. Out-of-state events (e.g. the Mr. Lake Ontario Leather weekend in Toronto), online events and events whose place can't be read are left out. The place is read the same way as the calendar's State filter (1.49.0, `CEC_Locations::for_event()`), so "OH", "Ohio" and one-line addresses all count.
+- The strip still fills up to its count (8 by default) by looking further ahead, so it only ever shows cards for dates that have Ohio events, never empty or short.
+- New setting, Events → Settings → **"Upcoming Events" only in** (default Ohio; blank shows everywhere). The shortcode also takes `region="Indiana"` or `region=""` to override it.
+- Numbered 1.53.0 because 1.52.0 is already used by the unmerged silent auction branch.
+
+**Verified** in the local WordPress kit: new `tests/upcoming-e2e.sh`, 15/15 (Ohio only and in date order, Toronto/Chicago/Indiana/online/unreadable left out, filled to its count, `region=""`, other states and provinces, the setting saved and blank, no plugin warnings). `php -l` clean. The calendar month view is untouched, so no `snap.php` comparison was needed.
 
 ## 1.51.0
 
