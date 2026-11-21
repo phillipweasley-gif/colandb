@@ -1,0 +1,71 @@
+/* COL&B Silent Auction 0.1.0: [csa_auction]. Same look as the events plugin's
+   fundraising cards (fundraisers.css). Visual properties of links, buttons and
+   inputs use !important because the theme styles them globally. */
+
+.csa-wrap {
+	--csa-pink: #FF50D7;
+	--csa-lime: #E1F577;
+	--csa-ink: #100F0F;
+	--csa-panel: #1A1A1A;
+	--csa-line: #2E2B33;
+	--csa-text: #FFFFFF;
+	--csa-muted: #CCCCCC;
+	--csa-bad: #FF8A8A;
+	max-width: 75rem;
+	margin: 0 auto 4rem;
+	color: var(--csa-text);
+	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	box-sizing: border-box;
+}
+.csa-wrap * { box-sizing: border-box; }
+.csa-auction + .csa-auction { margin-top: 4rem; }
+.csa-head { margin-bottom: 2rem; padding: 1.5rem; background: var(--csa-panel); border-left: 4px solid var(--csa-pink); }
+.csa-title { margin: 0 0 0.5rem; font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 800 !important; text-transform: uppercase; color: var(--csa-pink) !important; overflow-wrap: anywhere; }
+.csa-when { margin: 0 0 0.5rem; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--csa-lime); }
+.csa-countdown:not(:empty)::before { content: "· "; }
+.csa-for, .csa-terms, .csa-pickup, .csa-signin { margin: 0.5rem 0 0; color: var(--csa-muted); }
+.csa-signin a, .csa-pickup a { color: var(--csa-lime) !important; text-decoration: underline !important; }
+.csa-notice { margin: 0.75rem 0 0; color: var(--csa-lime); }
+.csa-terms-full { margin-top: 1rem; color: var(--csa-muted); font-size: 0.9rem; }
+.csa-terms-full summary { cursor: pointer; font-weight: 700; color: var(--csa-text); }
+.csa-terms-full p { margin: 0.5rem 0 0; }
+.csa-min a { color: var(--csa-muted) !important; text-decoration: underline !important; }
+.csa-desc { color: var(--csa-muted); font-size: 0.95rem; line-height: 1.55; }
+.csa-desc > :first-child { margin-top: 0; }
+.csa-desc > :last-child { margin-bottom: 0; }
+.csa-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: 1.5rem; }
+.csa-item { display: flex; flex-direction: column; background: var(--csa-panel); border: 1px solid var(--csa-pink); overflow: hidden; scroll-margin-top: 6rem; }
+.csa-item.is-closed { border-color: #444; }
+.csa-media { aspect-ratio: 4 / 3; overflow: hidden; background: #000; }
+.csa-media img, .csa-photo { display: block; width: 100% !important; height: 100% !important; object-fit: cover; }
+.csa-body { display: flex; flex-direction: column; gap: 0.75rem; padding: 1.5rem; flex: 1; }
+.csa-item-title { margin: 0; font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 800 !important; font-size: 1.2rem; text-transform: uppercase; color: var(--csa-text) !important; overflow-wrap: anywhere; }
+.csa-meta { margin: 0; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--csa-lime); }
+.csa-price { margin: 0; color: var(--csa-muted); }
+.csa-price strong { color: var(--csa-text); font-size: 1.35rem; font-family: 'Montserrat', 'Arial Black', sans-serif; font-weight: 800; }
+.csa-you { margin: 0; font-weight: 700; }
+.csa-you.is-top { color: var(--csa-lime); }
+.csa-you.is-outbid { color: var(--csa-bad); }
+.csa-msg { margin: 0; padding: 0.6rem 0.8rem; border-left: 4px solid var(--csa-lime); background: #222; }
+.csa-msg.is-error { border-left-color: var(--csa-bad); }
+.csa-extended { margin: 0; font-size: 0.9rem; color: var(--csa-lime); }
+.csa-bid { margin: auto 0 0; padding-top: 0.25rem; }
+.csa-bid label { display: block; margin-bottom: 0.35rem; font-weight: 700; }
+.csa-bid-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.csa-bid input[type="number"] {
+	flex: 1 1 8rem; min-width: 0; padding: 0.7rem 0.8rem !important; font-size: 1.05rem !important;
+	background: #000 !important; color: var(--csa-text) !important; border: 1px solid #666 !important; border-radius: 0 !important;
+}
+.csa-bid input[type="number"]:focus-visible { outline: 3px solid var(--csa-lime); outline-offset: 1px; }
+.csa-min { margin: 0.35rem 0 0; font-size: 0.85rem; color: var(--csa-muted); }
+.csa-buy { margin: 0; }
+.csa-give { margin: auto 0 0; }
+a.csa-btn, button.csa-btn, .csa-btn {
+	display: inline-block !important; padding: 0.8rem 1.4rem !important; background: var(--csa-pink) !important; color: var(--csa-ink) !important; cursor: pointer;
+	font-family: 'Montserrat', 'Arial Black', sans-serif !important; font-weight: 900 !important; font-size: 0.9rem !important; line-height: 1.2 !important;
+	letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none !important; border: 0 !important; border-radius: 0 !important;
+}
+.csa-btn.is-secondary { background: transparent !important; color: var(--csa-lime) !important; border: 2px solid var(--csa-lime) !important; }
+a.csa-btn:hover, button.csa-btn:hover, .csa-btn:focus-visible { background: var(--csa-lime) !important; color: var(--csa-ink) !important; }
+.csa-btn:focus-visible { outline: 3px solid var(--csa-lime); outline-offset: 2px; }
+.csa-empty { text-align: center; color: var(--csa-muted); }
